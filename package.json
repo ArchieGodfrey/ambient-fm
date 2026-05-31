@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --cwd apps/pwa run dev",
-    "build": "bun --cwd apps/pwa run build",
-    "preview": "bun --cwd apps/pwa run preview",
+    "dev": "cd apps/pwa && bun run dev",
+    "build": "cd apps/pwa && bun run build",
+    "preview": "cd apps/pwa && bun run preview",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
