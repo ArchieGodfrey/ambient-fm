@@ -3,6 +3,8 @@ import { startAudio, stopAudio } from "../audio/toneEngine";
 import { generateComposition, fallbackComposition } from "../ai/composer";
 import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop } from "../audio/compositionRuntime";
 import { postToast } from "../utils/toast";
+import { db } from "../db/db";
+import { analyzeSession } from "../memory/analyzeSession";
 import type { CompositionPlan } from "../ai/types";
 import type { StimulusEvent } from "../types";
 
@@ -12,10 +14,27 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
   const [status, setStatus] = useState("Ready");
   const [plan, setPlan] = useState<CompositionPlan | null>(null);
 
+  async function endSession(events: StimulusEvent[], plan: CompositionPlan | null) {
+    if (!plan) {
+      return;
+    }
+
+    try {
+      const summary = analyzeSession(crypto.randomUUID(), events, plan);
+      await db.sessions.add(summary);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("session-saved"));
+      }
+    } catch (error) {
+      console.error("Failed to save session summary", error);
+    }
+  }
+
   async function handlePlayToggle() {
     if (isPlaying) {
       stopAudio();
       stopRuntimeLoop();
+      await endSession(events, plan);
       setIsPlaying(false);
       setStatus("Audio stopped");
       return;

@@ -28,8 +28,26 @@ export default function ModelActions({
   onDelete,
   onResetRuntime,
 }: ModelActionsProps) {
+  const primaryLabel = !modelDownloaded
+    ? "Download Model"
+    : modelLoaded
+    ? "Unload Model"
+    : "Load Model";
+
+  const handlePrimaryAction = () => {
+    if (!modelDownloaded) {
+      onDownload();
+      return;
+    }
+    if (modelLoaded) {
+      onUnload();
+      return;
+    }
+    onLoad();
+  };
+
   return (
-    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+    <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
         Model:
         <select
@@ -44,16 +62,15 @@ export default function ModelActions({
           ))}
         </select>
       </label>
-      <button type="button" onClick={onDownload} disabled={modelLoaded} style={{ fontSize: 14, padding: "10px 16px" }}>
-        Download Model
+      <button type="button" onClick={handlePrimaryAction} style={{ fontSize: 14, padding: "10px 16px" }}>
+        {primaryLabel}
       </button>
-      <button type="button" onClick={onLoad} disabled={modelLoaded} style={{ fontSize: 14, padding: "10px 16px" }}>
-        Load Model
-      </button>
-      <button type="button" onClick={onUnload} disabled={!modelLoaded} style={{ fontSize: 14, padding: "10px 16px" }}>
-        Unload Model
-      </button>
-      <button type="button" onClick={onDelete} disabled={!modelDownloaded || modelLoaded} style={{ fontSize: 14, padding: "10px 16px" }}>
+      <button
+        type="button"
+        onClick={onDelete}
+        disabled={!modelDownloaded || modelLoaded}
+        style={{ fontSize: 14, padding: "10px 16px" }}
+      >
         Delete Model Cache
       </button>
       <button type="button" onClick={onResetRuntime} style={{ fontSize: 14, padding: "10px 16px" }}>

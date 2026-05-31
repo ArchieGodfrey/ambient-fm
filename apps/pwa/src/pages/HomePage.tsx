@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { nanoid } from "nanoid";
 import { buildStimulusSnapshot } from "../stimuli/buildStimulusSnapshot";
 import { db } from "../db/db";
+import { getSessionHistory } from "../memory/getMemoryContext";
+import type { SessionSummary } from "../memory/types";
 import { useAppStore } from "../store/useAppStore";
 import Toasts from "../components/Toasts";
 import StatusBar from "../components/StatusBar";
-import TimelinePage from "./TimelinePage";
 import MainActions from "../components/MainActions";
 import ModelActions from "../components/ModelActions";
 import MoodButtons from "../components/MoodButtons";
@@ -58,6 +59,7 @@ export default function HomePage() {
     drift: 0,
     planDuration: 0,
   });
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const displayStatus = progressText ?? modelStatus ?? audioStatus ?? appStatus;
 
@@ -76,8 +78,27 @@ export default function HomePage() {
     }
   }
 
+  async function loadSessions() {
+    try {
+      const history = await getSessionHistory();
+      setSessions(history);
+    } catch (error) {
+      console.error("Failed to load session history", error);
+    }
+  }
+
   useEffect(() => {
     loadEvents();
+    loadSessions();
+
+    const handleSessionSaved = () => {
+      loadSessions();
+    };
+
+    window.addEventListener("session-saved", handleSessionSaved);
+    return () => {
+      window.removeEventListener("session-saved", handleSessionSaved);
+    };
   }, []);
 
   useEffect(() => {
@@ -134,18 +155,15 @@ export default function HomePage() {
       <OffscreenCanvasHost onPayloadChange={setWorkerInitPayload} />
       <Toasts toasts={toasts} />
       <h1>Ambient FM</h1>
-      <p style={{ margin: "0 0 16px" }}>
-        Tap play once, then log mood or refresh the environment.
-      </p>
 
       <MainActions
         isPlaying={isPlaying}
         refreshing={refreshing}
         aiReady={aiStatus === "Ready" && modelLoaded}
+        modelLoaded={modelLoaded}
         onPlayToggle={handlePlayToggle}
         onRefresh={refreshStimuli}
         onGenerate={runAIComposer}
-        onToggleMonitor={() => window.dispatchEvent(new CustomEvent('toggle-monitor'))}
       />
 
       <ModelActions
@@ -199,7 +217,24 @@ export default function HomePage() {
         activeSection={runtimeState.activeSection}
       />
 
-      <TimelinePage />
+      <section style={{ marginTop: 24, padding: 18, borderRadius: 14, background: "#f4f6fb", border: "1px solid rgba(0,0,0,0.05)" }}>
+        <h2 style={{ margin: "0 0 10px", fontSize: 18 }}>Recent Sessions</h2>
+        {sessions.length ? (
+          <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+            {sessions.slice(0, 5).map((session) => (
+              <li key={session.id}>
+                {session.dominantMood} — {Math.round(session.avgBpm)} BPM — {session.key}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ margin: 0, color: "#555" }}>No saved session memory yet.</p>
+        )}
+      </section>
+
+      <p style={{ marginTop: 20, fontSize: 13, color: "#555" }}>
+        Use the bottom tabs to switch to Timeline or Sessions pages.
+      </p>
     </div>
   );
 }

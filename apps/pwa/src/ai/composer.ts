@@ -9,6 +9,8 @@ import { MLLayer } from "../runtime/ml/MLLayer";
 import { RuntimeKernel } from "../runtime/core/RuntimeKernel";
 import { Scheduler } from "../runtime/core/Scheduler";
 import { assertColdStart, checkMemorySafety } from "../runtime/guards/safariGuards";
+import { getMemoryContext, getLastSessionSummaries } from "../memory/getMemoryContext";
+import { applyMemoryBias } from "../memory/applyMemoryBias";
 
 type ToastType = "info" | "success" | "warning" | "error";
 
@@ -202,7 +204,7 @@ export function isModelLoaded() {
   return loadedModel;
 }
 
-function buildPrompt(events: StimulusEvent[]) {
+function buildPrompt(events: StimulusEvent[], memoryContext: string) {
   return `
 You are an ambient music composer.
 
@@ -216,6 +218,10 @@ RULES:
 - Use 3 to 5 sequential sections
 - Ensure sections are non-overlapping and each has start/duration/intensity/mood
 - Set duration to cover the end of the final section
+- You should slightly vary today’s composition while respecting past mood trends.
+- Avoid repeating identical keys or BPM patterns unless strongly justified by stimuli.
+
+${memoryContext}
 
 STIMULUS EVENTS:
 ${events
@@ -414,7 +420,8 @@ export async function generateComposition(events: StimulusEvent[]) {
     throw new Error("Model not loaded. Load the model before generating a composition.");
   }
 
-  const prompt = buildPrompt(events);
+  const memoryContext = await getMemoryContext();
+  const prompt = buildPrompt(events, memoryContext);
   dispatchRuntimeStatus({ stage: "infer-start", text: "Starting AI composition generation" });
 
   try {
@@ -431,8 +438,10 @@ export async function generateComposition(events: StimulusEvent[]) {
     let recovered: string | null = null;
     try {
       const plan = tryParseJsonWithRecovery(sanitized) as CompositionPlan;
+      const sessions = await getLastSessionSummaries();
+      const biasedPlan = applyMemoryBias(plan, sessions);
       dispatchRuntimeStatus({ stage: "infer-ready", text: "Composition ready" });
-      return plan;
+      return biasedPlan;
     } catch (parseError) {
       recovered = escapeJsonStringLiterals(sanitized);
       const errorMessage = `Failed to parse AI JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}\nSanitized text:\n${sanitized}\nRecovered text:\n${recovered}\nRaw response:\n${text}`;
