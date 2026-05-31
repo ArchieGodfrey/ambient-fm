@@ -1,0 +1,29 @@
+{
+  "name": "bun-react-template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --cwd apps/pwa run dev",
+    "build": "bun --cwd apps/pwa run build",
+    "preview": "bun --cwd apps/pwa run preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.84",
+    "bun-plugin-tailwind": "^0.1.2",
+    "dexie": "^4.4.3",
+    "nanoid": "^5.1.11",
+    "react": "^19",
+    "react-dom": "^19",
+    "tailwindcss": "^4.1.11",
+    "tone": "^15.1.22",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/bun": "latest"
+  }
+}
