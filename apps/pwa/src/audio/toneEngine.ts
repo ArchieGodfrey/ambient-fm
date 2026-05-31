@@ -1,24 +1,16 @@
 import * as Tone from "tone";
+import { initAudioGraph } from "./audioGraph";
 
 let started = false;
 let playing = false;
-let synth: Tone.Synth | null = null;
-let filter: Tone.Filter | null = null;
-let reverb: Tone.Reverb | null = null;
+let suspended = false;
+let transportWasPlayingBeforeSuspend = false;
 
 export async function startAudio() {
   if (!started) {
     await Tone.start();
     started = true;
-
-    filter = new Tone.Filter(800, "lowpass").toDestination();
-    reverb = new Tone.Reverb(3).connect(filter);
-    reverb.wet.value = 0.4;
-
-    synth = new Tone.Synth().connect(reverb);
-    new Tone.Loop((time) => {
-      synth?.triggerAttackRelease("C4", "8n", time);
-    }, "4n").start(0);
+    initAudioGraph();
   }
 
   if (!playing) {
@@ -35,16 +27,42 @@ export function stopAudio() {
   }
 
   playing = false;
+  suspended = false;
+  transportWasPlayingBeforeSuspend = false;
 }
 
-export function updateAudio(state: {
-  bpm: number;
-  filterCutoff: number;
-  reverbMix: number;
-}) {
-  if (!filter || !reverb) return;
+export async function suspendAudio() {
+  if (suspended) {
+    return;
+  }
 
-  filter.frequency.value = state.filterCutoff;
-  Tone.Transport.bpm.value = state.bpm;
-  reverb.wet.value = Math.min(Math.max(state.reverbMix, 0), 1);
+  transportWasPlayingBeforeSuspend = Tone.Transport.state === "started";
+  if (transportWasPlayingBeforeSuspend) {
+    Tone.Transport.pause();
+  }
+
+  const ctx = Tone.context as unknown as { suspend?: () => Promise<void> };
+  if (ctx && typeof ctx.suspend === "function") {
+    await ctx.suspend();
+  }
+
+  suspended = true;
+}
+
+export async function resumeAudio() {
+  if (!suspended) {
+    return;
+  }
+
+  const ctx = Tone.context as unknown as { resume?: () => Promise<void> };
+  if (ctx && typeof ctx.resume === "function") {
+    await ctx.resume();
+  }
+
+  if (transportWasPlayingBeforeSuspend) {
+    Tone.Transport.start();
+  }
+
+  suspended = false;
+  transportWasPlayingBeforeSuspend = false;
 }

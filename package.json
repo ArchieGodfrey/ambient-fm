@@ -22,8 +22,10 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@types/bun": "latest",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/bun": "latest"
+    "vite": "^8.0.14",
+    "vite-plugin-mkcert": "^2.0.0"
   }
 }

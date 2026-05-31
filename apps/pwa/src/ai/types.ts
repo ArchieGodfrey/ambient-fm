@@ -15,4 +15,10 @@ export interface CompositionPlan {
     brightness: number;
     reverbAmount: number;
   };
+  layers: {
+    drone: number;
+    pad: number;
+    texture: number;
+    pulse: number;
+  };
 }
