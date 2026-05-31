@@ -3,6 +3,7 @@ export interface CompositionSection {
   duration: number;
   mood: "calm" | "focused" | "tense" | "ambient" | "energised";
   intensity: number;
+  phraseIds: string[];
 }
 
 export interface Motif {
@@ -10,6 +11,14 @@ export interface Motif {
   layer: "pad" | "pulse" | "texture";
   notes: string[];
   rhythm: number[];
+}
+
+export interface Phrase {
+  id: string;
+  motifs: string[];
+  length: number;
+  variation: number;
+  role: "build" | "release" | "static" | "transition";
 }
 
 export interface CompositionPlan {
@@ -30,4 +39,5 @@ export interface CompositionPlan {
     pulse: number;
   };
   motifs: Motif[];
+  phrases: Phrase[];
 }

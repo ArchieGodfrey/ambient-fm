@@ -11,6 +11,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       includeAssets: ['favicon.svg', 'manifest.webmanifest'],
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico,png,txt,webmanifest}'],
         cleanupOutdatedCaches: true,
@@ -65,7 +69,7 @@ export default defineConfig({
         name: 'Ambient FM',
         short_name: 'AmbientFM',
         description: 'A minimal ambient audio PWA.',
-        start_url: '/index.html',
+        start_url: '.',
         scope: '/',
         display: 'standalone',
         background_color: '#0f172a',

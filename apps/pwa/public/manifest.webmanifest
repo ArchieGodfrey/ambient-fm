@@ -3,6 +3,7 @@
   "short_name": "AmbientFM",
   "description": "A minimal ambient audio PWA for iOS.",
   "start_url": ".",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",

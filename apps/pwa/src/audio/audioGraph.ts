@@ -25,6 +25,7 @@ function normalizeCompositionPlan(plan: CompositionPlan): CompositionPlan {
         duration: clampNumber(section.duration, 0, 0),
         mood: section.mood,
         intensity: clampNumber(section.intensity, 0.5, 0, 1),
+        phraseIds: Array.isArray(section.phraseIds) ? section.phraseIds : [],
       }))
     : [];
 
@@ -50,6 +51,7 @@ function normalizeCompositionPlan(plan: CompositionPlan): CompositionPlan {
       pulse: clampNumber(plan.layers?.pulse, 0.5, 0, 1),
     },
     motifs: Array.isArray(plan.motifs) ? plan.motifs : [],
+    phrases: Array.isArray(plan.phrases) ? plan.phrases : [],
   };
 }
 

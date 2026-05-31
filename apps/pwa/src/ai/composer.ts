@@ -220,10 +220,13 @@ RULES:
 - Set duration to cover the end of the final section
 - You should slightly vary today’s composition while respecting past mood trends.
 - Avoid repeating identical keys or BPM patterns unless strongly justified by stimuli.
-- Do NOT ask for a full composition. Only generate motif seeds and the plan metadata.
+- Do NOT ask for a full composition. Only generate motif seeds, phrase structure, and the plan metadata.
 - Also generate 2–4 musical motifs.
 - Each motif must be short (2–5 notes), assigned to a layer (pad, pulse, or texture), and use a simple rhythmic structure.
-- Keep the motif output minimal.
+- Also generate 2–3 phrases.
+- Each phrase should group 1–3 motifs, have a role (build, release, static, transition), and variation between 0 and 1.
+- Sections must reference one or more phrase IDs.
+- Keep the output minimal and avoid unnecessary extra detail.
 
 ${memoryContext}
 
@@ -245,7 +248,8 @@ OUTPUT FORMAT:
       "start": number,
       "duration": number,
       "mood": "calm | focused | tense | ambient | energised",
-      "intensity": number
+      "intensity": number,
+      "phraseIds": ["string"]
     }
   ],
   "texture": {
@@ -266,6 +270,15 @@ OUTPUT FORMAT:
       "notes": ["C4", "E4"],
       "rhythm": [1, 0.5]
     }
+  ],
+  "phrases": [
+    {
+      "id": "string",
+      "motifs": ["string"],
+      "length": number,
+      "variation": number,
+      "role": "build | release | static | transition"
+    }
   ]
 }
 `;
@@ -277,7 +290,22 @@ export function fallbackComposition(): CompositionPlan {
     bpm: 70,
     duration: 30,
     globalMood: "fallback",
-    sections: [],
+    sections: [
+      {
+        start: 0,
+        duration: 15,
+        mood: "calm",
+        intensity: 0.4,
+        phraseIds: ["phrase-1"],
+      },
+      {
+        start: 15,
+        duration: 15,
+        mood: "focused",
+        intensity: 0.7,
+        phraseIds: ["phrase-2"],
+      },
+    ],
     texture: {
       density: 0.5,
       brightness: 0.5,
@@ -307,6 +335,22 @@ export function fallbackComposition(): CompositionPlan {
         layer: "texture",
         notes: ["G3", "B3"],
         rhythm: [1, 0.5, 0.5],
+      },
+    ],
+    phrases: [
+      {
+        id: "phrase-1",
+        motifs: ["pad-1", "texture-1"],
+        length: 15,
+        variation: 0.1,
+        role: "static",
+      },
+      {
+        id: "phrase-2",
+        motifs: ["pad-1", "pulse-1"],
+        length: 15,
+        variation: 0.3,
+        role: "build",
       },
     ],
   };

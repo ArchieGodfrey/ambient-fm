@@ -2,10 +2,12 @@ import Dexie from "dexie";
 import type { Table } from "dexie";
 import type { StimulusEvent } from "../types";
 import type { SessionSummary } from "../memory/types";
+import type { RuntimeSnapshot } from "../memory/runtimeSnapshots";
 
 class AmbientDB extends Dexie {
   events!: Table<StimulusEvent, string>;
   sessions!: Table<SessionSummary, string>;
+  runtimeSnapshots!: Table<RuntimeSnapshot, string>;
 
   constructor() {
     super("ambient_db");
@@ -22,6 +24,12 @@ class AmbientDB extends Dexie {
     this.version(3).stores({
       events: "id, timestamp",
       sessions: "id, timestamp, dominantMood"
+    });
+
+    this.version(4).stores({
+      events: "id, timestamp",
+      sessions: "id, timestamp, dominantMood",
+      runtimeSnapshots: "id, timestamp"
     });
   }
 }

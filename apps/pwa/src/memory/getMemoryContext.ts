@@ -12,7 +12,7 @@ export async function getMemoryContext() {
   return [
     "PAST SESSIONS CONTEXT:",
     ...last.map((session) =>
-      `Mood:${session.dominantMood}, BPM:${Math.round(session.avgBpm)}, Key:${session.key}, Motifs:${session.motifCount}, DominantMotifLayer:${session.dominantMotifLayer}`,
+      `Mood:${session.dominantMood}, BPM:${Math.round(session.avgBpm)}, Key:${session.key}, Motifs:${session.motifCount}, DominantMotifLayer:${session.dominantMotifLayer}, DominantPhraseType:${session.dominantPhraseType}, PhraseTransitions:${session.phraseTransitionFrequency.toFixed(2)}`,
     ),
   ].join("\n");
 }

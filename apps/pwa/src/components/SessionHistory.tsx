@@ -36,6 +36,8 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
                 <div>Key: {session.key}</div>
                 <div>Motifs: {session.motifCount}</div>
                 <div>Dominant motif: {session.dominantMotifLayer}</div>
+                <div>Dominant phrase: {session.dominantPhraseType}</div>
+                <div>Transitions: {session.phraseTransitionFrequency.toFixed(2)}</div>
               </div>
               <div style={{ fontSize: 13, color: "#333" }}>
                 Layers: drone {session.layerProfile.drone.toFixed(2)}, pad {session.layerProfile.pad.toFixed(2)}, texture {session.layerProfile.texture.toFixed(2)}, pulse {session.layerProfile.pulse.toFixed(2)}

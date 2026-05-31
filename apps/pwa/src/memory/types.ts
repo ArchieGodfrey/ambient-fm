@@ -21,4 +21,6 @@ export interface SessionSummary {
 
   motifCount: number;
   dominantMotifLayer: "pad" | "pulse" | "texture" | "none";
+  dominantPhraseType: "build" | "release" | "static" | "transition" | "none";
+  phraseTransitionFrequency: number;
 }

@@ -12,6 +12,10 @@ type Props = {
   activeSection?: { mood: string } | null;
   runtimeIntensity?: number;
   runtimeDrift?: number;
+  runtimeUptime?: number;
+  frameDelay?: number;
+  audioRestartCount?: number;
+  snapshotCount?: number;
 };
 
 const diagnosticsStyle: CSSProperties = {
@@ -27,7 +31,7 @@ const labelStyle: CSSProperties = {
   marginBottom: 8,
 };
 
-export default function RuntimeDiagnostics({ gpuStatus, gpuLimits, heapUsage, runtimeCursor, activeSection, runtimeIntensity, runtimeDrift }: Props) {
+export default function RuntimeDiagnostics({ gpuStatus, gpuLimits, heapUsage, runtimeCursor, activeSection, runtimeIntensity, runtimeDrift, runtimeUptime, frameDelay, audioRestartCount, snapshotCount }: Props) {
   return (
     <div style={diagnosticsStyle}>
       <div style={labelStyle}>Runtime diagnostics</div>
@@ -48,6 +52,10 @@ export default function RuntimeDiagnostics({ gpuStatus, gpuLimits, heapUsage, ru
         <div><strong>Active Section:</strong> {activeSection?.mood ?? "None"}</div>
         <div><strong>Intensity:</strong> {runtimeIntensity?.toFixed(2) ?? "0.00"}</div>
         <div><strong>Drift:</strong> {runtimeDrift?.toFixed(3) ?? "0.000"}</div>
+        <div><strong>Uptime:</strong> {runtimeUptime?.toFixed(1) ?? "0.0"}s</div>
+        <div><strong>Frame delay:</strong> {frameDelay?.toFixed(1) ?? "0.0"}ms</div>
+        <div><strong>Audio restarts:</strong> {audioRestartCount ?? 0}</div>
+        <div><strong>Snapshot count:</strong> {snapshotCount ?? 0}</div>
       </div>
       <div style={{ fontSize: 14, marginTop: 8 }}>JS Heap: {heapUsage ?? "Unavailable"}</div>
     </div>

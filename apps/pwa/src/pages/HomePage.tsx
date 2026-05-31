@@ -52,13 +52,21 @@ export default function HomePage() {
     handlePlayToggle,
     runAIComposer,
     loadSessionPlan,
+    restoreSession,
   } = useAudioComposer(events, modelLoaded);
   const [runtimeState, setRuntimeState] = useState<CompositionRuntimeSnapshot>({
     cursor: 0,
     activeSection: null,
+    activePhrase: null,
     intensity: 0,
     drift: 0,
     planDuration: 0,
+    sectionTimeRemaining: 0,
+    activeMotifs: 0,
+    runtimeUptime: 0,
+    frameDelay: 0,
+    audioRestartCount: 0,
+    snapshotCount: 0,
   });
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -89,8 +97,13 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    loadEvents();
-    loadSessions();
+    async function init() {
+      await loadEvents();
+      await loadSessions();
+      await restoreSession();
+    }
+
+    init();
 
     const handleSessionSaved = () => {
       loadSessions();
@@ -205,6 +218,10 @@ export default function HomePage() {
         activeSection={runtimeState.activeSection}
         runtimeIntensity={runtimeState.intensity}
         runtimeDrift={runtimeState.drift}
+        runtimeUptime={runtimeState.runtimeUptime}
+        frameDelay={runtimeState.frameDelay}
+        audioRestartCount={runtimeState.audioRestartCount}
+        snapshotCount={runtimeState.snapshotCount}
       />
 
       <MoodButtons onAddMood={addMood} />
@@ -216,6 +233,8 @@ export default function HomePage() {
         plan={plan}
         runtimeCursor={runtimeState.cursor}
         activeSection={runtimeState.activeSection}
+        currentPhraseRole={runtimeState.activePhrase?.role ?? null}
+        sectionTimeRemaining={runtimeState.sectionTimeRemaining}
       />
 
       <section style={{ marginTop: 24, padding: 18, borderRadius: 14, background: "#f4f6fb", border: "1px solid rgba(0,0,0,0.05)" }}>

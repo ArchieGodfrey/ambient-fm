@@ -5,6 +5,7 @@ import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop } from "../a
 import { postToast } from "../utils/toast";
 import { db } from "../db/db";
 import { analyzeSession } from "../memory/analyzeSession";
+import { restoreRuntime } from "../runtime/restoreRuntime";
 import type { CompositionPlan } from "../ai/types";
 import type { StimulusEvent } from "../types";
 
@@ -110,6 +111,25 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
     startRuntimeLoop();
   }
 
+  async function restoreSession() {
+    try {
+      const snapshot = await restoreRuntime();
+      if (!snapshot) {
+        return null;
+      }
+
+      setPlan(snapshot.plan);
+      setIsPlaying(true);
+      setStatus("Session restored");
+      setCurrentSessionSaved(true);
+      startRuntimeLoop();
+      return snapshot;
+    } catch (error) {
+      console.error("Failed to restore session", error);
+      return null;
+    }
+  }
+
   return {
     isPlaying,
     aiStatus,
@@ -118,5 +138,6 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
     handlePlayToggle,
     runAIComposer,
     loadSessionPlan,
+    restoreSession,
   };
 }
