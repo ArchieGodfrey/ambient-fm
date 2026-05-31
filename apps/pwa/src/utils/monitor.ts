@@ -47,7 +47,7 @@ function getMemoryInfoFallback(): MemoryInfo | null {
 
 export function createMonitor() {
   const el = document.createElement("div");
-  let visible = true;
+  let visible = false;
 
   el.style.cssText = `
     position: fixed;

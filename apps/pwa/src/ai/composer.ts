@@ -213,6 +213,9 @@ RULES:
 - Do NOT include explanations, markdown fences, backticks, or any extra text
 - Do NOT wrap the JSON in quotes, code blocks, or markdown formatting
 - Only output the JSON object, nothing else
+- Use 3 to 5 sequential sections
+- Ensure sections are non-overlapping and each has start/duration/intensity/mood
+- Set duration to cover the end of the final section
 
 STIMULUS EVENTS:
 ${events
@@ -225,6 +228,7 @@ OUTPUT FORMAT:
 {
   "key": "string",
   "bpm": number,
+  "duration": number,
   "globalMood": "string",
   "sections": [
     {
@@ -253,6 +257,7 @@ export function fallbackComposition(): CompositionPlan {
   return {
     key: "C minor",
     bpm: 70,
+    duration: 30,
     globalMood: "fallback",
     sections: [],
     texture: {

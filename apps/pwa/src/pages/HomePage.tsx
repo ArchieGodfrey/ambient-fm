@@ -16,6 +16,7 @@ import useToastEvents from "../hooks/useToastEvents";
 import useModelManager from "../hooks/useModelManager";
 import useAudioComposer from "../hooks/useAudioComposer";
 import { getAvailableModels, getSelectedModelId, selectModel } from "../ai/composer";
+import { subscribeRuntimeState, type CompositionRuntimeSnapshot } from "../audio/compositionRuntime";
 import { postToast } from "../utils/toast";
 import type { StimulusEvent } from "../types";
 
@@ -50,6 +51,13 @@ export default function HomePage() {
     handlePlayToggle,
     runAIComposer,
   } = useAudioComposer(events, modelLoaded);
+  const [runtimeState, setRuntimeState] = useState<CompositionRuntimeSnapshot>({
+    cursor: 0,
+    activeSection: null,
+    intensity: 0,
+    drift: 0,
+    planDuration: 0,
+  });
   const [refreshing, setRefreshing] = useState(false);
   const displayStatus = progressText ?? modelStatus ?? audioStatus ?? appStatus;
 
@@ -70,6 +78,11 @@ export default function HomePage() {
 
   useEffect(() => {
     loadEvents();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeRuntimeState(setRuntimeState);
+    return unsubscribe;
   }, []);
 
   // Audio and AI composition are managed by useAudioComposer.
@@ -165,11 +178,26 @@ export default function HomePage() {
         modelProgress={modelProgress}
       />
 
-      <RuntimeDiagnostics gpuStatus={gpuStatus} gpuLimits={gpuLimits} heapUsage={heapUsage} />
+      <RuntimeDiagnostics
+        gpuStatus={gpuStatus}
+        gpuLimits={gpuLimits}
+        heapUsage={heapUsage}
+        runtimeCursor={runtimeState.cursor}
+        activeSection={runtimeState.activeSection}
+        runtimeIntensity={runtimeState.intensity}
+        runtimeDrift={runtimeState.drift}
+      />
 
       <MoodButtons onAddMood={addMood} />
 
-      <CompositionPlanSummary events={events} lastTime={lastTime} lastWeather={lastWeather} plan={plan} />
+      <CompositionPlanSummary
+        events={events}
+        lastTime={lastTime}
+        lastWeather={lastWeather}
+        plan={plan}
+        runtimeCursor={runtimeState.cursor}
+        activeSection={runtimeState.activeSection}
+      />
 
       <TimelinePage />
     </div>

@@ -32,12 +32,12 @@ export default defineConfig({
   ],
   server: {
     https: true,
-    host: 'localhost',
+    host: '0.0.0.0',
     port: 5173,
   },
   preview: {
     https: true,
-    host: 'localhost',
+    host: '0.0.0.0',
     port: 4173,
   }
 })

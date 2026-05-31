@@ -19,18 +19,25 @@ function clampNumber(value: unknown, fallback: number, min = -Infinity, max = In
 }
 
 function normalizeCompositionPlan(plan: CompositionPlan): CompositionPlan {
+  const normalizedSections = Array.isArray(plan.sections)
+    ? plan.sections.map((section) => ({
+        start: clampNumber(section.start, 0, 0),
+        duration: clampNumber(section.duration, 0, 0),
+        mood: section.mood,
+        intensity: clampNumber(section.intensity, 0.5, 0, 1),
+      }))
+    : [];
+
+  const computedDuration = normalizedSections.reduce((max, section) => {
+    return Math.max(max, section.start + section.duration);
+  }, 0);
+
   return {
     key: typeof plan.key === "string" && plan.key.trim() ? plan.key : "Unknown",
     bpm: clampNumber(plan.bpm, 70, 20, 240),
+    duration: clampNumber(plan.duration, computedDuration || 30, 1, 600),
     globalMood: typeof plan.globalMood === "string" ? plan.globalMood : "ambient",
-    sections: Array.isArray(plan.sections)
-      ? plan.sections.map((section) => ({
-          start: clampNumber(section.start, 0, 0),
-          duration: clampNumber(section.duration, 0, 0),
-          mood: section.mood,
-          intensity: clampNumber(section.intensity, 0.5, 0, 1),
-        }))
-      : [],
+    sections: normalizedSections,
     texture: {
       density: clampNumber(plan.texture?.density, 0.5, 0, 1),
       brightness: clampNumber(plan.texture?.brightness, 0.5, 0, 1),

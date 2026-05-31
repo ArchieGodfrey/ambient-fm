@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { startAudio, stopAudio } from "../audio/toneEngine";
-import { applyComposition } from "../audio/audioGraph";
 import { generateComposition, fallbackComposition } from "../ai/composer";
+import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop } from "../audio/compositionRuntime";
 import { postToast } from "../utils/toast";
 import type { CompositionPlan } from "../ai/types";
 import type { StimulusEvent } from "../types";
@@ -15,6 +15,7 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
   async function handlePlayToggle() {
     if (isPlaying) {
       stopAudio();
+      stopRuntimeLoop();
       setIsPlaying(false);
       setStatus("Audio stopped");
       return;
@@ -45,7 +46,8 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
     try {
       const composition = await generateComposition(events);
       setPlan(composition);
-      applyComposition(composition);
+      startCompositionRuntime(composition);
+      startRuntimeLoop();
       setStatus(`Composition generated: ${composition.key}`);
     } catch (error) {
       console.error("Failed to generate composition", error);
@@ -54,7 +56,8 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
       setStatus(`AI composition failed: ${message}`);
       const fallback = fallbackComposition();
       setPlan(fallback);
-      applyComposition(fallback);
+      startCompositionRuntime(fallback);
+      startRuntimeLoop();
     } finally {
       setAIStatus("Ready");
     }

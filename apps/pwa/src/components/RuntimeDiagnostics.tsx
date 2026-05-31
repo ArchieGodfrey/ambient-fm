@@ -8,6 +8,10 @@ type Props = {
     maxComputeWorkgroupStorageSize: number;
   } | null;
   heapUsage: string | null;
+  runtimeCursor?: number;
+  activeSection?: { mood: string } | null;
+  runtimeIntensity?: number;
+  runtimeDrift?: number;
 };
 
 const diagnosticsStyle: CSSProperties = {
@@ -23,7 +27,7 @@ const labelStyle: CSSProperties = {
   marginBottom: 8,
 };
 
-export default function RuntimeDiagnostics({ gpuStatus, gpuLimits, heapUsage }: Props) {
+export default function RuntimeDiagnostics({ gpuStatus, gpuLimits, heapUsage, runtimeCursor, activeSection, runtimeIntensity, runtimeDrift }: Props) {
   return (
     <div style={diagnosticsStyle}>
       <div style={labelStyle}>Runtime diagnostics</div>
@@ -39,6 +43,12 @@ export default function RuntimeDiagnostics({ gpuStatus, gpuLimits, heapUsage }: 
       ) : (
         <div style={{ fontSize: 14, color: "#666" }}>GPU limits not available yet.</div>
       )}
+      <div style={{ fontSize: 14, marginBottom: 8 }}>
+        <div><strong>Time Cursor:</strong> {runtimeCursor?.toFixed(1) ?? "0.0"}s</div>
+        <div><strong>Active Section:</strong> {activeSection?.mood ?? "None"}</div>
+        <div><strong>Intensity:</strong> {runtimeIntensity?.toFixed(2) ?? "0.00"}</div>
+        <div><strong>Drift:</strong> {runtimeDrift?.toFixed(3) ?? "0.000"}</div>
+      </div>
       <div style={{ fontSize: 14, marginTop: 8 }}>JS Heap: {heapUsage ?? "Unavailable"}</div>
     </div>
   );

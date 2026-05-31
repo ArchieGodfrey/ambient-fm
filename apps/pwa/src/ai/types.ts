@@ -8,6 +8,7 @@ export interface CompositionSection {
 export interface CompositionPlan {
   key: string;
   bpm: number;
+  duration: number;
   globalMood: string;
   sections: CompositionSection[];
   texture: {
