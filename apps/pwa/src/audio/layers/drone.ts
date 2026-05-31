@@ -5,6 +5,7 @@ export function createDrone() {
   const filter = new Tone.Filter(200, "lowpass");
 
   osc.connect(filter).toDestination();
+  osc.volume.value = -100;
   osc.start();
 
   return {

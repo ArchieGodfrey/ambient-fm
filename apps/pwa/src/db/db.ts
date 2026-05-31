@@ -18,6 +18,11 @@ class AmbientDB extends Dexie {
       events: "id, timestamp",
       sessions: "id, timestamp, dominantMood"
     });
+
+    this.version(3).stores({
+      events: "id, timestamp",
+      sessions: "id, timestamp, dominantMood"
+    });
   }
 }
 

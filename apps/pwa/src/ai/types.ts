@@ -5,6 +5,13 @@ export interface CompositionSection {
   intensity: number;
 }
 
+export interface Motif {
+  id: string;
+  layer: "pad" | "pulse" | "texture";
+  notes: string[];
+  rhythm: number[];
+}
+
 export interface CompositionPlan {
   key: string;
   bpm: number;
@@ -22,4 +29,5 @@ export interface CompositionPlan {
     texture: number;
     pulse: number;
   };
+  motifs: Motif[];
 }

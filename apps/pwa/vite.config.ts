@@ -10,10 +10,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'manifest.webmanifest'],
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico,png,txt,webmanifest}'],
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/huggingface\.co\/.*$/,
@@ -58,12 +58,15 @@ export default defineConfig({
             },
           },
         ],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [new RegExp('^\/api\/')],
       },
       manifest: {
         name: 'Ambient FM',
         short_name: 'AmbientFM',
         description: 'A minimal ambient audio PWA.',
-        start_url: '.',
+        start_url: '/index.html',
+        scope: '/',
         display: 'standalone',
         background_color: '#0f172a',
         theme_color: '#0f172a',

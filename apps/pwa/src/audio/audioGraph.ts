@@ -49,6 +49,7 @@ function normalizeCompositionPlan(plan: CompositionPlan): CompositionPlan {
       texture: clampNumber(plan.layers?.texture, 0.5, 0, 1),
       pulse: clampNumber(plan.layers?.pulse, 0.5, 0, 1),
     },
+    motifs: Array.isArray(plan.motifs) ? plan.motifs : [],
   };
 }
 

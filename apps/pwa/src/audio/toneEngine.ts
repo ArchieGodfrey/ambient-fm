@@ -13,6 +13,8 @@ export async function startAudio() {
     initAudioGraph();
   }
 
+  Tone.Destination.mute = false;
+
   if (!playing) {
     if (Tone.Transport.state !== "started") {
       Tone.Transport.start();
@@ -26,6 +28,7 @@ export function stopAudio() {
     Tone.Transport.stop();
   }
 
+  Tone.Destination.mute = true;
   playing = false;
   suspended = false;
   transportWasPlayingBeforeSuspend = false;

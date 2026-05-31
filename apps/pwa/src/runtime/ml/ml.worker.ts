@@ -188,7 +188,7 @@ async function infer(id: string, prompt: string) {
     const response = await engine.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7,
-      max_tokens: 256,
+      max_tokens: 512,
     });
     const text = response.choices?.[0]?.message?.content ?? "";
     self.postMessage({ type: "status", stage: "infer-complete", progress: 0.7, text: "Inference complete" });

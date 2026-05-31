@@ -220,6 +220,10 @@ RULES:
 - Set duration to cover the end of the final section
 - You should slightly vary today’s composition while respecting past mood trends.
 - Avoid repeating identical keys or BPM patterns unless strongly justified by stimuli.
+- Do NOT ask for a full composition. Only generate motif seeds and the plan metadata.
+- Also generate 2–4 musical motifs.
+- Each motif must be short (2–5 notes), assigned to a layer (pad, pulse, or texture), and use a simple rhythmic structure.
+- Keep the motif output minimal.
 
 ${memoryContext}
 
@@ -254,7 +258,15 @@ OUTPUT FORMAT:
     "pad": number,
     "texture": number,
     "pulse": number
-  }
+  },
+  "motifs": [
+    {
+      "id": "string",
+      "layer": "pad | pulse | texture",
+      "notes": ["C4", "E4"],
+      "rhythm": [1, 0.5]
+    }
+  ]
 }
 `;
 }
@@ -277,6 +289,26 @@ export function fallbackComposition(): CompositionPlan {
       texture: 0.5,
       pulse: 0.2,
     },
+    motifs: [
+      {
+        id: "pad-1",
+        layer: "pad",
+        notes: ["C4", "E4", "G4"],
+        rhythm: [1, 0.5, 1],
+      },
+      {
+        id: "pulse-1",
+        layer: "pulse",
+        notes: ["C2", "C3"],
+        rhythm: [0.5, 0.5],
+      },
+      {
+        id: "texture-1",
+        layer: "texture",
+        notes: ["G3", "B3"],
+        rhythm: [1, 0.5, 0.5],
+      },
+    ],
   };
 }
 
@@ -438,6 +470,7 @@ export async function generateComposition(events: StimulusEvent[]) {
     let recovered: string | null = null;
     try {
       const plan = tryParseJsonWithRecovery(sanitized) as CompositionPlan;
+      plan.motifs = Array.isArray((plan as any).motifs) ? (plan as any).motifs : [];
       const sessions = await getLastSessionSummaries();
       const biasedPlan = applyMemoryBias(plan, sessions);
       dispatchRuntimeStatus({ stage: "infer-ready", text: "Composition ready" });

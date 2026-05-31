@@ -2,6 +2,7 @@ import * as Tone from "tone";
 
 export function createPad() {
   const synth = new Tone.PolySynth().toDestination();
+  synth.volume.value = -100;
 
   return {
     setIntensity(v: number) {

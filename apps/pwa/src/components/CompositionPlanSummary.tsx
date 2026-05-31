@@ -59,6 +59,20 @@ export default function CompositionPlanSummary({ events, lastTime, lastWeather, 
                   <strong>Layers:</strong> drone {plan.layers.drone}, pad {plan.layers.pad}, texture {plan.layers.texture}, pulse {plan.layers.pulse}
                 </div>
                 <div>
+                  <strong>Motifs ({plan.motifs?.length ?? 0}):</strong>
+                  <ul style={{ margin: "8px 0 0 16px", padding: 0 }}>
+                    {plan.motifs && plan.motifs.length > 0 ? (
+                      plan.motifs.map((motif) => (
+                        <li key={motif.id} style={{ marginBottom: 4 }}>
+                          <strong>{motif.layer} motif:</strong> {motif.notes.join(" → ")} ({motif.rhythm.join(", ")})
+                        </li>
+                      ))
+                    ) : (
+                      <li style={{ marginBottom: 4 }}>No motifs generated yet.</li>
+                    )}
+                  </ul>
+                </div>
+                <div>
                   <strong>Sections ({plan.sections.length}):</strong>
                   <ul style={{ margin: "8px 0 0 16px", padding: 0 }}>
                     {(() => {

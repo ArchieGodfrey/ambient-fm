@@ -20,6 +20,15 @@ export default function SessionsPage() {
 
   useEffect(() => {
     loadSessions();
+
+    const handleSessionSaved = () => {
+      loadSessions();
+    };
+
+    window.addEventListener("session-saved", handleSessionSaved);
+    return () => {
+      window.removeEventListener("session-saved", handleSessionSaved);
+    };
   }, []);
 
   return (

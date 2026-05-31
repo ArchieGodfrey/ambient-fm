@@ -6,6 +6,7 @@ export function createTexture() {
 
   noise.connect(filter).toDestination();
   noise.start();
+  noise.volume.value = -100;
 
   return {
     setIntensity(v: number) {

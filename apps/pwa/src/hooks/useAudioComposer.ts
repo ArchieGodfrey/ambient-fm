@@ -13,21 +13,28 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
   const [aiStatus, setAIStatus] = useState("Ready");
   const [status, setStatus] = useState("Ready");
   const [plan, setPlan] = useState<CompositionPlan | null>(null);
+  const [currentSessionSaved, setCurrentSessionSaved] = useState(false);
 
-  async function endSession(events: StimulusEvent[], plan: CompositionPlan | null) {
-    if (!plan) {
-      return;
-    }
-
+  async function saveSession(events: StimulusEvent[], plan: CompositionPlan) {
     try {
       const summary = analyzeSession(crypto.randomUUID(), events, plan);
+      summary.plan = plan;
       await db.sessions.add(summary);
+      setCurrentSessionSaved(true);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("session-saved"));
       }
     } catch (error) {
       console.error("Failed to save session summary", error);
     }
+  }
+
+  async function endSession(events: StimulusEvent[], plan: CompositionPlan | null) {
+    if (!plan || currentSessionSaved) {
+      return;
+    }
+
+    await saveSession(events, plan);
   }
 
   async function handlePlayToggle() {
@@ -65,6 +72,7 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
     try {
       const composition = await generateComposition(events);
       setPlan(composition);
+      await saveSession(events, composition);
       startCompositionRuntime(composition);
       startRuntimeLoop();
       setStatus(`Composition generated: ${composition.key}`);
@@ -82,6 +90,26 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
     }
   }
 
+  async function loadSessionPlan(planInput: CompositionPlan) {
+    setPlan(planInput);
+    setCurrentSessionSaved(true);
+
+    try {
+      await startAudio();
+      setIsPlaying(true);
+      setStatus("Session loaded and playing");
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : String(error);
+      postToast(`Audio failed: ${message}`, "error");
+      setStatus("Audio failed");
+      return;
+    }
+
+    startCompositionRuntime(planInput);
+    startRuntimeLoop();
+  }
+
   return {
     isPlaying,
     aiStatus,
@@ -89,5 +117,6 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
     plan,
     handlePlayToggle,
     runAIComposer,
+    loadSessionPlan,
   };
 }

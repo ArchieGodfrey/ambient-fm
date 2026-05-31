@@ -51,6 +51,7 @@ export default function HomePage() {
     plan,
     handlePlayToggle,
     runAIComposer,
+    loadSessionPlan,
   } = useAudioComposer(events, modelLoaded);
   const [runtimeState, setRuntimeState] = useState<CompositionRuntimeSnapshot>({
     cursor: 0,
@@ -222,8 +223,25 @@ export default function HomePage() {
         {sessions.length ? (
           <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
             {sessions.slice(0, 5).map((session) => (
-              <li key={session.id}>
-                {session.dominantMood} — {Math.round(session.avgBpm)} BPM — {session.key}
+              <li key={session.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 8 }}>
+                <span>
+                  {session.dominantMood} — {Math.round(session.avgBpm)} BPM — {session.key}
+                </span>
+                <button
+                  type="button"
+                  disabled={!session.plan}
+                  onClick={() => session.plan && loadSessionPlan(session.plan)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #ccc",
+                    background: session.plan ? "white" : "#f0f0f0",
+                    color: session.plan ? "#111" : "#999",
+                    cursor: session.plan ? "pointer" : "not-allowed",
+                  }}
+                >
+                  Load
+                </button>
               </li>
             ))}
           </ul>

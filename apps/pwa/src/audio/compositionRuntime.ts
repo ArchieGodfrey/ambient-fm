@@ -1,5 +1,6 @@
 import type { CompositionPlan, CompositionSection } from "../ai/types";
 import { applySectionToAudio } from "./mapSectionToAudio";
+import { evolveMotifs, initMotifs, updateMotifs } from "./motifManager";
 
 export type CompositionRuntimeSnapshot = {
   cursor: number;
@@ -61,6 +62,8 @@ function updateSnapshot(cursor: number, activeSection: CompositionSection | null
   notifySubscribers();
 }
 
+let lastMotifEvolution = 0;
+
 function tick() {
   if (!plan) {
     rafId = requestAnimationFrame(tick);
@@ -71,6 +74,12 @@ function tick() {
   const activeSection = getActiveSection(cursor);
   const drift = getDrift();
 
+  updateMotifs(plan.layers);
+  if (performance.now() - lastMotifEvolution > 1500) {
+    evolveMotifs(plan.motifs);
+    lastMotifEvolution = performance.now();
+  }
+
   applySectionToAudio(activeSection, plan.layers, plan, drift);
   updateSnapshot(cursor, activeSection, drift);
 
@@ -79,11 +88,14 @@ function tick() {
 
 export function startCompositionRuntime(planInput: CompositionPlan) {
   plan = planInput;
+  initMotifs(plan.motifs);
   startTime = performance.now();
+  lastMotifEvolution = performance.now();
   const cursor = getCursor();
   const activeSection = getActiveSection(cursor);
   const drift = getDrift();
 
+  updateMotifs(plan.layers);
   applySectionToAudio(activeSection, plan.layers, plan, drift);
   updateSnapshot(cursor, activeSection, drift);
 }
