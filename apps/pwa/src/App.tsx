@@ -2,14 +2,18 @@ import { useEffect, useState } from "react";
 import { nanoid } from "nanoid";
 import { startAudio, stopAudio, updateAudio } from "./audio/toneEngine";
 import { deriveAudioState } from "./audio/deriveAudioState";
+import { applyComposition } from "./audio/applyComposition";
+import { generateComposition } from "./ai/composer";
 import { buildStimulusSnapshot } from "./stimuli/buildStimulusSnapshot";
 import { db } from "./db/db";
 import { useAppStore } from "./store/useAppStore";
+import type { CompositionPlan } from "./ai/types";
 import type { StimulusEvent } from "./types";
 
 export default function App() {
   const { events, setEvents, addEvent } = useAppStore();
   const [status, setStatus] = useState("Ready");
+  const [aiStatus, setAIStatus] = useState("Ready");
   const [audioState, setAudioState] = useState({
     bpm: 90,
     filterCutoff: 800,
@@ -17,6 +21,7 @@ export default function App() {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [plan, setPlan] = useState<CompositionPlan | null>(null);
 
   async function loadEvents() {
     try {
@@ -36,10 +41,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (plan) return;
     const state = deriveAudioState(events);
     setAudioState(state);
     updateAudio(state);
-  }, [events]);
+  }, [events, plan]);
 
   async function handlePlayToggle() {
     if (isPlaying) {
@@ -56,6 +62,26 @@ export default function App() {
     } catch (error) {
       console.error(error);
       setStatus("Audio failed");
+    }
+  }
+
+  async function runAIComposer() {
+    setAIStatus("Generating composition...");
+    try {
+      const composition = await generateComposition(events);
+      setPlan(composition);
+      applyComposition(composition);
+      setAudioState({
+        bpm: composition.bpm,
+        filterCutoff: 400 + composition.texture.brightness * 2000,
+        reverbMix: composition.texture.reverbAmount,
+      });
+      setStatus(`Composition generated: ${composition.key}`);
+    } catch (error) {
+      console.error("Failed to generate composition", error);
+      setStatus("AI composition failed");
+    } finally {
+      setAIStatus("Ready");
     }
   }
 
@@ -120,10 +146,19 @@ export default function App() {
         >
           {refreshing ? "Refreshing..." : "Refresh Environment"}
         </button>
+        <button
+          type="button"
+          onClick={runAIComposer}
+          disabled={aiStatus !== "Ready"}
+          style={{ fontSize: 16, padding: "12px 18px" }}
+        >
+          {aiStatus === "Ready" ? "Generate AI Composition" : "Generating..."}
+        </button>
       </div>
 
       <div style={{ marginBottom: 24 }}>
         <strong>Status:</strong> {status}
+        <div style={{ marginTop: 4, fontSize: 14, color: "#555" }}>AI: {aiStatus}</div>
       </div>
 
       <section style={{ marginBottom: 24 }}>
@@ -147,14 +182,37 @@ export default function App() {
       </section>
 
       <section style={{ marginBottom: 24 }}>
-        <h2>Derived Audio State</h2>
-        <div style={{ display: "grid", gap: 8, maxWidth: 360 }}>
+        <h2>AI Composition Output</h2>
+        <div style={{ display: "grid", gap: 8, maxWidth: 420 }}>
           <div>Stimulus Count: {events.length}</div>
           <div>BPM: {audioState.bpm.toFixed(0)}</div>
           <div>Filter Cutoff: {audioState.filterCutoff.toFixed(0)}</div>
           <div>Reverb Mix: {audioState.reverbMix.toFixed(2)}</div>
           <div>Last Time Stimulus: {lastTime?.label ?? "None"}</div>
           <div>Last Weather Stimulus: {lastWeather?.label ?? "None"}</div>
+        </div>
+        <div style={{ marginTop: 16, padding: 12, border: "1px solid #ddd", borderRadius: 12, background: "#f7f7f7" }}>
+          <h3>Composition Plan</h3>
+          {plan ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <div><strong>Key:</strong> {plan.key}</div>
+              <div><strong>BPM:</strong> {plan.bpm}</div>
+              <div><strong>Global Mood:</strong> {plan.globalMood}</div>
+              <div><strong>Texture:</strong> density {plan.texture.density}, brightness {plan.texture.brightness}, reverb {plan.texture.reverbAmount}</div>
+              <div>
+                <strong>Sections:</strong>
+                <ul style={{ margin: "8px 0 0 16px", padding: 0 }}>
+                  {plan.sections.map((section, index) => (
+                    <li key={index} style={{ marginBottom: 4 }}>
+                      {section.mood} ({section.start}–{section.start + section.duration}s) intensity {section.intensity}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <p>No AI composition generated yet.</p>
+          )}
         </div>
       </section>
 
