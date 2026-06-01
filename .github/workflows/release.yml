@@ -30,7 +30,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-bun@v2
+      - uses: oven-sh/setup-bun@v1
         with:
           bun-version: "latest"
 
