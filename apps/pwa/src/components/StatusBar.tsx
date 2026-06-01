@@ -3,9 +3,9 @@ import type { CSSProperties } from "react";
 const statusStyle: CSSProperties = {
   marginBottom: 24,
   padding: 16,
-  border: "1px solid #ddd",
+  border: "1px solid var(--border)",
   borderRadius: 12,
-  background: "#f7f7f7",
+  background: "var(--surface)",
 };
 
 export default function StatusBar({
@@ -24,7 +24,7 @@ export default function StatusBar({
   return (
     <div style={statusStyle}>
       <div style={{ fontWeight: 700, marginBottom: 8 }}>{status}</div>
-      <div style={{ fontSize: 14, color: "#555" }}>
+      <div style={{ fontSize: 14, color: "var(--text-muted)" }}>
         AI: {aiStatus} · Model: {modelLoaded ? "loaded" : modelDownloaded ? "downloaded" : "not downloaded"}
         {modelProgress !== null ? ` · Progress: ${Math.round(modelProgress * 100)}%` : ""}
       </div>

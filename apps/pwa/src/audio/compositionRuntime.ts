@@ -103,6 +103,7 @@ function updateSnapshot(cursor: number, activeSection: CompositionSection | null
   notifySubscribers();
 }
 
+const MAX_RUNTIME_MS = 1000 * 60 * 30;
 let lastMotifEvolution = 0;
 
 async function ensureAudioRunning() {
@@ -160,6 +161,11 @@ function stopCheckpointing() {
 function tick() {
   if (!plan) {
     rafId = requestAnimationFrame(tick);
+    return;
+  }
+
+  if (performance.now() - startTime > MAX_RUNTIME_MS) {
+    stopRuntimeLoop();
     return;
   }
 

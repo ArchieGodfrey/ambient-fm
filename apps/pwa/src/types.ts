@@ -1,9 +1,1 @@
-export type StimulusSource = "manual" | "time" | "weather";
-
-export interface StimulusEvent {
-  id: string;
-  timestamp: number;
-  source: StimulusSource;
-  label: string;
-  value?: number;
-}
+export type { StimulusEvent, StimulusSource, StimulusConfig, ManualMoodValues, EmotionalState, StimulusPlugin } from "./stimulus/types";

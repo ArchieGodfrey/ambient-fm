@@ -1,15 +1,19 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  --text: #1f2937;
+  --text-h: #111827;
+  --text-muted: #4b5563;
+  --bg: #f4f4f5;
+  --surface: #f8f8f9;
+  --surface-strong: #ffffff;
+  --surface-muted: #ececed;
+  --border: #d1d1d6;
+  --code-bg: #f3f4f6;
+  --accent: #4b5563;
+  --accent-bg: rgba(75, 85, 99, 0.08);
+  --accent-border: rgba(75, 85, 99, 0.18);
+  --social-bg: rgba(241, 245, 249, 0.6);
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    rgba(0, 0, 0, 0.08) 0 10px 15px -3px, rgba(0, 0, 0, 0.04) 0 4px 6px -2px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -32,17 +36,21 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
+    --text: #d1d5db;
+    --text-h: #f8fafc;
+    --text-muted: #9ca3af;
+    --bg: #101316;
+    --surface: #181b21;
+    --surface-strong: #11151b;
+    --surface-muted: #101316;
+    --border: #30333d;
+    --code-bg: #111827;
+    --accent: #9ca3af;
+    --accent-bg: rgba(156, 163, 175, 0.12);
+    --accent-border: rgba(156, 163, 175, 0.25);
+    --social-bg: rgba(31, 41, 55, 0.5);
     --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+      rgba(0, 0, 0, 0.35) 0 10px 15px -3px, rgba(0, 0, 0, 0.2) 0 4px 6px -2px;
   }
 
   #social .button-icon {
@@ -116,21 +124,21 @@ code {
 }
 
 .toast-info {
-  background: #0ea5e9;
-  color: #fff;
+  background: #d1d5db;
+  color: #111827;
 }
 
 .toast-success {
-  background: #16a34a;
-  color: #fff;
+  background: #9ca3af;
+  color: #111827;
 }
 
 .toast-warning {
-  background: #f59e0b;
-  color: #0f172a;
+  background: #e5e7eb;
+  color: #111827;
 }
 
 .toast-error {
-  background: #dc2626;
-  color: #fff;
+  background: #6b7280;
+  color: #f8fafc;
 }

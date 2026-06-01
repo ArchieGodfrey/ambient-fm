@@ -1,9 +1,6 @@
-import { getTimeStimulus } from "./timeStimulus";
-import { getWeatherStimulus } from "./weatherStimulus";
+import { createStimulusRegistryFromConfig } from "../stimulus/setup";
 
 export async function buildStimulusSnapshot() {
-  const time = getTimeStimulus();
-  const weather = await getWeatherStimulus();
-
-  return [time, weather];
+  const { registry } = await createStimulusRegistryFromConfig();
+  return await registry.collect();
 }

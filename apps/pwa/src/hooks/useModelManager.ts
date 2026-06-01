@@ -197,6 +197,7 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
     setModelProgress(0);
     setProgressText(actionText);
 
+    let success = true;
     try {
       if (!alreadyDownloaded) {
         await downloadModel(handleProgress, workerInitPayload);
@@ -209,6 +210,7 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
         setStatus("Model already cached");
       }
     } catch (error) {
+      success = false;
       console.error("Download model failed", error);
       const message = error instanceof Error ? error.message : String(error);
       postToast(`Download failed: ${message}`, "error");
@@ -219,6 +221,7 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
     }
 
     await checkModelState();
+    return success;
   }
 
   async function loadModelAction() {
@@ -226,12 +229,14 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
     setModelProgress(0);
     setProgressText("Loading model...");
 
+    let success = true;
     try {
       await loadModel(handleProgress, workerInitPayload);
       setModelLoaded(true);
       setModelProgress(1);
       setStatus("Model loaded");
     } catch (error) {
+      success = false;
       console.error("Load model failed", error);
       const message = error instanceof Error ? error.message : String(error);
       postToast(`Load failed: ${message}`, "error");
@@ -242,15 +247,18 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
     }
 
     await checkModelState();
+    return success;
   }
 
   async function unloadModelAction() {
     setStatus("Unloading model...");
+    let success = true;
     try {
       await unloadModel();
       setModelLoaded(false);
       setStatus("Model unloaded from memory");
     } catch (error) {
+      success = false;
       console.error("Unload model failed", error);
       const message = error instanceof Error ? error.message : String(error);
       postToast(`Unload failed: ${message}`, "error");
@@ -258,6 +266,7 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
     }
 
     await checkModelState();
+    return success;
   }
 
   async function deleteModelAction() {

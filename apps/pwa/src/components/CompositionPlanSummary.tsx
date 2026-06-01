@@ -1,11 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { CompositionPlan } from "../ai/types";
-import type { StimulusEvent } from "../types";
 
 type CompositionPlanSummaryProps = {
-  events: StimulusEvent[];
-  lastTime?: StimulusEvent;
-  lastWeather?: StimulusEvent;
   plan: CompositionPlan | null;
   runtimeCursor?: number;
   activeSection?: CompositionPlan["sections"][number] | null;
@@ -13,18 +9,28 @@ type CompositionPlanSummaryProps = {
   sectionTimeRemaining?: number;
 };
 
-export default function CompositionPlanSummary({ events, lastTime, lastWeather, plan, runtimeCursor, activeSection, currentPhraseRole, sectionTimeRemaining }: CompositionPlanSummaryProps) {
+export default function CompositionPlanSummary({ plan, runtimeCursor, activeSection, currentPhraseRole, sectionTimeRemaining }: CompositionPlanSummaryProps) {
   const [showRawJson, setShowRawJson] = useState(false);
+
+  const sectionItems = useMemo(() => {
+    if (!plan) return [];
+
+    const activeSectionIndex = plan.sections.findIndex((section) =>
+      runtimeCursor !== undefined && runtimeCursor >= section.start && runtimeCursor < section.start + section.duration,
+    );
+
+    return plan.sections.map((section, index) => ({
+      section,
+      isActive: index === activeSectionIndex,
+      start: section.start,
+      end: section.start + section.duration,
+      intensity: section.intensity,
+    }));
+  }, [plan, runtimeCursor]);
 
   return (
     <section style={{ marginBottom: 24 }}>
-      <h2>AI Composition Output</h2>
-      <div style={{ display: "grid", gap: 8, maxWidth: 420 }}>
-        <div>Stimulus Count: {events.length}</div>
-        <div>Last Time Stimulus: {lastTime?.label ?? "None"}</div>
-        <div>Last Weather Stimulus: {lastWeather?.label ?? "None"}</div>
-      </div>
-      <div style={{ marginTop: 16, padding: 12, border: "1px solid #ddd", borderRadius: 12, background: "#f7f7f7" }}>
+      <div style={{ marginTop: 16, padding: 12, border: "1px solid var(--border)", borderRadius: 12, background: "var(--surface)" }}>
         <h3>Composition Plan</h3>
         {plan ? (
           <div style={{ display: "grid", gap: 8 }}>
@@ -35,8 +41,9 @@ export default function CompositionPlanSummary({ events, lastTime, lastWeather, 
                 style={{
                   padding: "8px 12px",
                   borderRadius: 8,
-                  border: "1px solid #ccc",
-                  background: "white",
+                  border: "1px solid var(--border)",
+                  background: "var(--surface-strong)",
+                  color: "var(--text)",
                   cursor: "pointer",
                   alignSelf: "start",
                 }}
@@ -45,7 +52,7 @@ export default function CompositionPlanSummary({ events, lastTime, lastWeather, 
               </button>
             </div>
             {showRawJson ? (
-              <pre style={{ marginTop: 12, padding: 12, background: "#111", color: "#f7f7f7", borderRadius: 12, overflowX: "auto" }}>
+              <pre style={{ marginTop: 12, padding: 12, background: "var(--code-bg)", color: "var(--text-h)", borderRadius: 12, overflowX: "auto" }}>
                 {JSON.stringify(plan, null, 2)}
               </pre>
             ) : (
@@ -93,29 +100,20 @@ export default function CompositionPlanSummary({ events, lastTime, lastWeather, 
                 <div>
                   <strong>Sections ({plan.sections.length}):</strong>
                   <ul style={{ margin: "8px 0 0 16px", padding: 0 }}>
-                    {(() => {
-                      const activeSectionIndex = plan.sections.findIndex((section) =>
-                        runtimeCursor !== undefined && runtimeCursor >= section.start && runtimeCursor < section.start + section.duration,
-                      );
-
-                      return plan.sections.map((section, index) => {
-                        const isActive = index === activeSectionIndex;
-                        return (
-                          <li
-                            key={index}
-                            style={{
-                              marginBottom: 4,
-                              padding: isActive ? "4px 8px" : "0",
-                              borderRadius: 8,
-                              background: isActive ? "rgba(55, 125, 255, 0.08)" : "transparent",
-                              fontWeight: isActive ? 700 : 400,
-                            }}
-                          >
-                            {section.mood} ({section.start}–{section.start + section.duration}s) intensity {section.intensity}
-                          </li>
-                        );
-                      });
-                    })()}
+                    {sectionItems.map(({ section, isActive, start, end, intensity }, index) => (
+                      <li
+                        key={index}
+                        style={{
+                          marginBottom: 4,
+                          padding: isActive ? "4px 8px" : "0",
+                          borderRadius: 8,
+                          background: isActive ? "var(--accent-bg)" : "transparent",
+                          fontWeight: isActive ? 700 : 400,
+                        }}
+                      >
+                        {section.mood} ({start}–{end}s) intensity {intensity}
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </>

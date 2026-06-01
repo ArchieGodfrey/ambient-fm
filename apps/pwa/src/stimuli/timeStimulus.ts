@@ -27,5 +27,6 @@ export function getTimeStimulus(): StimulusEvent {
     source: "time",
     label,
     value,
+    strength: Math.min(1, Math.max(0, value)),
   };
 }

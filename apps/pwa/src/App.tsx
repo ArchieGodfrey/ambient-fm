@@ -1,11 +1,12 @@
 import { useState } from "react";
 import HomePage from "./pages/HomePage";
-import TimelinePage from "./pages/TimelinePage";
+import MoodPage from "./pages/MoodPage";
 import SessionsPage from "./pages/SessionsPage";
+import CurrentSessionBar from "./components/CurrentSessionBar";
 
 const tabs = [
   { key: "dashboard", label: "Now" },
-  { key: "timeline", label: "Timeline" },
+  { key: "mood", label: "Mood" },
   { key: "sessions", label: "Sessions" },
 ] as const;
 
@@ -14,19 +15,20 @@ type TabKey = (typeof tabs)[number]["key"];
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
 
-  function renderPage() {
-    if (activeTab === "timeline") {
-      return <TimelinePage />;
-    }
-    if (activeTab === "sessions") {
-      return <SessionsPage />;
-    }
-    return <HomePage />;
-  }
-
   return (
-    <div style={{ minHeight: "100vh", paddingBottom: 120, background: "#fff" }}>
-      {renderPage()}
+    <div style={{ minHeight: "100vh", paddingBottom: 120, background: "var(--bg)" }}>
+      <CurrentSessionBar />
+      <div style={{ position: "relative" }}>
+        <div style={{ display: activeTab === "dashboard" ? "block" : "none" }}>
+          <HomePage />
+        </div>
+        <div style={{ display: activeTab === "mood" ? "block" : "none" }}>
+          <MoodPage />
+        </div>
+        <div style={{ display: activeTab === "sessions" ? "block" : "none" }}>
+          <SessionsPage />
+        </div>
+      </div>
       <nav
         style={{
           position: "fixed",
@@ -34,8 +36,8 @@ export default function App() {
           right: 0,
           bottom: 0,
           height: 55,
-          borderTop: "1px solid rgba(0,0,0,0.08)",
-          background: "rgba(255,255,255,0.98)",
+          borderTop: "1px solid var(--border)",
+          background: "var(--surface-strong)",
           backdropFilter: "blur(12px)",
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
@@ -50,9 +52,9 @@ export default function App() {
             onClick={() => setActiveTab(tab.key)}
             style={{
               border: "none",
-              borderRight: index < tabs.length - 1 ? "1px solid rgba(0,0,0,0.08)" : "none",
-              background: activeTab === tab.key ? "rgba(0,0,0,0.05)" : "transparent",
-              color: activeTab === tab.key ? "#111" : "#555",
+              borderRight: index < tabs.length - 1 ? "1px solid var(--border)" : "none",
+              background: activeTab === tab.key ? "var(--surface)" : "transparent",
+              color: activeTab === tab.key ? "var(--text-h)" : "var(--text-muted)",
               fontWeight: activeTab === tab.key ? 700 : 500,
               fontSize: 13,
               height: "100%",
@@ -67,7 +69,7 @@ export default function App() {
             }}
           >
             <span style={{
-              borderBottom: activeTab === tab.key ? "2px solid #111" : "2px solid transparent",
+              borderBottom: activeTab === tab.key ? "2px solid var(--text-h)" : "2px solid transparent",
               paddingBottom: 4,
             }}>
               {tab.label}

@@ -5,7 +5,7 @@ import { initMotifs } from "../audio/motifManager";
 import { startCompositionRuntime } from "../audio/compositionRuntime";
 import type { RuntimeSnapshot } from "../memory/runtimeSnapshots";
 
-export async function restoreRuntime() {
+export async function restoreRuntime(options?: { startAudio?: boolean }) {
   const last = await db.runtimeSnapshots.orderBy("timestamp").last();
   if (!last) {
     return null;
@@ -13,7 +13,9 @@ export async function restoreRuntime() {
 
   initAudioGraph();
   initMotifs(last.plan.motifs);
-  await startAudio();
+  if (options?.startAudio) {
+    await startAudio();
+  }
   startCompositionRuntime(last.plan, last.cursorTime);
 
   return last as RuntimeSnapshot;

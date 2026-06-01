@@ -4,12 +4,14 @@ import type { StimulusEvent } from "../types";
 const WEATHER_CACHE_KEY = "ambient-fm-last-weather";
 
 function createWeatherEvent(label: string, value: number): StimulusEvent {
+  const strength = Math.min(1, Math.max(0, (value - 0) / 40));
   return {
     id: nanoid(),
     timestamp: Date.now(),
     source: "weather",
     label: `${label} ${value}°C`,
     value,
+    strength,
   };
 }
 
@@ -51,7 +53,8 @@ export async function getWeatherStimulus(): Promise<StimulusEvent> {
     else if (code <= 3) label = "Cloudy";
     else label = "Rainy";
 
-    const event = createWeatherEvent(label, temp);
+    const strength = Math.min(1, Math.max(0, (temp - 0) / 40));
+    const event = { ...createWeatherEvent(label, temp), strength };
     saveLastWeather(event);
     return event;
   } catch {

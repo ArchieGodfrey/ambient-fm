@@ -1,16 +1,22 @@
 import * as Tone from "tone";
 import type { Motif } from "../ai/types";
+import { instrumentRegistry } from "./instruments";
 
 export function createMotifPlayer(motif: Motif) {
-  const synth = new Tone.PolySynth().toDestination();
+  const instrument = instrumentRegistry.get(motif.layer);
   let index = 0;
 
+  const fallbackSynth = instrument ? null : new Tone.PolySynth().toDestination();
   const loop = new Tone.Loop((time) => {
     const note = motif.notes[index % motif.notes.length];
     const dur = motif.rhythm[index % motif.rhythm.length];
 
     if (note && typeof dur === "number" && dur > 0) {
-      synth.triggerAttackRelease(note, dur, time);
+      if (instrument) {
+        instrument.play(note, time, 0.5);
+      } else if (fallbackSynth) {
+        fallbackSynth.triggerAttackRelease(note, dur, time, 0.5);
+      }
     }
 
     index += 1;
@@ -23,11 +29,15 @@ export function createMotifPlayer(motif: Motif) {
 
     stop() {
       loop.stop();
-      synth.dispose();
+      if (fallbackSynth) {
+        fallbackSynth.dispose();
+      }
     },
 
     setIntensity(v: number) {
-      synth.volume.value = -30 + v * 10;
+      if (instrument) {
+        instrument.setIntensity(v);
+      }
     },
   };
 }

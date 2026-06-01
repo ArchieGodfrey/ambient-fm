@@ -1,28 +1,23 @@
-import { useEffect, useState } from "react";
-import { nanoid } from "nanoid";
+import "./HomePage.css";
+import { useEffect, useMemo, useState } from "react";
 import { buildStimulusSnapshot } from "../stimuli/buildStimulusSnapshot";
 import { db } from "../db/db";
-import { getSessionHistory } from "../memory/getMemoryContext";
-import type { SessionSummary } from "../memory/types";
 import { useAppStore } from "../store/useAppStore";
 import Toasts from "../components/Toasts";
-import StatusBar from "../components/StatusBar";
 import MainActions from "../components/MainActions";
 import ModelActions from "../components/ModelActions";
-import MoodButtons from "../components/MoodButtons";
 import CompositionPlanSummary from "../components/CompositionPlanSummary";
 import OffscreenCanvasHost from "../components/OffscreenCanvasHost";
 import RuntimeDiagnostics from "../components/RuntimeDiagnostics";
 import useToastEvents from "../hooks/useToastEvents";
 import useModelManager from "../hooks/useModelManager";
 import useAudioComposer from "../hooks/useAudioComposer";
+import useSessionHistory from "../hooks/useSessionHistory";
 import { getAvailableModels, getSelectedModelId, selectModel } from "../ai/composer";
-import { subscribeRuntimeState, type CompositionRuntimeSnapshot } from "../audio/compositionRuntime";
 import { postToast } from "../utils/toast";
-import type { StimulusEvent } from "../types";
 
 export default function HomePage() {
-  const { events, setEvents, addEvent } = useAppStore();
+  const { events, setEvents, addEvent, currentPlan, setCurrentSessionStatus } = useAppStore();
   const [workerInitPayload, setWorkerInitPayload] = useState<{ canvas: OffscreenCanvas; width: number; height: number } | undefined>(undefined);
   const [selectedModelId, setSelectedModelId] = useState(getSelectedModelId());
   const availableModels = getAvailableModels();
@@ -36,47 +31,66 @@ export default function HomePage() {
     progressText,
     gpuStatus,
     gpuLimits,
-    heapUsage,
     downloadModelAction,
     loadModelAction,
     unloadModelAction,
-    deleteModelAction,
     resetRuntimeAction,
+    deleteModelAction,
     checkModelState,
   } = useModelManager(workerInitPayload);
+  const [isGenerating, setIsGenerating] = useState(false);
   const {
-    isPlaying,
-    aiStatus,
     status: audioStatus,
     plan,
-    handlePlayToggle,
+    runtimeState,
     runAIComposer,
     loadSessionPlan,
+    loadStaticPlan,
     restoreSession,
   } = useAudioComposer(events, modelLoaded);
-  const [runtimeState, setRuntimeState] = useState<CompositionRuntimeSnapshot>({
-    cursor: 0,
-    activeSection: null,
-    activePhrase: null,
-    intensity: 0,
-    drift: 0,
-    planDuration: 0,
-    sectionTimeRemaining: 0,
-    activeMotifs: 0,
-    runtimeUptime: 0,
-    frameDelay: 0,
-    audioRestartCount: 0,
-    snapshotCount: 0,
-  });
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const displayStatus = progressText ?? modelStatus ?? audioStatus ?? appStatus;
+  const { sessions } = useSessionHistory();
+  const compositionPreview = useMemo(() => {
+    const sourceCounts = events.reduce(
+      (counts, event) => {
+        const source = typeof event.source === "string" ? event.source : String(event.source);
+        counts[source] = (counts[source] ?? 0) + 1;
+        return counts;
+      },
+      {} as Record<string, number>,
+    );
+
+    const manualEvents = events.filter((event) => event.source === "manual");
+    const manualStrength = manualEvents.length
+      ? manualEvents.reduce((sum, event) => sum + event.strength, 0) / manualEvents.length
+      : 0;
+
+    const sourceLabels = Object.entries(sourceCounts)
+      .map(([source, count]) => `${source} ${count}`)
+      .join(" · ");
+
+    return {
+      totalEvents: events.length,
+      sourceCounts,
+      sourceLabels: sourceLabels || "None",
+      manualCount: manualEvents.length,
+      manualStrength,
+    };
+  }, [events]);
 
   async function loadEvents() {
     try {
       const loaded = await db.events.orderBy("timestamp").reverse().toArray();
-      setEvents(loaded);
-      if (!loaded.some((event) => event.source === "time")) {
+      const normalized = loaded.map((event) => {
+        const strength = typeof event.strength === "number"
+          ? event.strength
+          : typeof (event as any).value === "number"
+            ? Math.max(0, Math.min(1, (event as any).value))
+            : 0.5;
+        return { ...event, strength };
+      });
+
+      setEvents(normalized);
+      if (!normalized.some((event) => event.source === "time")) {
         await refreshStimuli();
       }
     } catch (error) {
@@ -87,63 +101,7 @@ export default function HomePage() {
     }
   }
 
-  async function loadSessions() {
-    try {
-      const history = await getSessionHistory();
-      setSessions(history);
-    } catch (error) {
-      console.error("Failed to load session history", error);
-    }
-  }
-
-  useEffect(() => {
-    async function init() {
-      await loadEvents();
-      await loadSessions();
-      await restoreSession();
-    }
-
-    init();
-
-    const handleSessionSaved = () => {
-      loadSessions();
-    };
-
-    window.addEventListener("session-saved", handleSessionSaved);
-    return () => {
-      window.removeEventListener("session-saved", handleSessionSaved);
-    };
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = subscribeRuntimeState(setRuntimeState);
-    return unsubscribe;
-  }, []);
-
-  // Audio and AI composition are managed by useAudioComposer.
-
-  async function addMood(label: string) {
-    const event: StimulusEvent = {
-      id: nanoid(),
-      timestamp: Date.now(),
-      source: "manual",
-      label,
-    };
-
-    try {
-      await db.events.add(event);
-      addEvent(event);
-      setAppStatus(`Added ${label}`);
-    } catch (error) {
-      console.error("Failed to save mood event", error);
-      const message = error instanceof Error ? error.message : String(error);
-      postToast(`Save failed: ${message}`, "error");
-      setAppStatus("Save failed");
-    }
-  }
-
   async function refreshStimuli() {
-    setRefreshing(true);
     try {
       const snapshot = await buildStimulusSnapshot();
       for (const event of snapshot) {
@@ -156,33 +114,98 @@ export default function HomePage() {
       const message = error instanceof Error ? error.message : String(error);
       postToast(`Refresh failed: ${message}`, "error");
       setAppStatus("Refresh failed");
-    } finally {
-      setRefreshing(false);
     }
   }
 
-  const lastWeather = events.find((event) => event.source === "weather");
-  const lastTime = events.find((event) => event.source === "time");
+  async function handleGenerate() {
+    setIsGenerating(true);
+    try {
+      if (!modelDownloaded) {
+        const downloaded = await downloadModelAction();
+        if (!downloaded) {
+          return;
+        }
+      }
+
+      if (!modelLoaded) {
+        const loaded = await loadModelAction();
+        if (!loaded) {
+          return;
+        }
+      }
+
+      await runAIComposer();
+    } finally {
+      await unloadModelAction();
+      setIsGenerating(false);
+    }
+  }
+
+  useEffect(() => {
+    async function init() {
+      await loadEvents();
+
+      if (!currentPlan) {
+        const restored = await restoreSession();
+
+        if (!restored && sessions.length > 0 && sessions[0].plan) {
+          loadStaticPlan(sessions[0].plan);
+        }
+      } else {
+        loadStaticPlan(currentPlan);
+      }
+    }
+
+    init();
+  }, [currentPlan, loadStaticPlan, restoreSession, sessions]);
+
+  const displayStatus = progressText ?? modelStatus ?? audioStatus ?? appStatus;
+
+  useEffect(() => {
+    if (displayStatus !== "") {
+      setCurrentSessionStatus(displayStatus);
+    }
+  }, [displayStatus, setCurrentSessionStatus]);
 
   return (
-    <div style={{ padding: 20, fontFamily: "system-ui, sans-serif", color: "#111" }}>
+    <div style={{ padding: 20, fontFamily: "system-ui, sans-serif", color: "var(--text)", paddingBottom: 180 }}>
       <OffscreenCanvasHost onPayloadChange={setWorkerInitPayload} />
       <Toasts toasts={toasts} />
       <h1>Ambient FM</h1>
 
       <MainActions
-        isPlaying={isPlaying}
-        refreshing={refreshing}
-        aiReady={aiStatus === "Ready" && modelLoaded}
-        modelLoaded={modelLoaded}
-        onPlayToggle={handlePlayToggle}
-        onRefresh={refreshStimuli}
-        onGenerate={runAIComposer}
+        isGenerating={isGenerating}
+        onGenerate={handleGenerate}
       />
+
+      <section className="home-page__preview">
+        <h2 className="home-page__preview-title">Composition preview</h2>
+        <div className="home-page__preview-grid">
+          <div className="home-page__preview-row">
+            <span>Total timeline events</span>
+            <strong>{compositionPreview.totalEvents}</strong>
+          </div>
+          <div className="home-page__preview-row">
+            <span>Sources</span>
+            <strong>{compositionPreview.sourceLabels}</strong>
+          </div>
+          <div className="home-page__preview-row">
+            <span>Manual mood inputs</span>
+            <strong>{compositionPreview.manualCount} events</strong>
+          </div>
+          <div className="home-page__preview-row">
+            <span>Average manual strength</span>
+            <strong>{Math.round(compositionPreview.manualStrength * 100)}%</strong>
+          </div>
+        </div>
+        <p className="home-page__preview-note">This preview is based on the current timeline and manual mood inputs that will be passed to the generator.</p>
+      </section>
 
       <ModelActions
         availableModels={availableModels}
         selectedModelId={selectedModelId}
+        progressText={progressText}
+        modelProgress={modelProgress}
         onSelectModel={async (modelId) => {
           if (modelId === selectedModelId) return;
           const label = availableModels.find((model) => model.model_id === modelId)?.label ?? modelId;
@@ -202,34 +225,7 @@ export default function HomePage() {
         onResetRuntime={resetRuntimeAction}
       />
 
-      <StatusBar
-        status={displayStatus}
-        aiStatus={aiStatus}
-        modelLoaded={modelLoaded}
-        modelDownloaded={modelDownloaded}
-        modelProgress={modelProgress}
-      />
-
-      <RuntimeDiagnostics
-        gpuStatus={gpuStatus}
-        gpuLimits={gpuLimits}
-        heapUsage={heapUsage}
-        runtimeCursor={runtimeState.cursor}
-        activeSection={runtimeState.activeSection}
-        runtimeIntensity={runtimeState.intensity}
-        runtimeDrift={runtimeState.drift}
-        runtimeUptime={runtimeState.runtimeUptime}
-        frameDelay={runtimeState.frameDelay}
-        audioRestartCount={runtimeState.audioRestartCount}
-        snapshotCount={runtimeState.snapshotCount}
-      />
-
-      <MoodButtons onAddMood={addMood} />
-
       <CompositionPlanSummary
-        events={events}
-        lastTime={lastTime}
-        lastWeather={lastWeather}
         plan={plan}
         runtimeCursor={runtimeState.cursor}
         activeSection={runtimeState.activeSection}
@@ -237,7 +233,7 @@ export default function HomePage() {
         sectionTimeRemaining={runtimeState.sectionTimeRemaining}
       />
 
-      <section style={{ marginTop: 24, padding: 18, borderRadius: 14, background: "#f4f6fb", border: "1px solid rgba(0,0,0,0.05)" }}>
+      <section style={{ marginTop: 24, padding: 18, borderRadius: 14, background: "var(--surface)", border: "1px solid var(--border)" }}>
         <h2 style={{ margin: "0 0 10px", fontSize: 18 }}>Recent Sessions</h2>
         {sessions.length ? (
           <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
@@ -253,9 +249,9 @@ export default function HomePage() {
                   style={{
                     padding: "6px 12px",
                     borderRadius: 8,
-                    border: "1px solid #ccc",
-                    background: session.plan ? "white" : "#f0f0f0",
-                    color: session.plan ? "#111" : "#999",
+                    border: "1px solid var(--border)",
+                    background: session.plan ? "var(--surface-strong)" : "var(--surface)",
+                    color: session.plan ? "var(--text)" : "var(--text-muted)",
                     cursor: session.plan ? "pointer" : "not-allowed",
                   }}
                 >
@@ -265,13 +261,22 @@ export default function HomePage() {
             ))}
           </ul>
         ) : (
-          <p style={{ margin: 0, color: "#555" }}>No saved session memory yet.</p>
+          <p style={{ margin: 0, color: "var(--text-muted)" }}>No saved session memory yet.</p>
         )}
       </section>
 
-      <p style={{ marginTop: 20, fontSize: 13, color: "#555" }}>
-        Use the bottom tabs to switch to Timeline or Sessions pages.
-      </p>
+      <RuntimeDiagnostics
+        gpuStatus={gpuStatus}
+        gpuLimits={gpuLimits}
+        runtimeCursor={runtimeState.cursor}
+        activeSection={runtimeState.activeSection}
+        runtimeIntensity={runtimeState.intensity}
+        runtimeDrift={runtimeState.drift}
+        runtimeUptime={runtimeState.runtimeUptime}
+        frameDelay={runtimeState.frameDelay}
+        audioRestartCount={runtimeState.audioRestartCount}
+        snapshotCount={runtimeState.snapshotCount}
+      />
     </div>
   );
 }

@@ -1,0 +1,118 @@
+.mood-page {
+  padding: 20px;
+  font-family: system-ui, sans-serif;
+  color: var(--text);
+  padding-bottom: 110px;
+}
+
+.mood-page__subtitle {
+  margin: 0 0 18px;
+}
+
+.mood-page__grid {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.mood-page__panel {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  padding: 18px;
+}
+
+.mood-page__preset-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mood-page__button {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.mood-page__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mood-page__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.mood-page__text-input {
+  flex: 1;
+  min-width: 160px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.mood-page__panel-title {
+  margin: 0 0 10px;
+}
+
+.mood-page__strength-grid,
+.mood-page__timeline {
+  display: grid;
+  gap: 14px;
+}
+
+.mood-page__strength-grid {
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+}
+
+.mood-page__range-row {
+  display: grid;
+  gap: 6px;
+}
+
+.mood-page__range-heading {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mood-page__event-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--surface-strong);
+  display: grid;
+  gap: 8px;
+}
+
+.mood-page__event-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mood-page__event-meta,
+.mood-page__code {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.mood-page__status-note {
+  margin: 0;
+  color: var(--text-muted);
+}
