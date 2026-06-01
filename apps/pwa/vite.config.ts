@@ -4,7 +4,7 @@ import mkcert from 'vite-plugin-mkcert'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/',
+  base: './',
   plugins: [
     mkcert(),
     react(),
@@ -64,7 +64,7 @@ export default defineConfig({
             },
           },
         ],
-        navigateFallback: '/index.html',
+        navigateFallback: './index.html',
         navigateFallbackDenylist: [new RegExp('^\/api\/')],
       },
       manifest: {
@@ -72,7 +72,7 @@ export default defineConfig({
         short_name: 'AmbientFM',
         description: 'A minimal ambient audio PWA.',
         start_url: '.',
-        scope: '/',
+        scope: './',
         display: 'standalone',
         background_color: '#0f172a',
         theme_color: '#0f172a',
