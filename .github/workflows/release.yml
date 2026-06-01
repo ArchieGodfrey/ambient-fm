@@ -72,8 +72,7 @@ jobs:
 
       - name: Zip build
         run: |
-          cd apps/pwa/dist
-          zip -r ../../dist.zip .
+          zip -r dist.zip apps/pwa/dist
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
