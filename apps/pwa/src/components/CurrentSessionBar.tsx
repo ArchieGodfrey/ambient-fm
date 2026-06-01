@@ -4,7 +4,6 @@ import { useAppStore } from "../store/useAppStore";
 export default function CurrentSessionBar() {
   const plan = useAppStore((state) => state.currentPlan);
   const isPlaying = useAppStore((state) => state.isPlaying);
-  const status = useAppStore((state) => state.currentSessionStatus);
   const playToggle = useAppStore((state) => state.playToggle);
 
   return (

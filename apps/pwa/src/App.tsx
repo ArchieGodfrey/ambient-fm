@@ -3,6 +3,8 @@ import HomePage from "./pages/HomePage";
 import MoodPage from "./pages/MoodPage";
 import SessionsPage from "./pages/SessionsPage";
 import CurrentSessionBar from "./components/CurrentSessionBar";
+import Toasts from "./components/Toasts";
+import useToastEvents from "./hooks/useToastEvents";
 
 const tabs = [
   { key: "dashboard", label: "Now" },
@@ -14,10 +16,12 @@ type TabKey = (typeof tabs)[number]["key"];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
+  const toasts = useToastEvents();
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 120, background: "var(--bg)" }}>
       <CurrentSessionBar />
+      <Toasts toasts={toasts} />
       <div style={{ position: "relative" }}>
         <div style={{ display: activeTab === "dashboard" ? "block" : "none" }}>
           <HomePage />

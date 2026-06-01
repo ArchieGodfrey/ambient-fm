@@ -3,13 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { buildStimulusSnapshot } from "../stimuli/buildStimulusSnapshot";
 import { db } from "../db/db";
 import { useAppStore } from "../store/useAppStore";
-import Toasts from "../components/Toasts";
 import MainActions from "../components/MainActions";
 import ModelActions from "../components/ModelActions";
 import CompositionPlanSummary from "../components/CompositionPlanSummary";
 import OffscreenCanvasHost from "../components/OffscreenCanvasHost";
 import RuntimeDiagnostics from "../components/RuntimeDiagnostics";
-import useToastEvents from "../hooks/useToastEvents";
 import useModelManager from "../hooks/useModelManager";
 import useAudioComposer from "../hooks/useAudioComposer";
 import useSessionHistory from "../hooks/useSessionHistory";
@@ -21,7 +19,6 @@ export default function HomePage() {
   const [workerInitPayload, setWorkerInitPayload] = useState<{ canvas: OffscreenCanvas; width: number; height: number } | undefined>(undefined);
   const [selectedModelId, setSelectedModelId] = useState(getSelectedModelId());
   const availableModels = getAvailableModels();
-  const toasts = useToastEvents();
   const [appStatus, setAppStatus] = useState("Ready");
   const {
     status: modelStatus,
@@ -77,6 +74,10 @@ export default function HomePage() {
       .map(([source, count]) => `${source}${count > 1 ? ` x${count}` : ""}`)
       .join(" · ");
 
+    const intentSummary = plan?.intent
+      ? `${plan.intent.key.tonic} ${plan.intent.key.mode} @ ${plan.intent.bpm}`
+      : "None";
+
     return {
       totalEvents: events.length,
       sourceCounts,
@@ -85,6 +86,7 @@ export default function HomePage() {
       manualStrength,
       llmInputs,
       intent: plan?.intent,
+      intentSummary,
     };
   }, [events, plan]);
 
@@ -180,7 +182,6 @@ export default function HomePage() {
   return (
     <div style={{ padding: 20, fontFamily: "system-ui, sans-serif", color: "var(--text)", paddingBottom: 180 }}>
       <OffscreenCanvasHost onPayloadChange={setWorkerInitPayload} />
-      <Toasts toasts={toasts} />
       <h1>Ambient FM</h1>
 
       <MainActions
