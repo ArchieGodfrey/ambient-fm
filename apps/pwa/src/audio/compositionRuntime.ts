@@ -1,10 +1,11 @@
 import * as Tone from "tone";
 import type { CompositionPlan, CompositionSection, Phrase } from "../ai/types";
 import { applySectionToAudio } from "./mapSectionToAudio";
-import { evolveMotifs } from "./motifManager";
 import { activatePhrase, updatePhraseIntensity, stopPhrase } from "./phraseRuntime";
+import { field, getTick } from "../music/random/randomField";
 import { startScheduler, tick as schedulerTick } from "./sectionScheduler";
 import { saveSnapshot, type RuntimeSnapshot } from "../memory/runtimeSnapshots";
+import { composerState } from "../composer/composerState";
 
 export type CompositionRuntimeSnapshot = {
   cursor: number;
@@ -68,8 +69,48 @@ function getSectionTimeRemaining(cursor: number, section: CompositionSection | n
   return Math.max(0, section.start + section.duration - cursor);
 }
 
-function getDrift() {
-  return Math.sin(performance.now() / 10000) * 0.1;
+function getDrift(plan: CompositionPlan, tick: number) {
+  const rng = field(plan.seed, tick, "drift");
+  return (rng() - 0.5) * 0.2;
+}
+
+function deriveComposerState(plan: CompositionPlan, tick: number) {
+  const profile = plan.evolutionProfile;
+  const density = Math.min(1, Math.max(0, composerState.currentDensity ?? 0.4));
+  const densityRng = field(plan.seed, tick, "density");
+  const evolvedDensity = Math.min(
+    1,
+    Math.max(0, density + (densityRng() - 0.5) * (profile?.densityDrift ?? 0.05)),
+  );
+  const chordDuration = composerState.currentChordDuration ?? 16;
+  const baseBpm = composerState.intent?.bpm ?? plan.bpm;
+  const tempoFactor = 16 / chordDuration;
+  const adjustedBpm = Math.min(240, Math.max(20, baseBpm * tempoFactor));
+
+  const instrumentBoost = composerState.activeInstruments.reduce(
+    (acc, id) => {
+      if (id === "pad") acc.pad += 0.05;
+      if (id === "bell") acc.texture += 0.05;
+      if (id === "bass") acc.pulse += 0.05;
+      return acc;
+    },
+    { pad: 0, texture: 0, pulse: 0 } as { pad: number; texture: number; pulse: number },
+  );
+
+  return {
+    bpm: adjustedBpm,
+    layers: {
+      drone: plan.layers.drone,
+      pad: Math.min(1, Math.max(0, plan.layers.pad * (0.8 + evolvedDensity * 0.4) + instrumentBoost.pad)),
+      texture: Math.min(1, Math.max(0, plan.layers.texture * (0.7 + evolvedDensity * 0.5) + instrumentBoost.texture)),
+      pulse: Math.min(1, Math.max(0, plan.layers.pulse * (0.6 + evolvedDensity * 0.5) + instrumentBoost.pulse)),
+    },
+    texture: {
+      density: Math.min(1, Math.max(0, plan.texture.density * (0.9 + evolvedDensity * 0.1))),
+      brightness: Math.min(1, Math.max(0, plan.texture.brightness * (0.9 + density * 0.1))),
+      reverbAmount: plan.texture.reverbAmount,
+    },
+  };
 }
 
 function notifySubscribers() {
@@ -104,7 +145,6 @@ function updateSnapshot(cursor: number, activeSection: CompositionSection | null
 }
 
 const MAX_RUNTIME_MS = 1000 * 60 * 30;
-let lastMotifEvolution = 0;
 
 async function ensureAudioRunning() {
   const contextState = (Tone.context as unknown as { state?: unknown }).state;
@@ -180,29 +220,32 @@ function tick() {
 
   const cursor = getCursor();
   const activeSection = getActiveSection(cursor);
-  const drift = getDrift();
-
-  if (plan.layers) {
-    plan.layers.pad = Math.min(1, Math.max(0, plan.layers.pad * (0.99 + Math.random() * 0.02)));
-  }
+  const beatTick = getTick(cursor, plan.bpm);
+  const drift = getDrift(plan, beatTick);
 
   void ensureAudioRunning();
 
   schedulerTick(() => performance.now(), (phrase) => {
     currentPhrase = phrase;
-    activatePhrase(phrase, plan?.motifs ?? [], activeSection?.intensity ?? 0.5);
+    const planValue = plan;
+    if (!planValue) return;
+    const phraseRng = field(planValue.seed, beatTick, `phrase_${phrase.id}`);
+    activatePhrase(
+      phrase,
+      planValue.motifs ?? [],
+      activeSection?.intensity ?? 0.5,
+      composerState.currentDensity,
+      phraseRng,
+    );
   });
 
   if (currentPhrase) {
     updatePhraseIntensity(activeSection?.intensity ?? 0.5);
   }
 
-  if (performance.now() - lastMotifEvolution > 1500) {
-    evolveMotifs(plan.motifs);
-    lastMotifEvolution = performance.now();
-  }
-
-  applySectionToAudio(activeSection, plan.layers, plan, drift);
+  const derived = deriveComposerState(plan, beatTick);
+  Tone.Transport.bpm.value = derived.bpm;
+  applySectionToAudio(activeSection, derived.layers, { ...plan, texture: derived.texture }, drift);
   updateSnapshot(cursor, activeSection, drift);
 
   rafId = requestAnimationFrame(tick);
@@ -212,22 +255,33 @@ export function startCompositionRuntime(planInput: CompositionPlan, startOffset 
   plan = planInput;
   startScheduler(planInput);
   startTime = performance.now() - startOffset * 1000;
-  lastMotifEvolution = performance.now();
 
   const cursor = getCursor();
   const activeSection = getActiveSection(cursor);
-  const drift = getDrift();
+  const beatTick = getTick(cursor, plan.bpm);
+  const drift = getDrift(plan, beatTick);
 
   schedulerTick(() => performance.now(), (phrase) => {
     currentPhrase = phrase;
-    activatePhrase(phrase, plan?.motifs ?? [], activeSection?.intensity ?? 0.5);
+    const planValue = plan;
+    if (!planValue) return;
+    const phraseRng = field(planValue.seed, beatTick, `phrase_${phrase.id}`);
+    activatePhrase(
+      phrase,
+      planValue.motifs ?? [],
+      activeSection?.intensity ?? 0.5,
+      composerState.currentDensity,
+      phraseRng,
+    );
   });
 
   if (currentPhrase) {
     updatePhraseIntensity(activeSection?.intensity ?? 0.5);
   }
 
-  applySectionToAudio(activeSection, plan.layers, plan, drift);
+  const derived = deriveComposerState(plan, beatTick);
+  Tone.Transport.bpm.value = derived.bpm;
+  applySectionToAudio(activeSection, derived.layers, { ...plan, texture: derived.texture }, drift);
   updateSnapshot(cursor, activeSection, drift);
   scheduleCheckpointing();
 }

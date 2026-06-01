@@ -1,6 +1,7 @@
 import type { CompositionPlan } from "../ai/types";
 import type { Motif } from "../ai/types";
 import { createMotifPlayer } from "./motifEngine";
+import { field, shouldEvolve } from "../music/random/randomField";
 
 let players: Array<ReturnType<typeof createMotifPlayer>> = [];
 
@@ -28,15 +29,16 @@ function midiToNoteName(midi: number) {
   return `${note}${octave}`;
 }
 
-function randomNearbyNote(notes: string[]) {
-  const seed = notes[notes.length - 1] || notes[0] || "C4";
-  const midi = noteNameToMidi(seed);
+function randomNearbyNote(notes: string[], seed: number, tick: number) {
+  const rng = field(seed, tick, "randomNearbyNote");
+  const seedNote = notes[notes.length - 1] || notes[0] || "C4";
+  const midi = noteNameToMidi(seedNote);
   if (midi === null) {
     const fallbackNotes = ["C4", "D4", "E4", "G4", "A4"];
-    return fallbackNotes[Math.floor(Math.random() * fallbackNotes.length)];
+    return fallbackNotes[Math.floor(rng() * fallbackNotes.length)];
   }
 
-  const offset = Math.floor(Math.random() * 5) - 2;
+  const offset = Math.floor(rng() * 5) - 2;
   const nextMidi = clamp(midi + offset, 36, 84);
   return midiToNoteName(Math.round(nextMidi));
 }
@@ -65,10 +67,10 @@ export function updateMotifs(layers: CompositionPlan["layers"]) {
   });
 }
 
-export function evolveMotifs(motifs: Motif[]) {
-  motifs.forEach((motif) => {
-    if (Math.random() < 0.01 && motif.notes.length > 0) {
-      motif.notes.push(randomNearbyNote(motif.notes));
+export function evolveMotifs(motifs: Motif[], seed: number, tick: number) {
+  motifs.forEach((motif, index) => {
+    if (shouldEvolve(seed, tick + index, `motif_evolution_${motif.id}`, 0.01) && motif.notes.length > 0) {
+      motif.notes.push(randomNearbyNote(motif.notes, seed, tick + index));
       motif.notes.shift();
     }
   });

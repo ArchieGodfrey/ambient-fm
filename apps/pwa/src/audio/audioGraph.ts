@@ -39,16 +39,18 @@ function normalizeCompositionPlan(plan: CompositionPlan): CompositionPlan {
     duration: clampNumber(plan.duration, computedDuration || 30, 1, 600),
     globalMood: typeof plan.globalMood === "string" ? plan.globalMood : "ambient",
     sections: normalizedSections,
+    seed: clampNumber(plan.seed, 0, 0, 0xffffffff),
+    evolutionProfile: plan.evolutionProfile,
     texture: {
-      density: clampNumber(plan.texture?.density, 0.5, 0, 1),
-      brightness: clampNumber(plan.texture?.brightness, 0.5, 0, 1),
-      reverbAmount: clampNumber(plan.texture?.reverbAmount, 0.5, 0, 1),
+      density: clampNumber(plan.texture?.density, 0, 0, 1),
+      brightness: clampNumber(plan.texture?.brightness, 0, 0, 1),
+      reverbAmount: clampNumber(plan.texture?.reverbAmount, 0.2, 0, 1),
     },
     layers: {
-      drone: clampNumber(plan.layers?.drone, 0.5, 0, 1),
-      pad: clampNumber(plan.layers?.pad, 0.5, 0, 1),
-      texture: clampNumber(plan.layers?.texture, 0.5, 0, 1),
-      pulse: clampNumber(plan.layers?.pulse, 0.5, 0, 1),
+      drone: clampNumber(plan.layers?.drone, 0, 0, 1),
+      pad: clampNumber(plan.layers?.pad, 0, 0, 1),
+      texture: clampNumber(plan.layers?.texture, 0, 0, 1),
+      pulse: clampNumber(plan.layers?.pulse, 0, 0, 1),
     },
     motifs: Array.isArray(plan.motifs) ? plan.motifs : [],
     phrases: Array.isArray(plan.phrases) ? plan.phrases : [],
@@ -76,6 +78,9 @@ export function applyComposition(plan: CompositionPlan) {
   Tone.Transport.bpm.value = safePlan.bpm;
   drone?.setIntensity(safePlan.layers.drone);
   pad?.setIntensity(safePlan.layers.pad);
-  texture?.setIntensity(safePlan.layers.texture);
+  texture?.setIntensity(
+    safePlan.layers.texture * safePlan.texture.density,
+    safePlan.texture.brightness,
+  );
   pulse?.setIntensity(safePlan.layers.pulse);
 }

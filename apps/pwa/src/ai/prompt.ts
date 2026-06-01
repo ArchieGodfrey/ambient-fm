@@ -1,86 +1,59 @@
-import { buildAIContext } from "../stimulus/aiContext";
-import { computeEmotionalState } from "../stimulus/emotionalState";
-import type { StimulusEvent } from "../types";
+import type { CompositionContext } from "./compositionContext";
 
-export function buildPrompt(emotionalState: ReturnType<typeof computeEmotionalState>, memoryContext: string, events: StimulusEvent[]) {
-  const context = buildAIContext(emotionalState, memoryContext, events);
+function describeStimulus(stimulus: { source: string; label: string; strength: number; metadata?: any }) {
+  const subtype = typeof stimulus.metadata?.type === "string" ? stimulus.metadata.type : stimulus.label;
+  return `${stimulus.source}:${subtype} (${stimulus.strength.toFixed(2)})`;
+}
+
+export function buildPrompt(context: CompositionContext) {
+  const stimuliText = context.stimuli
+    .map((stimulus) => `- ${describeStimulus(stimulus)}`)
+    .join("\n");
 
   return `
 You are an ambient music composer.
 
-Convert the following emotional state and stimulus summary into a structured music plan.
+You have a context object that describes what is happening now, what has happened before, and how the composer should behave.
 
 RULES:
-- Output EXACTLY one valid JSON object
-- Do NOT include explanations, markdown fences, backticks, or any extra text
-- Do NOT wrap the JSON in quotes, code blocks, or markdown formatting
-- Only output the JSON object, nothing else
-- Use 3 to 5 sequential sections
-- Ensure sections are non-overlapping and each has start/duration/intensity/mood
-- Set duration to cover the end of the final section
-- You should slightly vary today’s composition while respecting past mood trends.
-- Avoid repeating identical keys or BPM patterns unless strongly justified by stimuli.
-- Do NOT ask for a full composition. Only generate motif seeds, phrase structure, and the plan metadata.
-- Also generate 2–4 musical motifs.
-- Each motif must be short (2–5 notes), assigned to a layer (pad, pulse, or texture), and use a simple rhythmic structure.
-- Also generate 2–3 phrases.
-- Each phrase should group 1–3 motifs, have a role (build, release, static, transition), and variation between 0 and 1.
-- Sections must reference one or more phrase IDs.
+- Output EXACTLY one valid JSON object.
+- Do NOT include explanations, markdown fences, backticks, or any extra text.
+- Do NOT wrap the JSON in quotes, code blocks, or markdown formatting.
+- Only output the JSON object, nothing else.
+- Do NOT include raw notes, MIDI, or complete melodies in the output.
+- The model should return a high-level composition intent that becomes a long-lived blueprint for the runtime.
+- The composition blueprint should preserve mood, identity, key, harmony, motif density, and evolution intent.
+- Use 3 to 5 chord degrees in the progression.
 - Keep the output minimal and avoid unnecessary extra detail.
 
-${memoryContext}
+STIMULI:
+${stimuliText || "- none"}
 
-EMOTIONAL STATE:
-${JSON.stringify(context.emotionalState, null, 2)}
+MEMORY:
+- recentKeys: ${context.memory.recentKeys.length > 0 ? context.memory.recentKeys.join(", ") : "none"}
+- dominantInstrument: ${context.memory.dominantInstrument ?? "none"}
+- averageDensity: ${context.memory.averageDensity.toFixed(2)}
+- recurringMotifs: ${context.memory.recurringMotifs.length > 0 ? context.memory.recurringMotifs.join(", ") : "none"}
 
-STIMULUS SUMMARY:
-${context.stimulusSummary
-    .map((stimulus) => `- ${stimulus.label}: ${stimulus.strength.toFixed(2)}`)
-    .join("\n")}
+USER PREFERENCES:
+- none
+
+COMPOSER SETTINGS:
+- complexity: ${context.composerSettings.complexity}
+- motifDensity: ${context.composerSettings.motifDensity}
+- harmonicMovement: ${context.composerSettings.harmonicMovement}
 
 OUTPUT FORMAT:
 {
-  "key": "string",
+  "key": {
+    "tonic": "D",
+    "mode": "minor"
+  },
   "bpm": number,
-  "duration": number,
-  "globalMood": "string",
-  "sections": [
-    {
-      "start": number,
-      "duration": number,
-      "mood": "calm | focused | tense | ambient | energised",
-      "intensity": number,
-      "phraseIds": ["string"]
-    }
-  ],
-  "texture": {
-    "density": number,
-    "brightness": number,
-    "reverbAmount": number
-  },
-  "layers": {
-    "drone": number,
-    "pad": number,
-    "texture": number,
-    "pulse": number
-  },
-  "motifs": [
-    {
-      "id": "string",
-      "layer": "pad | pulse | texture",
-      "notes": ["C4", "E4"],
-      "rhythm": [1, 0.5]
-    }
-  ],
-  "phrases": [
-    {
-      "id": "string",
-      "motifs": ["string"],
-      "length": number,
-      "variation": number,
-      "role": "build | release | static | transition"
-    }
-  ]
+  "progression": [0, 5, 3, 6],
+  "motifDensity": 0.6,
+  "complexity": 0.3,
+  "energy": 0.4
 }
 `;
 }

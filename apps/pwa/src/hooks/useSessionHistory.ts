@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getSessionHistory } from "../memory/getMemoryContext";
+import { getSessionHistory, deleteSessionSummary } from "../memory/getMemoryContext";
 import type { SessionSummary } from "../memory/types";
 import { postToast } from "../utils/toast";
 
@@ -17,6 +17,18 @@ export default function useSessionHistory() {
     }
   }
 
+  async function deleteSession(id: string) {
+    try {
+      await deleteSessionSummary(id);
+      await loadSessions();
+      postToast("Session deleted.", "success");
+    } catch (error) {
+      console.error("Failed to delete session", error);
+      const message = error instanceof Error ? error.message : String(error);
+      postToast(`Delete failed: ${message}`, "error");
+    }
+  }
+
   useEffect(() => {
     loadSessions();
 
@@ -30,5 +42,5 @@ export default function useSessionHistory() {
     };
   }, []);
 
-  return { sessions, loadSessions };
+  return { sessions, loadSessions, deleteSession };
 }

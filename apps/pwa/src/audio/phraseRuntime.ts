@@ -1,6 +1,7 @@
 import { resolvePhrase } from "./phraseEngine";
 import { createMotifPlayer } from "./motifEngine";
 import type { Motif, Phrase } from "../ai/types";
+import type { RNG } from "../music/random/randomField";
 
 let activePlayers: Array<ReturnType<typeof createMotifPlayer>> = [];
 let currentPhraseId: string | null = null;
@@ -14,13 +15,13 @@ function stopActivePlayers() {
   activePlayers = [];
 }
 
-function mutateMotif(motif: Motif, variation: number): Motif {
+function mutateMotif(motif: Motif, variation: number, rng: RNG): Motif {
   const noteCount = motif.notes.length;
-  const rhythm = motif.rhythm.map((duration) => Math.max(0.25, duration * (1 + (Math.random() - 0.5) * variation * 0.4)));
+  const rhythm = motif.rhythm.map((duration) => Math.max(0.25, duration * (1 + (rng() - 0.5) * variation * 0.4)));
   const notes = [...motif.notes];
 
-  if (variation > 0 && noteCount > 1 && Math.random() < variation * 0.5) {
-    const shift = Math.floor(Math.random() * noteCount);
+  if (variation > 0 && noteCount > 1 && rng() < variation * 0.5) {
+    const shift = Math.floor(rng() * noteCount);
     for (let i = 0; i < shift; i++) {
       notes.push(notes.shift()!);
     }
@@ -33,8 +34,26 @@ function mutateMotif(motif: Motif, variation: number): Motif {
   };
 }
 
-export function activatePhrase(phrase: Phrase, motifs: Motif[], intensity = 0.5) {
-  const resolved = resolvePhrase(phrase, motifs).map((motif) => mutateMotif({ ...motif }, phrase.variation));
+export function activatePhrase(
+  phrase: Phrase,
+  motifs: Motif[],
+  intensity = 0.5,
+  density = 0.5,
+  rng: RNG,
+) {
+  const densityFactor = Math.min(1, Math.max(0, density));
+  const resolved = resolvePhrase(phrase, motifs).map((motif) => {
+    const evolved = mutateMotif({ ...motif }, phrase.variation, rng);
+    const tempoFactor = 1 + (densityFactor - 0.5) * 0.8;
+    const notes = [...evolved.notes];
+
+    if (densityFactor > 0.75 && notes.length > 0) {
+      notes.push(notes[0]);
+    }
+
+    const rhythm = evolved.rhythm.map((duration) => Math.max(0.15, duration / tempoFactor));
+    return { ...evolved, notes, rhythm };
+  });
 
   if (phrase.id === currentPhraseId) {
     updatePhraseIntensity(intensity);

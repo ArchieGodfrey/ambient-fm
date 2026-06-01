@@ -1,20 +1,28 @@
-import { getMemoryContext, getLastSessionSummaries } from "../memory/getMemoryContext";
+import { getLastSessionSummaries } from "../memory/getMemoryContext";
 import { applyMemoryBias } from "../memory/applyMemoryBias";
-import { computeEmotionalState } from "../stimulus/emotionalState";
 import { dispatchRuntimeStatus, infer, isModelLoaded } from "../runtime/modelRuntime";
 import { buildPrompt, sanitizeJsonResponse, tryParseJsonWithRecovery } from "./prompt";
+import { buildCompositionContext } from "./compositionContext";
 import { postToast } from "../utils/toast";
 import type { CompositionPlan } from "./types";
+import type { CompositionIntent } from "./intentSchema";
+import { buildCompositionPlanFromIntent } from "./intentToPlan";
+import { createSeed } from "../utils/randomField";
+import type { ComposerSettings } from "../features/composer/types";
 import type { StimulusEvent } from "../types";
 
-export async function generateComposition(events: StimulusEvent[]) {
+export type GeneratedComposition = {
+  plan: CompositionPlan;
+  intent: CompositionIntent;
+};
+
+export async function generateComposition(events: StimulusEvent[], composerSettings: ComposerSettings): Promise<GeneratedComposition> {
   if (!isModelLoaded()) {
     throw new Error("Model not loaded. Load the model before generating a composition.");
   }
 
-  const memoryContext = await getMemoryContext();
-  const emotionalState = computeEmotionalState(events);
-  const prompt = buildPrompt(emotionalState, memoryContext, events);
+  const context = await buildCompositionContext(events, composerSettings);
+  const prompt = buildPrompt(context);
   dispatchRuntimeStatus({ stage: "infer-start", text: "Starting AI composition generation" });
 
   try {
@@ -30,12 +38,16 @@ export async function generateComposition(events: StimulusEvent[]) {
     const sanitized = sanitizeJsonResponse(text);
     let recovered: string | null = null;
     try {
-      const plan = tryParseJsonWithRecovery(sanitized) as CompositionPlan;
-      plan.motifs = Array.isArray((plan as any).motifs) ? (plan as any).motifs : [];
+      const intent = tryParseJsonWithRecovery(sanitized) as CompositionIntent;
+      const seed = createSeed();
+      const plan = buildCompositionPlanFromIntent(intent, composerSettings, seed);
+      plan.intent = intent;
       const sessions = await getLastSessionSummaries();
       const biasedPlan = applyMemoryBias(plan, sessions);
+      biasedPlan.seed = plan.seed;
+      biasedPlan.intent = intent;
       dispatchRuntimeStatus({ stage: "infer-ready", text: "Composition ready" });
-      return biasedPlan;
+      return { plan: biasedPlan, intent };
     } catch (parseError) {
       recovered = sanitizeJsonResponse(sanitized);
       const errorMessage = `Failed to parse AI JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}\nSanitized text:\n${sanitized}\nRecovered text:\n${recovered}\nRaw response:\n${text}`;
@@ -63,6 +75,7 @@ export function fallbackComposition(): CompositionPlan {
     key: "C minor",
     bpm: 70,
     duration: 30,
+    seed: createSeed(),
     globalMood: "fallback",
     sections: [
       {
@@ -80,6 +93,13 @@ export function fallbackComposition(): CompositionPlan {
         phraseIds: ["phrase-2"],
       },
     ],
+    evolutionProfile: {
+      motifMutationChance: 0.08,
+      chordChangeChance: 0.08,
+      instrumentChangeChance: 0.08,
+      densityDrift: 0.05,
+      rhythmVariation: 0.1,
+    },
     texture: {
       density: 0.5,
       brightness: 0.5,

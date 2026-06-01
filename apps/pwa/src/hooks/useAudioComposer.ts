@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import { startAudio, stopAudio } from "../audio/toneEngine";
 import { generateComposition, fallbackComposition } from "../ai/composer";
 import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop, subscribeRuntimeState } from "../audio/compositionRuntime";
+import { startComposer, stopComposer } from "../composer/runtime";
 import { postToast } from "../utils/toast";
 import { db } from "../db/db";
 import { analyzeSession } from "../memory/analyzeSession";
@@ -14,6 +15,7 @@ import type { CompositionRuntimeSnapshot } from "../audio/compositionRuntime";
 export default function useAudioComposer(events: StimulusEvent[], modelLoaded: boolean) {
   const setStoreIsPlaying = useAppStore((state) => state.setIsPlaying);
   const setPlayToggle = useAppStore((state) => state.setPlayToggle);
+  const composerSettings = useAppStore((state) => state.composerSettings);
   const [isPlaying, setIsPlaying] = useState(false);
   const [aiStatus, setAIStatus] = useState("Ready");
   const [status, setStatus] = useState("Ready");
@@ -77,6 +79,7 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
     if (isPlaying) {
       stopAudio();
       stopRuntimeLoop();
+      stopComposer();
       await endSession(events, plan);
       setIsPlaying(false);
       setStoreIsPlaying(false);
@@ -86,6 +89,10 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
 
     try {
       await startAudio();
+      if (plan) {
+        startCompositionRuntime(plan);
+        startRuntimeLoop();
+      }
       setIsPlaying(true);
       setStoreIsPlaying(true);
       setStatus("Audio started");
@@ -121,11 +128,11 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
     setStatus("Generating composition...");
 
     try {
-      const composition = await generateComposition(inputEvents);
+      const { plan: composition, intent } = await generateComposition(inputEvents, composerSettings);
       setSharedPlan(composition);
       await saveSession(inputEvents, composition);
       startCompositionRuntime(composition);
-      startRuntimeLoop();
+      startComposer(intent);
       setStatus(`Composition generated: ${composition.key}`);
     } catch (error) {
       console.error("Failed to generate composition", error);
@@ -135,7 +142,14 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
       const fallback = fallbackComposition();
       setSharedPlan(fallback);
       startCompositionRuntime(fallback);
-      startRuntimeLoop();
+      startComposer({
+        key: { tonic: "C", mode: "minor" },
+        bpm: fallback.bpm,
+        progression: [0, 3, 4, 5],
+        motifDensity: fallback.texture.density,
+        complexity: 0.4,
+        energy: 0.5,
+      });
     } finally {
       setAIStatus("Ready");
     }

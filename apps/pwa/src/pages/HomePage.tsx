@@ -50,22 +50,31 @@ export default function HomePage() {
   } = useAudioComposer(events, modelLoaded);
   const { sessions } = useSessionHistory();
   const compositionPreview = useMemo(() => {
-    const sourceCounts = events.reduce(
-      (counts, event) => {
-        const source = typeof event.source === "string" ? event.source : String(event.source);
-        counts[source] = (counts[source] ?? 0) + 1;
-        return counts;
-      },
-      {} as Record<string, number>,
-    );
+    const sourceIndexes = {} as Record<string, number>;
+    const llmInputs = events.map((event) => {
+      const source = typeof event.source === "string" ? event.source : String(event.source);
+      const index = (sourceIndexes[source] = (sourceIndexes[source] ?? 0) + 1);
+      const weightedStrength = event.strength / index;
+      return {
+        ...event,
+        source,
+        repeatIndex: index,
+        weightedStrength,
+      };
+    });
 
-    const manualEvents = events.filter((event) => event.source === "manual");
+    const sourceCounts = llmInputs.reduce((counts, event) => {
+      counts[event.source] = (counts[event.source] ?? 0) + 1;
+      return counts;
+    }, {} as Record<string, number>);
+
+    const manualEvents = llmInputs.filter((event) => event.source === "manual");
     const manualStrength = manualEvents.length
       ? manualEvents.reduce((sum, event) => sum + event.strength, 0) / manualEvents.length
       : 0;
 
     const sourceLabels = Object.entries(sourceCounts)
-      .map(([source, count]) => `${source} ${count}`)
+      .map(([source, count]) => `${source}${count > 1 ? ` x${count}` : ""}`)
       .join(" · ");
 
     return {
@@ -74,8 +83,10 @@ export default function HomePage() {
       sourceLabels: sourceLabels || "None",
       manualCount: manualEvents.length,
       manualStrength,
+      llmInputs,
+      intent: plan?.intent,
     };
-  }, [events]);
+  }, [events, plan]);
 
   async function loadEvents() {
     try {
@@ -127,11 +138,10 @@ export default function HomePage() {
         }
       }
 
-      if (!modelLoaded) {
-        const loaded = await loadModelAction();
-        if (!loaded) {
-          return;
-        }
+      const loaded = modelLoaded || (await loadModelAction());
+      if (!loaded) {
+        setAppStatus("Model failed to load before generating.");
+        return;
       }
 
       await runAIComposer();
@@ -178,29 +188,6 @@ export default function HomePage() {
         onGenerate={handleGenerate}
       />
 
-      <section className="home-page__preview">
-        <h2 className="home-page__preview-title">Composition preview</h2>
-        <div className="home-page__preview-grid">
-          <div className="home-page__preview-row">
-            <span>Total timeline events</span>
-            <strong>{compositionPreview.totalEvents}</strong>
-          </div>
-          <div className="home-page__preview-row">
-            <span>Sources</span>
-            <strong>{compositionPreview.sourceLabels}</strong>
-          </div>
-          <div className="home-page__preview-row">
-            <span>Manual mood inputs</span>
-            <strong>{compositionPreview.manualCount} events</strong>
-          </div>
-          <div className="home-page__preview-row">
-            <span>Average manual strength</span>
-            <strong>{Math.round(compositionPreview.manualStrength * 100)}%</strong>
-          </div>
-        </div>
-        <p className="home-page__preview-note">This preview is based on the current timeline and manual mood inputs that will be passed to the generator.</p>
-      </section>
-
       <ModelActions
         availableModels={availableModels}
         selectedModelId={selectedModelId}
@@ -224,6 +211,45 @@ export default function HomePage() {
         onDelete={deleteModelAction}
         onResetRuntime={resetRuntimeAction}
       />
+
+      <section className="home-page__preview">
+        <h2 className="home-page__preview-title">Composition inputs</h2>
+        <div className="home-page__preview-grid">
+          <div className="home-page__preview-row">
+            <span>Events</span>
+            <strong>{compositionPreview.totalEvents}</strong>
+          </div>
+          <div className="home-page__preview-row">
+            <span>Sources</span>
+            <strong>{compositionPreview.sourceLabels}</strong>
+          </div>
+          <div className="home-page__preview-row">
+            <span>Manual mood avg</span>
+            <strong>{compositionPreview.manualCount ? `${Math.round(compositionPreview.manualStrength * 100)}% (${compositionPreview.manualCount})` : "none"}</strong>
+          </div>
+          <div className="home-page__preview-row">
+            <span>Intent</span>
+            <strong>{compositionPreview.intentSummary}</strong>
+          </div>
+        </div>
+        {compositionPreview.llmInputs.length ? (
+          <div style={{ marginTop: 12 }}>
+            <strong>LLM inputs</strong>
+            <div className="home-page__preview-input-list">
+              {compositionPreview.llmInputs.map((input, index) => (
+                <div key={`${input.id}-${index}`} className="home-page__preview-input-row">
+                  <span>{input.source}{input.repeatIndex > 1 ? ` (${input.repeatIndex})` : ""}</span>
+                  <span>{input.label}</span>
+                  <span>
+                    {Math.round(input.strength * 100)}%
+                    {input.repeatIndex > 1 ? ` → ${Math.round(input.weightedStrength * 100)}%` : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </section>
 
       <CompositionPlanSummary
         plan={plan}

@@ -1,6 +1,7 @@
 import "./MoodPage.css";
 import StimulusMixer from "../components/StimulusMixer";
 import useMoodPage from "../hooks/useMoodPage";
+import ComposerControls from "../features/composer/ComposerControls";
 
 export default function MoodPage() {
   const {
@@ -19,6 +20,7 @@ export default function MoodPage() {
     isSavingCustomMood,
     moodValues,
     saveCustomMood,
+    saveMoodEvent,
     setCustomMoodName,
   } = useMoodPage();
 
@@ -30,7 +32,7 @@ export default function MoodPage() {
       </p>
 
       <section className="mood-page__grid">
-        <div className="mood-page__panel">
+        <div>
           <div className="mood-page__preset-list">
             {allMoodPresets.map((preset) => (
               <button
@@ -65,8 +67,7 @@ export default function MoodPage() {
           ) : null}
         </div>
 
-        <div className="mood-page__panel">
-          <h2 className="mood-page__panel-title">Mood Strengths</h2>
+        <div>
           <div className="mood-page__strength-grid">
             {(["energy", "calmness", "tension", "brightness"] as const).map((key) => (
               <div key={key} className="mood-page__range-row">
@@ -87,8 +88,7 @@ export default function MoodPage() {
           </div>
         </div>
 
-        <div className="mood-page__panel">
-          <h2 className="mood-page__panel-title">Stimulus Mixer</h2>
+        <div>
           {isReady ? (
             <StimulusMixer configs={configs} onToggleEnabled={handleToggleEnabled} onUpdateWeight={handleUpdateWeight} />
           ) : (
@@ -97,7 +97,19 @@ export default function MoodPage() {
         </div>
       </section>
 
+      <ComposerControls />
+
       <section>
+        <div className="mood-page__actions mood-page__actions--centered">
+          <button
+            type="button"
+            className="mood-page__button"
+            disabled={!isReady}
+            onClick={() => void saveMoodEvent()}
+          >
+            Save Mood
+          </button>
+        </div>
         <h2 className="mood-page__panel-title">Recent Mood Timeline</h2>
         {events.length === 0 ? (
           <p className="mood-page__status-note">No mood events yet.</p>

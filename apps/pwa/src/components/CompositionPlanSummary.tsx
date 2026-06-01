@@ -65,6 +65,15 @@ export default function CompositionPlanSummary({ plan, runtimeCursor, activeSect
                 <div><strong>Active section:</strong> {activeSection?.mood ?? "None"}</div>
                 <div><strong>Current phrase:</strong> {currentPhraseRole ?? "None"}</div>
                 <div><strong>Section time remaining:</strong> {sectionTimeRemaining?.toFixed(1) ?? "0.0"}s</div>
+                {plan.intent ? (
+                  <div style={{ display: "grid", gap: 4, padding: "8px 0" }}>
+                    <div><strong>Intent key:</strong> {plan.intent.key.tonic} {plan.intent.key.mode}</div>
+                    <div><strong>Intent progression:</strong> {plan.intent.progression.join(" → ")}</div>
+                    <div><strong>Motif density:</strong> {plan.intent.motifDensity.toFixed(2)}</div>
+                    <div><strong>Complexity:</strong> {plan.intent.complexity.toFixed(2)}</div>
+                    <div><strong>Energy:</strong> {plan.intent.energy.toFixed(2)}</div>
+                  </div>
+                ) : null}
                 <div><strong>Texture:</strong> density {plan.texture.density}, brightness {plan.texture.brightness}, reverb {plan.texture.reverbAmount}</div>
                 <div>
                   <strong>Layers:</strong> drone {plan.layers.drone}, pad {plan.layers.pad}, texture {plan.layers.texture}, pulse {plan.layers.pulse}

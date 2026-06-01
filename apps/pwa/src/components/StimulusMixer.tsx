@@ -14,43 +14,40 @@ const descriptions: Record<string, string> = {
 
 export default function StimulusMixer({ configs, onToggleEnabled, onUpdateWeight }: StimulusMixerProps) {
   return (
-    <section style={{ marginTop: 24, padding: 18, borderRadius: 14, background: "var(--surface)", border: "1px solid var(--border)" }}>
-      <h2 style={{ marginBottom: 12 }}>Stimulus Mixer</h2>
-      <div style={{ display: "grid", gap: 18 }}>
-        {configs.map((config) => (
-          <div key={config.id} style={{ display: "grid", gap: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontWeight: 700 }}>{config.label}</div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{descriptions[config.id] ?? "Adjust the influence of this input."}</div>
-              </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={config.enabled}
-                  onChange={(event) => onToggleEnabled(config.id, event.target.checked)}
-                />
-                Enabled
-              </label>
+    <div style={{ display: "grid", gap: 18 }}>
+      {configs.map((config) => (
+        <div key={config.id} style={{ display: "grid", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontWeight: 700 }}>{config.label}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{descriptions[config.id] ?? "Adjust the influence of this input."}</div>
             </div>
-            <div style={{ display: "grid", gap: 6 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-muted)" }}>
-                <span>Weight</span>
-                <span>{Math.round(config.userWeight * 100)}%</span>
-              </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={config.userWeight}
-                onChange={(event) => onUpdateWeight(config.id, Number(event.target.value))}
-                style={{ width: "100%" }}
+                type="checkbox"
+                checked={config.enabled}
+                onChange={(event) => onToggleEnabled(config.id, event.target.checked)}
               />
-            </div>
+              Enabled
+            </label>
           </div>
-        ))}
-      </div>
-    </section>
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-muted)" }}>
+              <span>Weight</span>
+              <span>{Math.round(config.userWeight * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={config.userWeight}
+              onChange={(event) => onUpdateWeight(config.id, Number(event.target.value))}
+              style={{ width: "100%" }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

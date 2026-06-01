@@ -1,3 +1,5 @@
+import type { CompositionIntent } from "./intentSchema";
+
 export interface CompositionSection {
   start: number;
   duration: number;
@@ -21,12 +23,22 @@ export interface Phrase {
   role: "build" | "release" | "static" | "transition";
 }
 
+export interface EvolutionProfile {
+  motifMutationChance: number;
+  chordChangeChance: number;
+  instrumentChangeChance: number;
+  densityDrift: number;
+  rhythmVariation: number;
+}
+
 export interface CompositionPlan {
   key: string;
   bpm: number;
   duration: number;
+  seed: number;
   globalMood: string;
   sections: CompositionSection[];
+  evolutionProfile: EvolutionProfile;
   texture: {
     density: number;
     brightness: number;
@@ -40,4 +52,7 @@ export interface CompositionPlan {
   };
   motifs: Motif[];
   phrases: Phrase[];
+  intent?: CompositionIntent;
 }
+
+export type { CompositionIntent };

@@ -15,13 +15,6 @@
   margin-bottom: 24px;
 }
 
-.mood-page__panel {
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--surface-strong);
-  padding: 18px;
-}
-
 .mood-page__preset-list {
   display: flex;
   flex-wrap: wrap;
@@ -52,6 +45,12 @@
   margin-top: 12px;
 }
 
+.mood-page__actions--centered {
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
 .mood-page__text-input {
   flex: 1;
   min-width: 160px;
@@ -73,10 +72,7 @@
 }
 
 .mood-page__strength-grid {
-  padding: 18px;
-  border-radius: 14px;
-  background: var(--surface-strong);
-  border: 1px solid var(--border);
+  padding: 18px 0;
 }
 
 .mood-page__range-row {
@@ -110,6 +106,10 @@
 .mood-page__code {
   font-size: 13px;
   color: var(--text-muted);
+}
+
+.mood-page__composer-controls {
+  margin-bottom: 24px;
 }
 
 .mood-page__status-note {

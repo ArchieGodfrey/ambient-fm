@@ -72,7 +72,7 @@ function normalizeEventStrength(event: StimulusEvent): StimulusEvent {
 }
 
 export default function useMoodPage() {
-  const { setEvents } = useAppStore();
+  const { setEvents, addEvent } = useAppStore();
   const [events, setLocalEvents] = useState<StimulusEvent[]>([]);
   const [configs, setConfigs] = useState<StimulusConfig[]>([]);
   const [moodValues, setMoodValues] = useState<ManualMoodValues>(DEFAULT_MOOD_VALUES);
@@ -199,6 +199,26 @@ export default function useMoodPage() {
     [events, setEvents]
   );
 
+  const saveMoodEvent = useCallback(async () => {
+    const manualPlugin = manualPluginRef.current;
+    if (!manualPlugin) {
+      postToast("Unable to save current mood: mood controls not ready.", "error");
+      return;
+    }
+
+    try {
+      const [event] = await manualPlugin.generate();
+      await db.events.add(event);
+      setLocalEvents((current) => [event, ...current]);
+      addEvent(event);
+      postToast("Current mood saved to timeline.", "success");
+    } catch (error) {
+      console.error("Failed to save mood event", error);
+      const message = error instanceof Error ? error.message : String(error);
+      postToast(`Failed to save mood event: ${message}`, "error");
+    }
+  }, [addEvent]);
+
   const handleToggleEnabled = useCallback(
     async (id: string, enabled: boolean) => {
       const registry = stimulusRegistry.current;
@@ -324,6 +344,7 @@ export default function useMoodPage() {
     isSavingCustomMood,
     moodValues,
     saveCustomMood,
+    saveMoodEvent,
     setCustomMoodName,
   };
 }

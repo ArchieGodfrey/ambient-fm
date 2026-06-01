@@ -31,6 +31,7 @@ let loadedModel = false;
 async function destroyRuntime() {
   loadedModel = false;
   await mlLayer.destroy();
+  gpuLayer.destroy();
 }
 
 async function createRuntime(

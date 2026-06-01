@@ -34,7 +34,7 @@ export default function CurrentSessionBar() {
           minHeight: 48,
         }}
       >
-        <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, textAlign: "left" }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {plan?.key ?? "No session loaded"}
           </div>
@@ -45,7 +45,6 @@ export default function CurrentSessionBar() {
                 <span>{plan.globalMood}</span>
               </>
             ) : null}
-            <span>{status}</span>
           </div>
         </div>
 

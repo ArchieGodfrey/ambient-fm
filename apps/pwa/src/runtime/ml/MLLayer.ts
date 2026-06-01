@@ -1,5 +1,6 @@
 import type { AppConfig } from "@mlc-ai/web-llm";
 import type { WorkerInitPayload } from "../core/types";
+import { nanoid } from "nanoid";
 import { shouldInfer } from "../guards/safariGuards";
 
 export class MLLayer {
@@ -201,7 +202,7 @@ export class MLLayer {
       throw new Error("Skipping inference: memory pressure");
     }
 
-    const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+    const id = crypto.randomUUID ? crypto.randomUUID() : nanoid();
     return new Promise<string>((resolve, reject) => {
       this.inferResolvers.set(id, { resolve, reject });
       this.inferQueue.push({ id, prompt });

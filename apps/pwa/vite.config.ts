@@ -4,6 +4,7 @@ import mkcert from 'vite-plugin-mkcert'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  base: '/',
   plugins: [
     mkcert(),
     react(),
@@ -18,6 +19,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico,png,txt,webmanifest}'],
         cleanupOutdatedCaches: true,
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/huggingface\.co\/.*$/,
