@@ -35,7 +35,7 @@ export function buildCompositionPlanFromIntent(
   const motifDensity = composerSettings?.motifDensity ?? intent.motifDensity;
   const complexity = composerSettings?.complexity ?? intent.complexity;
   const evolutionProfile = buildEvolutionProfile(intent, complexity);
-  const duration = 60 + Math.round((complexity + intent.energy) * 30);
+
   const motifs = progression.map((chord, index) => {
     const notes = generateMotif(chord, motifDensity, planSeed, index).map(
       (note) => `${note}`,
@@ -50,35 +50,72 @@ export function buildCompositionPlanFromIntent(
     };
   });
 
-  const phrases = motifs.map((motif, index) => {
+  // Build more phrases when we have more sections to cover
+  const sectionCount = Array.isArray(intent.sections) && intent.sections.length >= 3
+    ? intent.sections.length
+    : 2;
+  const phraseCount = Math.max(motifs.length, sectionCount);
+  const phrases: Phrase[] = Array.from({ length: phraseCount }, (_, index) => {
     const role: Phrase["role"] =
-      index === 0 ? "static" : index === 1 ? "build" : "transition";
-
+      index === 0 ? "static"
+      : index === phraseCount - 1 ? "release"
+      : index % 2 === 0 ? "transition"
+      : "build";
     return {
       id: `phrase-${index + 1}`,
-      motifs: [motif.id],
+      motifs: [motifs[index % motifs.length].id],
       length: 15,
       variation: Math.min(1, complexity * 0.5 + index * 0.05),
       role,
     };
   });
 
-  const sections: CompositionSection[] = [
-    {
-      start: 0,
-      duration: Math.max(1, Math.floor(duration * 0.5)),
-      mood: "ambient",
-      intensity: clamp(intent.energy * 0.8, 0, 1),
-      phraseIds: [phrases[0]?.id ?? ""],
-    },
-    {
-      start: Math.max(1, Math.floor(duration * 0.5)),
-      duration: Math.max(1, Math.ceil(duration * 0.5)),
-      mood: "focused",
-      intensity: clamp(Math.min(1, intent.energy + 0.1), 0, 1),
-      phraseIds: [phrases[1]?.id ?? phrases[0]?.id ?? ""],
-    },
-  ];
+  let sections: CompositionSection[];
+  let duration: number;
+
+  if (Array.isArray(intent.sections) && intent.sections.length >= 3) {
+    // Use LLM-specified sections with per-section layer intensities
+    let cursor = 0;
+    sections = intent.sections.map((s, index) => {
+      const sectionDuration = Math.max(5, Math.round(s.duration));
+      const start = cursor;
+      cursor += sectionDuration;
+      return {
+        start,
+        duration: sectionDuration,
+        mood: s.mood,
+        intensity: clamp(s.intensity, 0, 1),
+        phraseIds: [phrases[index % phrases.length].id],
+        layers: {
+          drone: clamp(s.layers.drone, 0, 1),
+          pad: clamp(s.layers.pad, 0, 1),
+          texture: clamp(s.layers.texture, 0, 1),
+          pulse: clamp(s.layers.pulse, 0, 1),
+        },
+        ...(s.lyricLine ? { lyricLine: s.lyricLine } : {}),
+      };
+    });
+    duration = cursor;
+  } else {
+    // Fallback: 2-section structure at ~60-90s
+    duration = 60 + Math.round((complexity + intent.energy) * 30);
+    sections = [
+      {
+        start: 0,
+        duration: Math.max(1, Math.floor(duration * 0.5)),
+        mood: "ambient",
+        intensity: clamp(intent.energy * 0.8, 0, 1),
+        phraseIds: [phrases[0]?.id ?? ""],
+      },
+      {
+        start: Math.max(1, Math.floor(duration * 0.5)),
+        duration: Math.max(1, Math.ceil(duration * 0.5)),
+        mood: "focused",
+        intensity: clamp(Math.min(1, intent.energy + 0.1), 0, 1),
+        phraseIds: [phrases[1]?.id ?? phrases[0]?.id ?? ""],
+      },
+    ];
+  }
 
   return {
     key: `${intent.key.tonic} ${intent.key.mode}`,

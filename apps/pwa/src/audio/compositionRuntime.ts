@@ -20,6 +20,7 @@ export type CompositionRuntimeSnapshot = {
   frameDelay: number;
   audioRestartCount: number;
   snapshotCount: number;
+  currentLyricLine: string | null;
 };
 
 let plan: CompositionPlan | null = null;
@@ -39,6 +40,7 @@ let snapshot: CompositionRuntimeSnapshot = {
   frameDelay: 0,
   audioRestartCount: 0,
   snapshotCount: 0,
+  currentLyricLine: null,
 };
 let lastFrameTime = performance.now();
 let audioRestartCount = 0;
@@ -87,6 +89,11 @@ function deriveComposerState(plan: CompositionPlan, tick: number) {
   const tempoFactor = 16 / chordDuration;
   const adjustedBpm = Math.min(240, Math.max(20, baseBpm * tempoFactor));
 
+  // Use per-section layer intensities when available, falling back to plan-level layers
+  const cursor = getCursor();
+  const activeSection = getActiveSection(cursor);
+  const baseLayers = activeSection?.layers ?? plan.layers;
+
   const instrumentBoost = composerState.activeInstruments.reduce(
     (acc, id) => {
       if (id === "pad") acc.pad += 0.05;
@@ -100,10 +107,10 @@ function deriveComposerState(plan: CompositionPlan, tick: number) {
   return {
     bpm: adjustedBpm,
     layers: {
-      drone: plan.layers.drone,
-      pad: Math.min(1, Math.max(0, plan.layers.pad * (0.8 + evolvedDensity * 0.4) + instrumentBoost.pad)),
-      texture: Math.min(1, Math.max(0, plan.layers.texture * (0.7 + evolvedDensity * 0.5) + instrumentBoost.texture)),
-      pulse: Math.min(1, Math.max(0, plan.layers.pulse * (0.6 + evolvedDensity * 0.5) + instrumentBoost.pulse)),
+      drone: baseLayers.drone,
+      pad: Math.min(1, Math.max(0, baseLayers.pad * (0.8 + evolvedDensity * 0.4) + instrumentBoost.pad)),
+      texture: Math.min(1, Math.max(0, baseLayers.texture * (0.7 + evolvedDensity * 0.5) + instrumentBoost.texture)),
+      pulse: Math.min(1, Math.max(0, baseLayers.pulse * (0.6 + evolvedDensity * 0.5) + instrumentBoost.pulse)),
     },
     texture: {
       density: Math.min(1, Math.max(0, plan.texture.density * (0.9 + evolvedDensity * 0.1))),
@@ -140,6 +147,7 @@ function updateSnapshot(cursor: number, activeSection: CompositionSection | null
     frameDelay,
     audioRestartCount,
     snapshotCount,
+    currentLyricLine: activeSection?.lyricLine ?? null,
   };
   notifySubscribers();
 }

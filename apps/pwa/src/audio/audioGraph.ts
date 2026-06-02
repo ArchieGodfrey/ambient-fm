@@ -26,6 +26,17 @@ function normalizeCompositionPlan(plan: CompositionPlan): CompositionPlan {
         mood: section.mood,
         intensity: clampNumber(section.intensity, 0.5, 0, 1),
         phraseIds: Array.isArray(section.phraseIds) ? section.phraseIds : [],
+        ...(section.layers
+          ? {
+              layers: {
+                drone: clampNumber(section.layers.drone, 0, 0, 1),
+                pad: clampNumber(section.layers.pad, 0, 0, 1),
+                texture: clampNumber(section.layers.texture, 0, 0, 1),
+                pulse: clampNumber(section.layers.pulse, 0, 0, 1),
+              },
+            }
+          : {}),
+        ...(section.lyricLine ? { lyricLine: section.lyricLine } : {}),
       }))
     : [];
 

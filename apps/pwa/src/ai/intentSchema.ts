@@ -1,3 +1,16 @@
+export interface SectionIntent {
+  duration: number;
+  mood: "calm" | "focused" | "tense" | "ambient" | "energised";
+  intensity: number;
+  lyricLine?: string;
+  layers: {
+    drone: number;
+    pad: number;
+    texture: number;
+    pulse: number;
+  };
+}
+
 export interface CompositionIntent {
   key: {
     tonic: string;
@@ -13,4 +26,6 @@ export interface CompositionIntent {
   complexity: number;
 
   energy: number;
+
+  sections: SectionIntent[];
 }

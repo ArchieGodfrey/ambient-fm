@@ -6,6 +6,13 @@ export interface CompositionSection {
   mood: "calm" | "focused" | "tense" | "ambient" | "energised";
   intensity: number;
   phraseIds: string[];
+  lyricLine?: string;
+  layers?: {
+    drone: number;
+    pad: number;
+    texture: number;
+    pulse: number;
+  };
 }
 
 export interface Motif {

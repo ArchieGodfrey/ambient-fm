@@ -35,6 +35,7 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
     frameDelay: 0,
     audioRestartCount: 0,
     snapshotCount: 0,
+    currentLyricLine: null,
   });
 
   const setSharedPlan = useCallback((planInput: CompositionPlan | null) => {

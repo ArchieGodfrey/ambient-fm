@@ -26,6 +26,30 @@ RULES:
 - Use 3 to 5 chord degrees in the progression.
 - Keep the output minimal and avoid unnecessary extra detail.
 
+AVAILABLE INSTRUMENTS:
+These are the four audio layers you can assign per section. Each value is 0.0 (silent) to 1.0 (full intensity).
+- drone: Continuous low-frequency sine wave oscillator with lowpass filter. Provides grounding and sustained presence. Works well as a quiet foundation throughout the piece.
+- pad: Polyphonic harmonic synth (PolySynth). Plays chord notes with a 2-beat sustain. Best for warm harmonic texture and melody. Primary voice of the composition.
+- texture: FM synthesis with whole-note modulated timbres. Evolving harmonic shimmer and atmospheric movement. Good for building density or adding otherworldly character.
+- pulse: Monophonic square-wave synth with 8th-note articulation. Adds rhythmic accent and forward motion. Use sparingly — best during energised or focused sections.
+
+COMPOSITION STRUCTURE RULES:
+- Compose exactly 3 to 5 sections that tell an evolving story.
+- The total duration of all sections combined should be approximately 90 seconds (1.5 minutes).
+- Each section must specify: duration (seconds), mood, intensity (0–1), and per-instrument layer intensities.
+- Sections should evolve meaningfully: for example, open sparsely with drone/pad, build texture and complexity in the middle, then resolve or peak at the end.
+- Vary layer intensities between sections — avoid keeping all layers at the same value throughout.
+- The first section should feel like an introduction (low pulse, moderate pad).
+- The last section should feel conclusive (either a gentle fade or an emotional peak).
+
+LYRIC RULES:
+- Each section must include a "lyricLine": a short poetic phrase of 4–8 words that evokes the mood and feeling of that section.
+- The lyric should be imagistic and abstract — no literal descriptions of music or instruments.
+- Match the emotional character of the section's mood and the piece's musical key.
+- Rhyme is not required. Aim for texture, not narrative.
+- Example: "salt light before the tide", "waiting at the edge of the room", "held breath, slow dissolve".
+- Do NOT use generic filler phrases like "ambient music" or "calm vibes".
+
 STIMULI:
 ${stimuliText || "- none"}
 
@@ -45,15 +69,19 @@ COMPOSER SETTINGS:
 
 OUTPUT FORMAT:
 {
-  "key": {
-    "tonic": "D",
-    "mode": "minor"
-  },
-  "bpm": number,
+  "key": { "tonic": "D", "mode": "minor" },
+  "bpm": 72,
   "progression": [0, 5, 3, 6],
   "motifDensity": 0.6,
-  "complexity": 0.3,
-  "energy": 0.4
+  "complexity": 0.4,
+  "energy": 0.5,
+  "sections": [
+    { "duration": 20, "mood": "ambient",   "intensity": 0.3, "lyricLine": "salt light before the tide",       "layers": { "drone": 0.6, "pad": 0.5, "texture": 0.2, "pulse": 0.0 } },
+    { "duration": 25, "mood": "focused",   "intensity": 0.5, "lyricLine": "something is moving beneath",      "layers": { "drone": 0.4, "pad": 0.7, "texture": 0.4, "pulse": 0.2 } },
+    { "duration": 20, "mood": "tense",     "intensity": 0.7, "lyricLine": "the edge of a held breath",        "layers": { "drone": 0.3, "pad": 0.6, "texture": 0.7, "pulse": 0.5 } },
+    { "duration": 15, "mood": "energised", "intensity": 0.8, "lyricLine": "open sky, nothing between us",     "layers": { "drone": 0.2, "pad": 0.8, "texture": 0.6, "pulse": 0.7 } },
+    { "duration": 10, "mood": "calm",      "intensity": 0.2, "lyricLine": "slow dissolve into the afternoon",  "layers": { "drone": 0.5, "pad": 0.4, "texture": 0.2, "pulse": 0.0 } }
+  ]
 }
 `;
 }
