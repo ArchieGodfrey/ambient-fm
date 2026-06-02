@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { startAudio, stopAudio } from "../audio/toneEngine";
-import { generateComposition, fallbackComposition } from "../ai/composer";
+import { generateComposition } from "../ai/composer";
 import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop, subscribeRuntimeState } from "../audio/compositionRuntime";
 import { startComposer, stopComposer } from "../composer/runtime";
 import { postToast } from "../utils/toast";
@@ -140,17 +140,6 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
       const message = error instanceof Error ? error.message : String(error);
       postToast(`AI composition failed: ${message}`, "error");
       setStatus(`AI composition failed: ${message}`);
-      const fallback = fallbackComposition();
-      setSharedPlan(fallback);
-      startCompositionRuntime(fallback);
-      startComposer({
-        key: { tonic: "C", mode: "minor" },
-        bpm: fallback.bpm,
-        progression: [0, 3, 4, 5],
-        motifDensity: fallback.texture.density,
-        complexity: 0.4,
-        energy: 0.5,
-      });
     } finally {
       setAIStatus("Ready");
     }
