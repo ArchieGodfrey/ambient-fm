@@ -20,6 +20,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -63,8 +65,6 @@ jobs:
 
       - name: Download Kokoro TTS model (optional, requires HF_TOKEN secret)
         if: ${{ secrets.HF_TOKEN != '' }}
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           # transformers.js fetches: /models/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/<file>
           # so we mirror the HF URL structure exactly under public/models/
@@ -78,6 +78,12 @@ jobs:
           done
           echo "Kokoro model pre-downloaded to $MODEL_DIR"
 
+      - name: Copy Piper phonemize files to public
+        run: |
+          mkdir -p apps/pwa/public/piper
+          cp apps/pwa/node_modules/piper-tts-web/dist/piper/piper_phonemize.wasm apps/pwa/public/piper/
+          cp apps/pwa/node_modules/piper-tts-web/dist/piper/piper_phonemize.data apps/pwa/public/piper/
+
       - name: Copy ORT WASM to public
         run: |
           mkdir -p apps/pwa/public/ort
@@ -89,8 +95,6 @@ jobs:
           cp apps/pwa/node_modules/onnxruntime-web/dist/ort.w*.min.mjs apps/pwa/public/ort/ 2>/dev/null || true
 
       - name: Build PWA
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           cd apps/pwa
           bun run build
@@ -117,7 +121,6 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-
     steps:
       - name: Deploy Pages
         uses: actions/deploy-pages@v4

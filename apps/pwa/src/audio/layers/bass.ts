@@ -2,6 +2,20 @@ import * as Tone from "tone";
 import { getScale } from "../../music/harmony/index";
 import type { CompositionPlan, CompositionSection } from "../../ai/types";
 
+/** Strip the octave number from a note string like "A3" → "A", "D#4" → "D#" */
+function noteName(n: string): string {
+  return n.replace(/\d+$/, "");
+}
+
+/** Get the chord tones for the active section from its motif */
+function getChordNotes(plan: CompositionPlan, section: CompositionSection): string[] {
+  const phraseId = section.phraseIds?.[0];
+  const phrase = plan.phrases?.find(p => p.id === phraseId);
+  const motifId = phrase?.motifs?.[0];
+  const motif = plan.motifs?.find(m => m.id === motifId);
+  return motif?.notes ?? [];
+}
+
 export class BassLayer {
   private synth: Tone.MonoSynth;
   private reverb: Tone.Reverb;
@@ -9,15 +23,19 @@ export class BassLayer {
   private _enabled = true;
 
   constructor() {
-    this.reverb = new Tone.Reverb({ decay: 1.5, wet: 0.25 });
+    this.reverb = new Tone.Reverb({ decay: 1.2, wet: 0.2 });
     this.synth = new Tone.MonoSynth({
-      oscillator: { type: "triangle" as const },
-      envelope: { attack: 0.05, decay: 0.3, sustain: 0.7, release: 1.5 },
-      filterEnvelope: { attack: 0.05, decay: 0.5, sustain: 0.4, release: 2, baseFrequency: 200, octaves: 2.5 },
+      oscillator: { type: "sawtooth" as const },
+      envelope: { attack: 0.02, decay: 0.2, sustain: 0.6, release: 1.2 },
+      filterEnvelope: {
+        attack: 0.02, decay: 0.4, sustain: 0.3, release: 1.5,
+        baseFrequency: 120, octaves: 3,
+      },
+      filter: { Q: 3, type: "lowpass" as const, rolloff: -24 as const },
     });
     this.synth.connect(this.reverb);
     this.reverb.toDestination();
-    this.synth.volume.value = -12;
+    this.synth.volume.value = -10;
   }
 
   playBassLine(plan: CompositionPlan, section: CompositionSection): void {
@@ -25,42 +43,59 @@ export class BassLayer {
     this.clearScheduled();
 
     const bassType = plan.bassType ?? this.deriveBassType(section);
-    if (bassType === "none" || section.intensity < 0.25) return;
+    if (bassType === "none" || section.intensity < 0.2) return;
 
+    // Get chord tones for THIS section — follows chord changes, not just the key root
+    const chordNotes = getChordNotes(plan, section);
     const parts = plan.key.trim().split(/\s+/);
     const tonic = parts[0] ?? "C";
     const mode = (parts[1] === "major" ? "major" : "minor") as "major" | "minor";
     const scale = getScale(tonic, mode);
 
-    const secPerBeat = 60 / plan.bpm;
-    const rootNote = `${scale[0]}2`;
-    const fifthNote = `${scale[4]}2`;
+    // Bass note = chord root (from motif) at octave 2, fallback to scale root
+    const root = chordNotes.length > 0 ? `${noteName(chordNotes[0])}2` : `${scale[0]}2`;
+    const third = chordNotes.length > 1 ? `${noteName(chordNotes[1])}2` : `${scale[2]}2`;
+    const fifth = chordNotes.length > 2 ? `${noteName(chordNotes[2])}2` : `${scale[4]}2`;
 
-    const velocity = 0.4 + section.intensity * 0.35;
-    this.synth.volume.value = -14 + section.intensity * 6;
+    const secPerBeat = 60 / plan.bpm;
+    const velocity = 0.45 + section.intensity * 0.3;
+    this.synth.volume.value = -12 + section.intensity * 5;
 
     let pattern: Array<{ note: string; dur: string; offset: number }> = [];
 
     if (bassType === "sparse") {
+      // Long root note with occasional fifth — anchors the harmony
       pattern = [
-        { note: rootNote, dur: "2n", offset: 0 },
-        { note: fifthNote, dur: "2n", offset: secPerBeat * 2 },
+        { note: root, dur: "2n", offset: 0 },
+        { note: fifth, dur: "2n", offset: secPerBeat * 2 },
+        { note: root, dur: "1n", offset: secPerBeat * 4 },
       ];
     } else if (bassType === "walking") {
-      const walkNotes = [scale[0], scale[2], scale[4], scale[2]].map((n) => `${n}2`);
-      pattern = walkNotes.map((note, i) => ({ note, dur: "4n", offset: i * secPerBeat }));
+      // Quarter-note walk through chord tones
+      pattern = [
+        { note: root, dur: "4n", offset: 0 },
+        { note: third, dur: "4n", offset: secPerBeat },
+        { note: fifth, dur: "4n", offset: secPerBeat * 2 },
+        { note: third, dur: "4n", offset: secPerBeat * 3 },
+        { note: root, dur: "4n", offset: secPerBeat * 4 },
+        { note: fifth, dur: "4n", offset: secPerBeat * 5 },
+        { note: third, dur: "4n", offset: secPerBeat * 6 },
+        { note: root, dur: "4n", offset: secPerBeat * 7 },
+      ];
     } else if (bassType === "pulse") {
-      pattern = Array.from({ length: 8 }, (_, i) => ({
-        note: i % 4 === 0 ? rootNote : i % 2 === 0 ? fifthNote : rootNote,
+      // Syncopated eighth-note pattern anchored on root
+      const beats = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5].map(b => b * secPerBeat);
+      pattern = beats.map((offset, i) => ({
+        note: i === 0 || i === 4 ? root : i % 2 === 0 ? fifth : root,
         dur: "8n",
-        offset: i * secPerBeat * 0.5,
+        offset,
       }));
     }
 
     for (const { note, dur, offset } of pattern) {
       const id = Tone.Transport.scheduleOnce((time) => {
         this.synth.triggerAttackRelease(note, dur, time, velocity);
-      }, `+${(offset + 0.1).toFixed(3)}`);
+      }, `+${(offset + 0.05).toFixed(3)}`);
       this.scheduled.push(id);
     }
   }
@@ -69,6 +104,7 @@ export class BassLayer {
     if (section.intensity < 0.3) return "sparse";
     if (section.mood === "energised") return "pulse";
     if (section.mood === "focused") return "walking";
+    if (section.mood === "tense") return "walking";
     return "sparse";
   }
 
@@ -77,16 +113,9 @@ export class BassLayer {
     this.scheduled = [];
   }
 
-  set enabled(v: boolean) {
-    this._enabled = v;
-    if (!v) this.clearScheduled();
-  }
+  set enabled(v: boolean) { this._enabled = v; if (!v) this.clearScheduled(); }
 
-  dispose(): void {
-    this.clearScheduled();
-    this.synth.dispose();
-    this.reverb.dispose();
-  }
+  dispose(): void { this.clearScheduled(); this.synth.dispose(); this.reverb.dispose(); }
 }
 
 let instance: BassLayer | null = null;
