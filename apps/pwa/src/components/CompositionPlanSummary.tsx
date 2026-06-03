@@ -121,6 +121,9 @@ export default function CompositionPlanSummary({ plan, runtimeCursor, activeSect
                         }}
                       >
                         {section.mood} ({start}–{end}s) intensity {intensity}
+                        {section.lyricLine && (
+                          <span style={{ display: "block", fontStyle: "italic", opacity: 0.6, fontSize: "0.9em", marginTop: 2 }}>"{section.lyricLine}"</span>
+                        )}
                       </li>
                     ))}
                   </ul>

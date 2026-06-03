@@ -37,6 +37,7 @@ function normalizeCompositionPlan(plan: CompositionPlan): CompositionPlan {
             }
           : {}),
         ...(section.lyricLine ? { lyricLine: section.lyricLine } : {}),
+        ...(section.melodyInstruments ? { melodyInstruments: section.melodyInstruments } : {}),
       }))
     : [];
 
@@ -65,6 +66,8 @@ function normalizeCompositionPlan(plan: CompositionPlan): CompositionPlan {
     },
     motifs: Array.isArray(plan.motifs) ? plan.motifs : [],
     phrases: Array.isArray(plan.phrases) ? plan.phrases : [],
+    melodyInstrument: plan.melodyInstrument,
+    bassType: plan.bassType,
   };
 }
 

@@ -3,6 +3,7 @@ export interface SectionIntent {
   mood: "calm" | "focused" | "tense" | "ambient" | "energised";
   intensity: number;
   lyricLine?: string;
+  melodyInstruments?: string[];
   layers: {
     drone: number;
     pad: number;
@@ -28,4 +29,7 @@ export interface CompositionIntent {
   energy: number;
 
   sections: SectionIntent[];
+  vocalVoice?: string;
+  melodyInstrument?: string;
+  bassType?: 'sparse' | 'walking' | 'pulse' | 'none';
 }

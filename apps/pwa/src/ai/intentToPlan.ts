@@ -40,7 +40,8 @@ export function buildCompositionPlanFromIntent(
     const notes = generateMotif(chord, motifDensity, planSeed, index).map(
       (note) => `${note}`,
     );
-    const rhythm = [1, 0.5, 1, 0.5].slice(0, Math.min(4, notes.length));
+    const rhythmPatterns = [[1, 0.5, 1, 0.5], [0.5, 0.5, 1, 1], [1, 1, 0.5, 0.5, 1], [0.5, 1, 0.5, 1, 0.5]];
+    const rhythm = rhythmPatterns[index % rhythmPatterns.length].slice(0, Math.min(rhythmPatterns[index % rhythmPatterns.length].length, notes.length));
 
     return {
       id: `motif-${index + 1}`,
@@ -93,6 +94,7 @@ export function buildCompositionPlanFromIntent(
           pulse: clamp(s.layers.pulse, 0, 1),
         },
         ...(s.lyricLine ? { lyricLine: s.lyricLine } : {}),
+        ...(s.melodyInstruments ? { melodyInstruments: s.melodyInstruments } : {}),
       };
     });
     duration = cursor;
@@ -138,5 +140,8 @@ export function buildCompositionPlanFromIntent(
     },
     motifs,
     phrases,
+    ...(intent.vocalVoice ? { vocalVoice: intent.vocalVoice } : {}),
+    ...(intent.melodyInstrument ? { melodyInstrument: intent.melodyInstrument } : {}),
+    ...(intent.bassType ? { bassType: intent.bassType } : {}),
   };
 }

@@ -71,12 +71,32 @@
 
 /* Lyric */
 .npo-lyric-area {
+  position: relative;
   min-height: 72px;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 0 8px;
+}
+.npo-vocal-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+.npo-vocal-toggle:hover {
+  color: rgba(255, 255, 255, 0.7);
 }
 @keyframes npo-lyric-in {
   from { opacity: 0; transform: translateY(10px); }

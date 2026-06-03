@@ -11,7 +11,18 @@ export default function CurrentSessionBar() {
 
   return (
     <>
-      {overlayOpen && <NowPlayingOverlay onClose={() => setOverlayOpen(false)} />}
+      {/* Slide-up player — no backdrop, slides from bottom */}
+      <div
+        style={{
+          position: "fixed", inset: 0,
+          transform: overlayOpen ? "translateY(0)" : "translateY(100%)",
+          transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+          zIndex: 60,
+          pointerEvents: overlayOpen ? "auto" : "none",
+        }}
+      >
+        {overlayOpen && <NowPlayingOverlay onClose={() => setOverlayOpen(false)} />}
+      </div>
       <div
         style={{
           position: "fixed",

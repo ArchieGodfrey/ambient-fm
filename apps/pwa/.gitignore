@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Piano samples (auto-downloaded, not committed)
+public/samples/

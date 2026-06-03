@@ -28,7 +28,7 @@ const availableModelOptions: ModelOption[] = [
       low_resource_required: true,
       vram_required_MB: 944.62,
       overrides: {
-        context_window_size: 2048,
+        context_window_size: 4096,
       },
     },
   },

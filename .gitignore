@@ -33,3 +33,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# ORT WASM files (copied from node_modules, version-matched)
+apps/pwa/public/ort/
+
+# Piper TTS phonemizer (copied from node_modules)
+apps/pwa/public/piper/

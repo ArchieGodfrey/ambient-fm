@@ -61,7 +61,36 @@ jobs:
           echo "$LOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Download Kokoro TTS model (optional, requires HF_TOKEN secret)
+        if: ${{ secrets.HF_TOKEN != '' }}
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # transformers.js fetches: /models/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/<file>
+          # so we mirror the HF URL structure exactly under public/models/
+          MODEL_DIR=apps/pwa/public/models/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main
+          mkdir -p "$MODEL_DIR/onnx"
+          BASE="https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main"
+          AUTH="Authorization: Bearer $HF_TOKEN"
+          for FILE in tokenizer.json tokenizer_config.json config.json voices.json onnx/model_q8.onnx; do
+            echo "Downloading $FILE..."
+            curl -fsSL -H "$AUTH" -L "$BASE/$FILE" -o "$MODEL_DIR/$FILE"
+          done
+          echo "Kokoro model pre-downloaded to $MODEL_DIR"
+
+      - name: Copy ORT WASM to public
+        run: |
+          mkdir -p apps/pwa/public/ort
+          cp apps/pwa/node_modules/onnxruntime-web/dist/*.wasm apps/pwa/public/ort/
+          cp apps/pwa/node_modules/onnxruntime-web/dist/ort.bundle.min.mjs apps/pwa/public/ort/
+          cp apps/pwa/node_modules/onnxruntime-web/dist/ort.min.mjs apps/pwa/public/ort/
+          cp apps/pwa/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs apps/pwa/public/ort/
+          cp apps/pwa/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs apps/pwa/public/ort/
+          cp apps/pwa/node_modules/onnxruntime-web/dist/ort.w*.min.mjs apps/pwa/public/ort/ 2>/dev/null || true
+
       - name: Build PWA
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           cd apps/pwa
           bun run build

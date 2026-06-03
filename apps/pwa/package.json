@@ -11,13 +11,18 @@
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.84",
+    "coi-serviceworker": "^0.1.7",
     "dexie": "^4.4.3",
+    "kokoro-js": "^1.2.1",
+    "lucide-react": "^0.468.0",
+    "piper-tts-web": "^1.1.2",
+    "piper-wasm": "^0.1.4",
+    "pitchfinder": "^2.3.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "tone": "^15.1.22",
     "zod": "^4.4.3",
-    "zustand": "^5.0.14",
-    "lucide-react": "^0.468.0"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

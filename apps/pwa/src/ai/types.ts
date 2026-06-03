@@ -7,6 +7,7 @@ export interface CompositionSection {
   intensity: number;
   phraseIds: string[];
   lyricLine?: string;
+  melodyInstruments?: string[];
   layers?: {
     drone: number;
     pad: number;
@@ -60,6 +61,9 @@ export interface CompositionPlan {
   motifs: Motif[];
   phrases: Phrase[];
   intent?: CompositionIntent;
+  vocalVoice?: string;
+  melodyInstrument?: string;
+  bassType?: string;
 }
 
 export type { CompositionIntent };

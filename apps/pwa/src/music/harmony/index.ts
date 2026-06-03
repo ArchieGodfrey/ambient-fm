@@ -1,21 +1,17 @@
 import type { Chord, MusicalKey } from "../types";
 
-const MINOR_SCALES: Record<string, string[]> = {
-  D: ["D", "E", "F", "G", "A", "Bb", "C"],
-  A: ["A", "B", "C", "D", "E", "F", "G"],
-};
+const CHROMATIC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const FLAT_NAMES = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const PREFER_FLAT = new Set(['F','Bb','Eb','Ab','Db','Gb']);
+const MAJOR_STEPS = [0,2,4,5,7,9,11];
+const MINOR_STEPS = [0,2,3,5,7,8,10];
 
-export function getScale(tonic: string, mode: "major" | "minor") {
-  if (mode !== "minor") {
-    throw new Error("not implemented");
-  }
-
-  const scale = MINOR_SCALES[tonic];
-  if (!scale) {
-    throw new Error(`Unsupported tonic: ${tonic}`);
-  }
-
-  return scale;
+export function getScale(tonic: string, mode: 'major' | 'minor'): string[] {
+  const source = PREFER_FLAT.has(tonic) ? FLAT_NAMES : CHROMATIC;
+  const idx = source.indexOf(tonic);
+  if (idx === -1) return MINOR_STEPS.map(s => CHROMATIC[s]); // fallback C minor
+  const steps = mode === 'major' ? MAJOR_STEPS : MINOR_STEPS;
+  return steps.map(s => source[(idx + s) % 12]);
 }
 
 export function getTriad(scale: string[], degree: number) {

@@ -6,6 +6,13 @@ import { field, getTick } from "../music/random/randomField";
 import { startScheduler, tick as schedulerTick } from "./sectionScheduler";
 import { saveSnapshot, type RuntimeSnapshot } from "../memory/runtimeSnapshots";
 import { composerState } from "../composer/composerState";
+import { getVocalLayer } from "./layers/vocal";
+import { getSingingParams } from "./vocal/musicTheory";
+import { getVocalSynth } from "./vocal/vocalSynth";
+import { useAppStore } from "../store/useAppStore";
+import { getMelodyLayer } from "./layers/melody";
+import { getBassLayer } from "./layers/bass";
+import { getCounterMelodyLayer } from "./layers/counterMelody";
 
 export type CompositionRuntimeSnapshot = {
   cursor: number;
@@ -46,7 +53,22 @@ let lastFrameTime = performance.now();
 let audioRestartCount = 0;
 let snapshotCount = 0;
 let checkpointIntervalId: number | null = null;
+let generativeGenerating = false;
 const subscribers = new Set<(snapshot: CompositionRuntimeSnapshot) => void>();
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('generative-done', () => { generativeGenerating = false; });
+}
+
+function speakFallback(text: string) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.75;
+  utterance.volume = 0.65;
+  window.speechSynthesis.speak(utterance);
+}
+let lastVocalSectionStart: number | null = null;
 
 function getPlanDuration() {
   if (!plan) return 0;
@@ -227,6 +249,15 @@ function tick() {
   }
 
   const cursor = getCursor();
+
+  // Generative mode: trigger new section generation near end of composition
+  const genEnabled = useAppStore.getState().generativeMode;
+  const planDur = getPlanDuration();
+  if (genEnabled && !generativeGenerating && plan && planDur > 0 && cursor > planDur - 8 && cursor < planDur) {
+    generativeGenerating = true;
+    window.dispatchEvent(new CustomEvent('generative-trigger', { detail: { plan } }));
+  }
+
   const activeSection = getActiveSection(cursor);
   const beatTick = getTick(cursor, plan.bpm);
   const drift = getDrift(plan, beatTick);
@@ -253,6 +284,32 @@ function tick() {
 
   const derived = deriveComposerState(plan, beatTick);
   Tone.Transport.bpm.value = derived.bpm;
+  if (activeSection && activeSection.start !== lastVocalSectionStart) {
+    lastVocalSectionStart = activeSection.start;
+    if (activeSection.lyricLine && useAppStore.getState().vocalsEnabled) {
+      const voice = useAppStore.getState().currentPlan?.vocalVoice
+        ?? useAppStore.getState().composerSettings?.vocalVoice
+        ?? 'browser';
+      if (voice === 'browser') {
+        speakFallback(activeSection.lyricLine);
+      } else {
+        const singingParams = plan ? getSingingParams(plan, activeSection) : undefined;
+        const raw = getVocalSynth().getCachedRaw(activeSection.lyricLine, voice, singingParams);
+        if (raw) {
+          getVocalLayer().playRaw(raw);
+        }
+        // If not cached: stay silent — synthesis is running in background.
+        // The overlay shows "synthesising" status so the user knows what's happening.
+      }
+    }
+    // Trigger melody phrase on section change
+    const melodyEnabled = useAppStore.getState().melodyEnabled ?? true;
+    if (melodyEnabled && plan) {
+      getMelodyLayer().playPhrase(plan, activeSection, cursor).catch(() => {});
+      getCounterMelodyLayer().playPhrase(plan, activeSection, cursor).catch(() => {});
+    }
+    if (plan) getBassLayer().playBassLine(plan, activeSection);
+  }
   applySectionToAudio(activeSection, derived.layers, { ...plan, texture: derived.texture }, drift);
   updateSnapshot(cursor, activeSection, drift);
 
@@ -260,6 +317,10 @@ function tick() {
 }
 
 export function startCompositionRuntime(planInput: CompositionPlan, startOffset = 0) {
+  lastVocalSectionStart = null;
+  getMelodyLayer().clearScheduled();
+  getBassLayer().clearScheduled();
+  getCounterMelodyLayer().clearScheduled();
   plan = planInput;
   startScheduler(planInput);
   startTime = performance.now() - startOffset * 1000;
@@ -299,13 +360,25 @@ export function startRuntimeLoop() {
   rafId = requestAnimationFrame(tick);
 }
 
+export function seekRuntime(targetTime: number) {
+  if (!plan) return;
+  const duration = getPlanDuration();
+  startTime = performance.now() - Math.max(0, Math.min(duration, targetTime)) * 1000;
+  lastVocalSectionStart = null; // retrigger vocals for the new section
+}
+
 export function stopRuntimeLoop() {
   if (rafId !== null) {
     cancelAnimationFrame(rafId);
     rafId = null;
   }
   stopPhrase();
+  getMelodyLayer().clearScheduled();
+  getBassLayer().clearScheduled();
+  getCounterMelodyLayer().clearScheduled();
   stopCheckpointing();
+  getVocalLayer().stop();
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 }
 
 export function getRuntimeSnapshot() {
