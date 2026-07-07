@@ -9,7 +9,7 @@ import { DEFAULT_MOOD, DEFAULT_COMPOSER_SETTINGS, type Sound } from "../sounds/t
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
 export default function YourSound() {
-  const { sounds, createSound, updateSound } = useSounds();
+  const { sounds, createSound, updateSound, deleteSound } = useSounds();
   const [openId, setOpenId] = useState<string | null>(null);
   const open = sounds.find((s) => s.id === openId) ?? null;
 
@@ -46,7 +46,7 @@ export default function YourSound() {
       </div>
 
       {open ? (
-        <Studio sound={open} onClose={() => setOpenId(null)} onSave={(patch) => updateSound(open.id, patch)} />
+        <Studio sound={open} onClose={() => setOpenId(null)} onSave={(patch) => updateSound(open.id, patch)} onDelete={() => void deleteSound(open.id)} />
       ) : null}
     </>
   );

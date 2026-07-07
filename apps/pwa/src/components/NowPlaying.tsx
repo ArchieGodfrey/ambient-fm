@@ -5,6 +5,7 @@ import { useSession } from "../session/SessionProvider";
 import useSessionHistory from "../hooks/useSessionHistory";
 import useFeedback from "../hooks/useFeedback";
 import { recordFeedback } from "../feedback/feedback";
+import TrackFeedback from "./TrackFeedback";
 import Disc from "./Disc";
 
 function isToday(ts: number) {
@@ -95,20 +96,21 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
           {tracksToday.map((t, i) => {
             const loaded = plan?.seed != null && t.plan?.seed === plan.seed;
             return (
-              <button key={t.id} type="button" disabled={!t.plan}
-                onClick={() => { if (!t.plan) return; void audio.loadSessionPlan(t.plan, t.title, t.id); void recordFeedback("replay", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
-                  padding: "11px 8px", border: "none", borderRadius: 10, cursor: t.plan ? "pointer" : "default",
-                  background: loaded ? "var(--accent-soft)" : "transparent", color: "var(--text)",
-                }}>
-                <span style={{ width: 20, fontSize: 12, color: "var(--text-faint)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{i + 1}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, color: loaded ? "var(--accent)" : "var(--text-h)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {t.title ?? `Track ${i + 1}`}
-                </span>
-                <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0, textTransform: "capitalize" }}>{t.dominantMood}</span>
-                <span style={{ fontSize: 12, color: "var(--text-faint)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{clock(t.timestamp)}</span>
-              </button>
+              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", borderRadius: 10, background: loaded ? "var(--accent-soft)" : "transparent" }}>
+                <button type="button" disabled={!t.plan}
+                  onClick={() => { if (!t.plan) return; void audio.loadSessionPlan(t.plan, t.title, t.id); void recordFeedback("replay", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, textAlign: "left",
+                    padding: "6px 0", border: "none", background: "transparent", cursor: t.plan ? "pointer" : "default", color: "var(--text)",
+                  }}>
+                  <span style={{ width: 20, fontSize: 12, color: "var(--text-faint)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{i + 1}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, color: loaded ? "var(--accent)" : "var(--text-h)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {t.title ?? `Track ${i + 1}`}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--text-faint)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{clock(t.timestamp)}</span>
+                </button>
+                <TrackFeedback track={{ sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }} opinion={opinionFor(t.id)} />
+              </div>
             );
           })}
         </div>

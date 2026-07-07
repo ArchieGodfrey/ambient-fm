@@ -5,6 +5,8 @@ import { useSession } from "../session/SessionProvider";
 import { postToast } from "../utils/toast";
 import Disc from "../components/Disc";
 import CapturesSection from "../components/CapturesSection";
+import TrackFeedback from "../components/TrackFeedback";
+import useFeedback from "../hooks/useFeedback";
 import { recordFeedback } from "../feedback/feedback";
 import { screen, screenEyebrow, screenTitle, card, mutedNote } from "../ui/styles";
 import type { SessionSummary } from "../memory/types";
@@ -27,6 +29,7 @@ function trackTime(ts: number) {
 export default function Journey() {
   const { sessions, deleteSession } = useSessionHistory();
   const { audio, handleGenerate, isGenerating } = useSession();
+  const { opinionFor } = useFeedback();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   // Compose a fresh track seeded from an existing one's key/mood/tempo (6d).
@@ -113,6 +116,7 @@ export default function Journey() {
                       {t.key} · {Math.round(t.avgBpm)} bpm · {trackTime(t.timestamp)}
                     </div>
                   </div>
+                  <TrackFeedback track={{ sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }} opinion={opinionFor(t.id)} />
                   <button type="button" disabled={isGenerating} onClick={() => void moreLikeThis(t)} aria-label="More like this" title="More like this" style={{ border: "none", background: "transparent", color: "var(--accent)", cursor: isGenerating ? "default" : "pointer", padding: 6, opacity: isGenerating ? 0.5 : 1 }}>
                     <Sparkles size={15} />
                   </button>
