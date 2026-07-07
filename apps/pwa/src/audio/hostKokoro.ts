@@ -1,14 +1,13 @@
 import * as Tone from "tone";
 import { runExclusive } from "../runtime/modelRuntime";
-import { idbModelCache, clearModelCache } from "./kokoroCache";
 
-// Kokoro-82M neural TTS (kokoro-js → transformers.js). OPT-IN: it never loads
-// until the user downloads it in Settings — loading an 82M model unprompted can
-// crash memory-constrained devices (iOS). Rendered PCM is played through the
-// (already-unlocked) WebAudio context via a BufferSource routed straight to the
-// hardware destination — reliable on iOS, unlike an HTMLAudioElement, and it
-// bypasses the duck so the voice sits on top. Rendering is serialized through
-// the shared runtime mutex. Falls back to Web Speech everywhere it isn't ready.
+// Kokoro-82M neural TTS (kokoro-js → transformers.js). OPT-IN and DESKTOP-ONLY:
+// its onnxruntime/WASM stack throws "undefined is not a function" and blows past
+// memory on iOS Safari, so we don't load it there — the station uses the system
+// speechSynthesis voice on iOS instead. Rendered PCM plays through the
+// (already-unlocked) WebAudio context via a BufferSource straight to the hardware
+// destination (bypasses the duck so the voice sits on top). Serialized through
+// the shared runtime mutex; falls back to Web Speech whenever it isn't ready.
 
 const MODEL = "onnx-community/Kokoro-82M-v1.0-ONNX";
 const VOICE = "af_heart";
@@ -38,30 +37,28 @@ export function kokoroInstalled(): boolean {
   try { return localStorage.getItem(INSTALLED_KEY) === "1"; } catch { return false; }
 }
 
-// iOS Safari WebGPU is fragile and memory-limited; prefer WASM there (and
-// wherever WebGPU is absent). Desktop with WebGPU gets the faster fp32 path.
-function detectDevice(): "webgpu" | "wasm" {
-  if (typeof navigator === "undefined") return "wasm";
+// iOS (incl. iPadOS reporting as Mac): Kokoro's ML stack crashes/OOMs, so it's
+// unsupported there.
+function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
-  const iOS = /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && typeof document !== "undefined" && "ontouchend" in document);
-  const hasGpu = !!(navigator as unknown as { gpu?: unknown }).gpu;
-  return hasGpu && !iOS ? "webgpu" : "wasm";
+  const nav = navigator as unknown as { platform?: string; maxTouchPoints?: number };
+  return /iP(hone|ad|od)/.test(ua) || (nav.platform === "MacIntel" && (nav.maxTouchPoints ?? 0) > 1);
+}
+export function kokoroSupported(): boolean { return !isIOS(); }
+
+function detectDevice(): "webgpu" | "wasm" {
+  const hasGpu = typeof navigator !== "undefined" && !!(navigator as unknown as { gpu?: unknown }).gpu;
+  return hasGpu ? "webgpu" : "wasm";
 }
 
 export async function loadKokoro(onProgress?: (p: number, text: string) => void): Promise<boolean> {
+  if (!kokoroSupported()) { status = "error"; return false; } // iOS: never touch the ML stack
   if (kokoroReady()) return true;
   if (loadPromise) return loadPromise;
   status = "loading";
   loadPromise = (async () => {
     try {
-      // Route model caching through IndexedDB (Safari's Cache API put fails on
-      // the HF responses). Must be set before from_pretrained fetches anything.
-      try {
-        const { env } = await import("@huggingface/transformers");
-        env.useBrowserCache = false;
-        env.useCustomCache = true;
-        env.customCache = idbModelCache as unknown as typeof env.customCache;
-      } catch { /* fall back to default caching */ }
       const mod = await import("kokoro-js");
       const device = detectDevice();
       const opts = {
@@ -88,9 +85,9 @@ export async function loadKokoro(onProgress?: (p: number, text: string) => void)
   return loadPromise;
 }
 
-// Warm the model in the background, only if the user has enabled the voice.
+// Warm the model in the background, only if enabled and supported (not iOS).
 export function preloadKokoro(): void {
-  if (kokoroEnabled() && status === "idle") void loadKokoro();
+  if (kokoroSupported() && kokoroEnabled() && status === "idle") void loadKokoro();
 }
 
 // Render text → object URL of a WAV blob, or null if Kokoro isn't ready. Does
@@ -112,7 +109,6 @@ export async function clearKokoro(): Promise<void> {
   model = null;
   status = "idle";
   try { localStorage.removeItem(INSTALLED_KEY); } catch { /* ignore */ }
-  await clearModelCache();
   try {
     if ("caches" in window) {
       const keys = await caches.keys();

@@ -8,7 +8,7 @@ import { card, mutedNote, ghostButton, primaryButton } from "../ui/styles";
 // opt-in (an ~80MB model) so it never loads unprompted — until it's downloaded,
 // the station uses the device's built-in speech voice.
 export default function VoiceActions() {
-  const { enabled, status, installed, progress, progressText, download, remove, test } = useKokoroManager();
+  const { enabled, status, installed, supported, progress, progressText, download, remove, test } = useKokoroManager();
   const ready = status === "ready";
   const loading = status === "loading";
   const have = ready || installed; // downloaded before (may need a quick load from cache)
@@ -23,12 +23,12 @@ export default function VoiceActions() {
             {enabled && ready ? " Active." : " Until it's downloaded, the station uses the built-in voice."}
           </span>
         </span>
-        <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: ready || installed ? "var(--accent)" : status === "error" ? "#c2506f" : "var(--text-faint)" }}>
-          {ready ? "Ready" : loading ? "Loading…" : installed ? "Installed" : status === "error" ? "Failed" : "Not installed"}
+        <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: !supported ? "var(--text-faint)" : ready || installed ? "var(--accent)" : status === "error" ? "#c2506f" : "var(--text-faint)" }}>
+          {!supported ? "Unavailable here" : ready ? "Ready" : loading ? "Loading…" : installed ? "Installed" : status === "error" ? "Failed" : "Not installed"}
         </span>
       </div>
 
-      {loading ? (
+      {supported && loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {progress > 0 ? (
             <div style={{ height: 6, borderRadius: 3, background: "var(--surface-muted)", overflow: "hidden" }}>
@@ -41,22 +41,26 @@ export default function VoiceActions() {
         </div>
       ) : null}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {!have ? (
-          <button type="button" onClick={() => { unlockVoice(); unlockAudio(); void download(); }} disabled={loading} style={{ ...primaryButton, opacity: loading ? 0.6 : 1 }}>
-            {loading ? <span className="afm-spin"><Loader size={15} /></span> : <Download size={15} />}
-            {loading ? "Downloading…" : "Download voice"}
-          </button>
-        ) : (
-          <>
-            <button type="button" onClick={() => { unlockVoice(); void test(); }} disabled={loading} style={{ ...ghostButton, opacity: loading ? 0.6 : 1 }}>{loading ? <span className="afm-spin"><Loader size={15} /></span> : <Volume2 size={15} />} Test voice</button>
-            <button type="button" onClick={() => void remove()} style={{ ...ghostButton, color: "#c2506f", borderColor: "#c2506f55" }}><Trash2 size={15} /> Remove</button>
-          </>
-        )}
-      </div>
+      {supported ? (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {!have ? (
+            <button type="button" onClick={() => { unlockVoice(); unlockAudio(); void download(); }} disabled={loading} style={{ ...primaryButton, opacity: loading ? 0.6 : 1 }}>
+              {loading ? <span className="afm-spin"><Loader size={15} /></span> : <Download size={15} />}
+              {loading ? "Downloading…" : "Download voice"}
+            </button>
+          ) : (
+            <>
+              <button type="button" onClick={() => { unlockVoice(); void test(); }} disabled={loading} style={{ ...ghostButton, opacity: loading ? 0.6 : 1 }}>{loading ? <span className="afm-spin"><Loader size={15} /></span> : <Volume2 size={15} />} Test voice</button>
+              <button type="button" onClick={() => void remove()} style={{ ...ghostButton, color: "#c2506f", borderColor: "#c2506f55" }}><Trash2 size={15} /> Remove</button>
+            </>
+          )}
+        </div>
+      ) : null}
 
       <span style={{ ...mutedNote, fontSize: 11.5 }}>
-        If it can't load on your device, the built-in voice is used automatically.
+        {supported
+          ? "If it can't load on your device, the built-in voice is used automatically."
+          : "This voice can't run on iPhone/iPad yet, so the station uses the built-in system voice there."}
       </span>
     </div>
   );

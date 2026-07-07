@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import {
-  kokoroEnabled, setKokoroEnabled, kokoroStatus, kokoroInstalled, kokoroReady, loadKokoro, clearKokoro, kokoroRender, kokoroPlay,
+  kokoroEnabled, setKokoroEnabled, kokoroStatus, kokoroInstalled, kokoroReady, kokoroSupported, loadKokoro, clearKokoro, kokoroRender, kokoroPlay,
   type KokoroStatus,
 } from "../audio/hostKokoro";
 import { postToast } from "../utils/toast";
@@ -62,5 +62,5 @@ export default function useKokoroManager() {
     else postToast("Voice host isn't ready yet.", "error");
   }, []);
 
-  return { enabled, status, installed, progress, progressText, download, toggle, remove, test };
+  return { enabled, status, installed, supported: kokoroSupported(), progress, progressText, download, toggle, remove, test };
 }
