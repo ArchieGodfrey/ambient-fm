@@ -1,6 +1,9 @@
-import { Radio as RadioIcon, Power, Mic, Square, Play } from "lucide-react";
+import { useState } from "react";
+import { Radio as RadioIcon, Power, Mic, Square, Play, Download, Loader } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import useCapture from "../hooks/useCapture";
+import { unlockAudio } from "../audio/toneEngine";
+import { unlockVoice } from "../audio/host";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
 // The station front door. Tune in → the composer runs an ongoing set, the DJ
@@ -8,12 +11,23 @@ import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 // else a random saved Sound). Bespoke/manual generation lives in the Studio now.
 // The disc + tracklist are one tap deeper, in the expanded now-playing view.
 export default function Radio() {
-  const { radio, startRadio, displayStatus } = useSession();
+  const { radio, startRadio, displayStatus, model } = useSession();
   const { recording, start, stop } = useCapture();
+  const [preparing, setPreparing] = useState(false);
 
   const on = radio.isOn;
-  const busy = radio.state === "generating";
+  // The composer model must be downloaded (once) + loaded before it can play.
+  const needsDownload = !model.modelDownloaded && !model.modelLoaded;
+  const busy = preparing || radio.state === "generating";
   const isError = /fail|error|not available|unavailable/i.test(displayStatus ?? "");
+
+  const tuneIn = async () => {
+    // Unlock audio SYNCHRONOUSLY in the click (iOS) before the async model work.
+    unlockAudio();
+    unlockVoice();
+    setPreparing(true);
+    try { await startRadio(); } finally { setPreparing(false); }
+  };
 
   const statusLine =
     radio.state === "generating" ? "composing the next track…"
@@ -75,20 +89,44 @@ export default function Radio() {
             Tune out
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={() => void startRadio()}
-            disabled={busy}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 9,
-              padding: "14px 30px", borderRadius: "var(--radius-pill)", cursor: busy ? "default" : "pointer",
-              border: "none", background: "var(--accent)", color: "#fff",
-              fontSize: 15, fontWeight: 700, boxShadow: "var(--shadow)", opacity: busy ? 0.7 : 1,
-            }}
-          >
-            <Play size={17} />
-            {busy ? "Tuning in…" : "Tune in"}
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, width: "100%" }}>
+            <button
+              type="button"
+              onClick={() => void tuneIn()}
+              disabled={busy}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 9,
+                padding: "14px 30px", borderRadius: "var(--radius-pill)", cursor: busy ? "default" : "pointer",
+                border: "none", background: "var(--accent)", color: "#fff",
+                fontSize: 15, fontWeight: 700, boxShadow: "var(--shadow)", opacity: busy ? 0.7 : 1,
+              }}
+            >
+              {busy ? <span className="afm-spin"><Loader size={17} /></span> : needsDownload ? <Download size={17} /> : <Play size={17} />}
+              {busy ? "Preparing…" : needsDownload ? "Download & tune in" : "Tune in"}
+            </button>
+
+            {/* Pre-click: tell the user a one-time download is needed first */}
+            {needsDownload && !busy ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)", textAlign: "center", maxWidth: 320 }}>
+                <Download size={13} />
+                First tune-in downloads the composer (one time, a few hundred MB — give it a minute).
+              </span>
+            ) : null}
+
+            {/* While preparing, show the download/load progress */}
+            {busy && !on ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "min(320px, 90%)" }}>
+                {model.modelProgress && model.modelProgress > 0 ? (
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface-muted)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.round(model.modelProgress * 100)}%`, background: "var(--accent)", transition: "width 0.2s ease" }} />
+                  </div>
+                ) : (
+                  <div className="afm-bar-indet" style={{ height: 6, borderRadius: 3, background: "var(--surface-muted)" }} />
+                )}
+                <span style={{ ...mutedNote, fontSize: 11.5, textAlign: "center" }}>{model.progressText || displayStatus || "preparing the composer…"}</span>
+              </div>
+            ) : null}
+          </div>
         )}
 
         {!radio.ttsAvailable ? (

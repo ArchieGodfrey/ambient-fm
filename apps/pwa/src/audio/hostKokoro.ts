@@ -99,24 +99,44 @@ export async function clearKokoro(): Promise<void> {
   } catch { /* ignore */ }
 }
 
-let el: HTMLAudioElement | null = null;
+// A SINGLE reused audio element. iOS only allows programmatic playback on an
+// element that was first played inside a user gesture — so we unlock this one on
+// the tune-in / test click, then reuse it for every clip. Creating a fresh
+// `new Audio()` per clip (post-await) is silently blocked on iOS.
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAIA+AAABAAgAZGF0YQAAAAA=";
+let voiceEl: HTMLAudioElement | null = null;
 let url: string | null = null;
 
+function ensureVoiceEl(): HTMLAudioElement | null {
+  if (!voiceEl && typeof Audio !== "undefined") voiceEl = new Audio();
+  return voiceEl;
+}
+
+// Call synchronously from a user gesture to unlock media playback on iOS.
+export function unlockVoice(): void {
+  const el = ensureVoiceEl();
+  if (!el) return;
+  try {
+    el.src = SILENT_WAV;
+    void el.play().then(() => el.pause()).catch(() => { /* blocked; nothing to do */ });
+  } catch { /* ignore */ }
+}
+
 export function kokoroPlay(clipUrl: string): Promise<void> {
+  const el = ensureVoiceEl();
+  if (!el) return Promise.resolve();
   stopKokoro();
   url = clipUrl;
   return new Promise((resolve) => {
-    const a = new Audio(clipUrl);
-    el = a;
     const done = () => { stopKokoro(); resolve(); };
-    a.onended = done;
-    a.onerror = done;
-    void a.play().catch(done);
+    el.onended = done;
+    el.onerror = done;
+    el.src = clipUrl;
+    void el.play().catch(done);
   });
 }
 
 export function stopKokoro(): void {
-  try { el?.pause(); } catch { /* ignore */ }
-  el = null;
+  try { voiceEl?.pause(); } catch { /* ignore */ }
   if (url) { URL.revokeObjectURL(url); url = null; }
 }

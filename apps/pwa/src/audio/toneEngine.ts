@@ -17,6 +17,18 @@ export async function resumeAudioContext() {
   }
 }
 
+// Unlock audio for iOS. MUST be called synchronously inside a user gesture
+// (e.g. the Tune-in click) — iOS only lets the AudioContext resume from a real
+// user action, and our flow otherwise defers playback until after a long model
+// load, by which point the gesture is gone ("AudioContext is suspended…").
+export function unlockAudio() {
+  try {
+    void Tone.start();
+    const raw = Tone.getContext().rawContext as unknown as { state?: string; resume?: () => Promise<void> };
+    if (raw?.state === "suspended") void raw.resume?.();
+  } catch { /* no context yet */ }
+}
+
 // Duck the whole mix down to a quiet "bed" (dB) and back — used by the radio so
 // the DJ host can talk over a low soundscape without the music cutting out.
 // There's no master gain bus, so we ramp the shared destination volume.

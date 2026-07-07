@@ -1,5 +1,7 @@
 import { Download, Volume2, Trash2, Loader } from "lucide-react";
 import useKokoroManager from "../hooks/useKokoroManager";
+import { unlockVoice } from "../audio/host";
+import { unlockAudio } from "../audio/toneEngine";
 import { card, mutedNote, ghostButton, primaryButton } from "../ui/styles";
 
 // Download / enable / test / remove the optional Kokoro neural DJ voice. It's
@@ -27,29 +29,34 @@ export default function VoiceActions() {
 
       {loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ height: 6, borderRadius: 3, background: "var(--surface-muted)", overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${Math.round(progress * 100)}%`, background: "var(--accent)", transition: "width 0.2s ease" }} />
-          </div>
+          {progress > 0 ? (
+            <div style={{ height: 6, borderRadius: 3, background: "var(--surface-muted)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${Math.round(progress * 100)}%`, background: "var(--accent)", transition: "width 0.2s ease" }} />
+            </div>
+          ) : (
+            <div className="afm-bar-indet" style={{ height: 6, borderRadius: 3, background: "var(--surface-muted)" }} />
+          )}
           <span style={{ ...mutedNote, fontSize: 11.5 }}>{progressText || "preparing…"}</span>
         </div>
       ) : null}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {!ready ? (
-          <button type="button" onClick={() => void download()} disabled={loading} style={{ ...primaryButton, opacity: loading ? 0.6 : 1 }}>
-            {loading ? <Loader size={15} /> : <Download size={15} />}
+          <button type="button" onClick={() => { unlockVoice(); unlockAudio(); void download(); }} disabled={loading} style={{ ...primaryButton, opacity: loading ? 0.6 : 1 }}>
+            {loading ? <span className="afm-spin"><Loader size={15} /></span> : <Download size={15} />}
             {loading ? "Downloading…" : "Download voice"}
           </button>
         ) : (
           <>
-            <button type="button" onClick={() => void test()} style={ghostButton}><Volume2 size={15} /> Test voice</button>
+            <button type="button" onClick={() => { unlockVoice(); void test(); }} style={ghostButton}><Volume2 size={15} /> Test voice</button>
             <button type="button" onClick={() => void remove()} style={{ ...ghostButton, color: "#c2506f", borderColor: "#c2506f55" }}><Trash2 size={15} /> Remove</button>
           </>
         )}
       </div>
 
       <span style={{ ...mutedNote, fontSize: 11.5 }}>
-        On iPhone this runs in a lighter compatibility mode; if it can't load, the built-in voice is used automatically.
+        On iPhone this runs in a lighter compatibility mode and Safari may not keep it cached between sessions
+        (so it can re-download). If it can't load, the built-in voice is used automatically.
       </span>
     </div>
   );

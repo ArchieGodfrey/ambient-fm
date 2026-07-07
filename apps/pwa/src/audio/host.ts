@@ -1,10 +1,10 @@
-import { kokoroRender, kokoroPlay, stopKokoro, preloadKokoro } from "./hostKokoro";
+import { kokoroRender, kokoroPlay, stopKokoro, preloadKokoro, unlockVoice } from "./hostKokoro";
 
 // The DJ host voice. Prefers Kokoro neural TTS (nicer voice); falls back to the
 // platform Web Speech API. Both are independent of the Tone audio context (which
 // suspends during inference), so the voice covers the track-generation gap.
 
-export { preloadKokoro };
+export { preloadKokoro, unlockVoice };
 
 export function hostAvailable(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
