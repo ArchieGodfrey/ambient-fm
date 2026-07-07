@@ -76,6 +76,8 @@ export function applyComposition(plan: CompositionPlan) {
   const safePlan = normalizeCompositionPlan(plan);
 
   Tone.Transport.bpm.value = safePlan.bpm;
+  const tonic = safePlan.key.split(/\s+/)[0];
+  if (tonic) drone?.setNote(`${tonic}2`); // drone follows the key instead of a fixed C2
   drone?.setIntensity(safePlan.layers.drone);
   pad?.setIntensity(safePlan.layers.pad);
   texture?.setIntensity(

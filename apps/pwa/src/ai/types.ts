@@ -56,6 +56,9 @@ export interface CompositionPlan {
   // Optional user-recorded melody, scheduled as a timed track over the soundscape.
   melodyNotes?: { note: string; start: number; duration: number }[];
   melodyInstrument?: string;
+  // Harmonic bed voiced over the section timeline (seconds): block chords + bass.
+  chordEvents?: { notes: string[]; start: number; duration: number }[];
+  bassEvents?: { note: string; start: number; duration: number }[];
 }
 
 export type { CompositionIntent };

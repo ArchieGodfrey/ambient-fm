@@ -7,6 +7,7 @@ import { startScheduler, tick as schedulerTick } from "./sectionScheduler";
 import { saveSnapshot, type RuntimeSnapshot } from "../memory/runtimeSnapshots";
 import { composerState } from "../composer/composerState";
 import { setMelody, stopMelody } from "./melodyTrack";
+import { setHarmony, stopHarmony } from "./harmonyTrack";
 
 export type CompositionRuntimeSnapshot = {
   cursor: number;
@@ -256,6 +257,7 @@ export function startCompositionRuntime(planInput: CompositionPlan, startOffset 
   plan = planInput;
   startScheduler(planInput);
   setMelody(planInput.melodyNotes, planInput.melodyInstrument); // recorded melody track (if any)
+  setHarmony(planInput.chordEvents, planInput.bassEvents); // chord + bass bed
   startTime = performance.now() - startOffset * 1000;
 
   const cursor = getCursor();
@@ -300,6 +302,7 @@ export function stopRuntimeLoop() {
   }
   stopPhrase();
   stopMelody();
+  stopHarmony();
   stopCheckpointing();
 }
 

@@ -75,6 +75,18 @@ export function buildCompositionPlanFromIntent(
     phraseIds: [phrases[i % phrases.length]?.id ?? phrases[0]?.id ?? ""],
   }));
 
+  // Voice a harmonic bed per section: block chord (root/3rd/5th ~oct3, 7th oct4)
+  // + a bass root, so harmony is actually sounded and moves with the sections.
+  const voiceChord = (notes: string[]) => notes.map((pc, i) => `${pc}${i >= 3 ? 4 : 3}`);
+  const chordEvents = sections.map((s, i) => {
+    const chord = progression[i % Math.max(1, progression.length)];
+    return { notes: chord ? voiceChord(chord.notes) : [], start: s.start, duration: s.duration };
+  });
+  const bassEvents = sections.map((s, i) => {
+    const chord = progression[i % Math.max(1, progression.length)];
+    return { note: chord ? `${chord.notes[0]}2` : "C2", start: s.start, duration: s.duration };
+  });
+
   return {
     key: `${intent.key.tonic} ${intent.key.mode}`,
     bpm,
@@ -83,6 +95,8 @@ export function buildCompositionPlanFromIntent(
     globalMood: "intent-driven",
     evolutionProfile,
     sections,
+    chordEvents,
+    bassEvents,
     texture: {
       density: Math.min(1, Math.max(0, motifDensity)),
       brightness: Math.min(1, Math.max(0, 0.5 + complexity * 0.3)),
