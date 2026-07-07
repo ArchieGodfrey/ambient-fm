@@ -17,6 +17,16 @@ export async function resumeAudioContext() {
   }
 }
 
+// Duck the whole mix down to a quiet "bed" (dB) and back — used by the radio so
+// the DJ host can talk over a low soundscape without the music cutting out.
+// There's no master gain bus, so we ramp the shared destination volume.
+export function duckTo(db = -16, seconds = 0.4) {
+  try { Tone.getDestination().volume.rampTo(db, seconds); } catch { /* no context yet */ }
+}
+export function unduck(seconds = 0.8) {
+  try { Tone.getDestination().volume.rampTo(0, seconds); } catch { /* no context yet */ }
+}
+
 export async function startAudio() {
   if (!started) {
     await Tone.start();

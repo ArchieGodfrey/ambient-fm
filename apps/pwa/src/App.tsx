@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Disc3, Library, SlidersHorizontal, Settings as SettingsIcon } from "lucide-react";
+import { Radio, Library, SlidersHorizontal, Settings as SettingsIcon } from "lucide-react";
 import { SessionProvider } from "./session/SessionProvider";
-import Today from "./screens/Today";
+import RadioScreen from "./screens/Radio";
 import Journey from "./screens/Journey";
 import YourSound from "./screens/YourSound";
 import Settings from "./screens/Settings";
@@ -11,7 +11,7 @@ import DebugLog from "./components/DebugLog";
 import { useAppStore } from "./store/useAppStore";
 
 const tabs = [
-  { key: "today", label: "Today", Icon: Disc3, Screen: Today },
+  { key: "radio", label: "Radio", Icon: Radio, Screen: RadioScreen },
   { key: "journey", label: "Library", Icon: Library, Screen: Journey },
   { key: "sound", label: "Your Sound", Icon: SlidersHorizontal, Screen: YourSound },
   { key: "settings", label: "Settings", Icon: SettingsIcon, Screen: Settings },
@@ -20,7 +20,7 @@ const tabs = [
 type TabKey = (typeof tabs)[number]["key"];
 
 export default function App() {
-  const [active, setActive] = useState<TabKey>("today");
+  const [active, setActive] = useState<TabKey>("radio");
   const [expanded, setExpanded] = useState(false);
   const debug = useAppStore((s) => s.debug);
   const ActiveScreen = tabs.find((t) => t.key === active)!.Screen;

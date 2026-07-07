@@ -121,6 +121,11 @@ button {
   from { opacity: 0; transform: translateY(-38px) scale(0.9); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+@keyframes afm-onair {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-soft); }
+  50% { box-shadow: 0 0 0 14px transparent; }
+}
+.afm-onair { animation: afm-onair 2.2s ease-in-out infinite; }
 
 /* ── Responsive shell: bottom tab bar on phones, left rail on desktop ── */
 .afm-main {

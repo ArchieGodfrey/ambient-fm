@@ -4,6 +4,7 @@ import { buildStimulusSnapshot } from "../stimuli/buildStimulusSnapshot";
 import { useAppStore } from "../store/useAppStore";
 import useModelManager from "../hooks/useModelManager";
 import useAudioComposer from "../hooks/useAudioComposer";
+import useRadio from "../hooks/useRadio";
 import useSessionHistory from "../hooks/useSessionHistory";
 import { getAvailableModels, getSelectedModelId, selectModel, isModelLoaded } from "../ai/composer";
 import { postToast } from "../utils/toast";
@@ -28,6 +29,7 @@ function useSessionRuntime() {
 
   const model = useModelManager(workerInitPayload);
   const audio = useAudioComposer(events);
+  const radio = useRadio(audio, events);
   const { sessions } = useSessionHistory();
 
   async function refreshStimuli() {
@@ -89,6 +91,20 @@ function useSessionRuntime() {
     }
   }
 
+  // Tune in: resume audio within the gesture, ensure the model is ready, then
+  // hand off to the radio loop. Mirrors handleGenerate's model gating.
+  async function startRadio() {
+    await resumeAudioContext();
+    if (!isModelLoaded()) {
+      const loaded = await model.loadModelAction();
+      if (!loaded) {
+        setAppStatus("Composer failed to prepare.");
+        return;
+      }
+    }
+    radio.tuneIn();
+  }
+
   async function generateVibe(opts: { moodWords: string; key?: string; tempo?: number; instruction?: string }): Promise<string> {
     if (!isModelLoaded()) {
       const loaded = await model.loadModelAction();
@@ -145,6 +161,8 @@ function useSessionRuntime() {
     audio,
     isGenerating,
     handleGenerate,
+    radio,
+    startRadio,
     generateVibe,
     refreshStimuli,
     availableModels,

@@ -13,6 +13,7 @@ import type { Sound } from "../sounds/types";
 import { restoreRuntime } from "../runtime/restoreRuntime";
 import { useAppStore } from "../store/useAppStore";
 import type { CompositionPlan } from "../ai/types";
+import type { CompositionIntent } from "../ai/intentSchema";
 import type { StimulusEvent } from "../types";
 import type { CompositionRuntimeSnapshot } from "../audio/compositionRuntime";
 
@@ -20,6 +21,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
   const setStoreIsPlaying = useAppStore((state) => state.setIsPlaying);
   const setPlayToggle = useAppStore((state) => state.setPlayToggle);
   const composerSettings = useAppStore((state) => state.composerSettings);
+  const setCurrentTitle = useAppStore((state) => state.setCurrentTitle);
   const [isPlaying, setIsPlaying] = useState(false);
   const [aiStatus, setAIStatus] = useState("Ready");
   const [status, setStatus] = useState("Ready");
@@ -121,43 +123,84 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     return unsubscribe;
   }, []);
 
-  async function runAIComposer(overrideEvents?: StimulusEvent[], direction?: CompositionDirection, sound?: Partial<Sound>) {
+  type Composed = { plan: CompositionPlan; intent: CompositionIntent; title: string };
+
+  // Compose a track (generate + name + persist) WITHOUT starting playback, so
+  // callers (esp. the radio) can narrate the intro before the track comes in.
+  async function composeTrack(overrideEvents?: StimulusEvent[], direction?: CompositionDirection, sound?: Partial<Sound>): Promise<Composed | null> {
     if (!isModelLoaded()) {
       setStatus("Composer isn't ready yet — the model failed to load.");
-      return;
+      return null;
     }
-
     const inputEvents = overrideEvents ?? events;
     setAIStatus("Generating composition...");
     setStatus("Generating composition...");
-
     try {
       const settings = sound?.composerSettings ?? composerSettings;
       const { plan: composition, intent } = await generateComposition(inputEvents, settings, direction);
       // Graft in the parts of the loaded Sound the intent path can't emit —
-      // the recorded melody, explicit layers, tempo — so the burn is truly "your sound".
+      // the recorded melody, explicit layers, tempo — so it's truly "your sound".
       if (sound) applySoundToPlan(composition, sound);
-      setSharedPlan(composition);
-      await resumeAudioContext(); // model load may have suspended the context
-      startCompositionRuntime(composition);
-      startComposer(intent);
-      setStatus(`Composition generated: ${composition.key}`);
-      // Name it with the model (fallbacks to deterministic), then persist —
-      // done after audio starts so naming latency doesn't delay playback.
       const title = await generateTrackNameLLM(composition, { vibe: sound?.vibe ?? direction?.vibe, moodWords: direction?.moodWords });
       await saveSession(inputEvents, composition, title);
+      return { plan: composition, intent, title };
     } catch (error) {
-      // No fallback — surface the failure instead of presenting a stand-in disc.
       console.error("Failed to generate composition", error);
       const message = error instanceof Error ? error.message : String(error);
       setStatus(`Composing failed: ${message}`);
+      return null;
     } finally {
       setAIStatus("Ready");
     }
   }
 
-  const loadSessionPlan = useCallback(async (planInput: CompositionPlan) => {
+  // Start (or restart) playback of an already-composed plan.
+  const playComposed = useCallback(async (composition: CompositionPlan, intent?: CompositionIntent, title?: string | null) => {
+    setSharedPlan(composition);
+    setCurrentTitle(title ?? null);
+    setCurrentSessionSaved(true);
+    try {
+      await startAudio();
+      startCompositionRuntime(composition);
+      startRuntimeLoop();
+      if (intent) startComposer(intent);
+      setIsPlaying(true);
+      setStoreIsPlaying(true);
+      setStatus(`Now playing: ${composition.key}`);
+    } catch (error) {
+      console.error(error);
+      postToast(`Audio failed: ${error instanceof Error ? error.message : String(error)}`, "error");
+      setStatus("Audio failed");
+    }
+  }, [setSharedPlan, setCurrentTitle, setStoreIsPlaying]);
+
+  // Stop everything (used by the radio's tune-out and manual stop).
+  const stopPlayback = useCallback(() => {
+    stopAudio();
+    stopRuntimeLoop();
+    stopComposer();
+    setIsPlaying(false);
+    setStoreIsPlaying(false);
+    setStatus("Audio stopped");
+  }, [setStoreIsPlaying]);
+
+  // Compose then load the plan (Today "burn" / Studio "elevate" — playback is
+  // a separate user action). Returns the composed result.
+  async function runAIComposer(overrideEvents?: StimulusEvent[], direction?: CompositionDirection, sound?: Partial<Sound>): Promise<Composed | null> {
+    const result = await composeTrack(overrideEvents, direction, sound);
+    if (!result) return null;
+    setSharedPlan(result.plan);
+    setCurrentTitle(result.title);
+    await resumeAudioContext(); // model load may have suspended the context
+    startCompositionRuntime(result.plan);
+    startComposer(result.intent);
+    setStatus(`Composition generated: ${result.plan.key}`);
+    return result;
+  }
+
+  const loadSessionPlan = useCallback(async (planInput: CompositionPlan, title?: string) => {
     setSharedPlan(planInput);
+    setCurrentTitle(title ?? null);
     setCurrentSessionSaved(true);
 
     try {
@@ -175,7 +218,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
 
     startCompositionRuntime(planInput);
     startRuntimeLoop();
-  }, []);
+  }, [setCurrentTitle]);
 
   const loadStaticPlan = useCallback((planInput: CompositionPlan) => {
     setSharedPlan(planInput);
@@ -192,9 +235,10 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     setIsPlaying(false);
     setStoreIsPlaying(false);
     setSharedPlan(null);
+    setCurrentTitle(null);
     setCurrentSessionSaved(true);
     setStatus("Tray empty");
-  }, [setSharedPlan, setStoreIsPlaying]);
+  }, [setSharedPlan, setCurrentTitle, setStoreIsPlaying]);
 
   const restoreSession = useCallback(async () => {
     try {
@@ -221,6 +265,9 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     runtimeState,
     handlePlayToggle,
     runAIComposer,
+    composeTrack,
+    playComposed,
+    stopPlayback,
     loadSessionPlan,
     loadStaticPlan,
     restoreSession,
