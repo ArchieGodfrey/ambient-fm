@@ -49,6 +49,14 @@ export async function startAudio() {
   Tone.Destination.mute = false;
 
   if (!playing) {
+    // Fade the master up from near-silent so the stacked downbeat at t=0 (all
+    // parts triggering together) doesn't crack out as a loud transient.
+    try {
+      const vol = Tone.getDestination().volume;
+      vol.cancelScheduledValues(Tone.now());
+      vol.value = -28;
+      vol.rampTo(0, 0.6);
+    } catch { /* no context yet */ }
     if (Tone.Transport.state !== "started") {
       Tone.Transport.start();
     }

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Play, Trash2, Sparkles } from "lucide-react";
+import { Trash2, Plus } from "lucide-react";
 import useSessionHistory from "../hooks/useSessionHistory";
+import useSounds from "../hooks/useSounds";
 import { useSession } from "../session/SessionProvider";
 import { postToast } from "../utils/toast";
 import Disc from "../components/Disc";
@@ -22,21 +23,27 @@ function dayKey(ts: number) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-function trackTime(ts: number) {
-  return new Date(ts).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
 export default function Journey() {
   const { sessions, deleteSession } = useSessionHistory();
-  const { audio, handleGenerate, isGenerating } = useSession();
+  const { audio } = useSession();
+  const { createFromSound } = useSounds();
   const { opinionFor } = useFeedback();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  // Compose a fresh track seeded from an existing one's key/mood/tempo (6d).
-  async function moreLikeThis(t: SessionSummary) {
+  // Save a track you like as a reusable, editable Sound (its key/tempo/mood/layers).
+  async function saveAsSound(t: SessionSummary) {
     const [tonic, mode] = (t.key ?? "C major").split(/\s+/);
-    const result = await handleGenerate({ key: { tonic: tonic || "C", mode: /minor/i.test(mode || "") ? "minor" : "major" }, moodWords: t.dominantMood, tempo: Math.round(t.avgBpm) });
-    if (result) postToast(`Composed “${result.title}” — more like ${t.title ?? "that"}.`, "success");
+    const minor = /minor/i.test(mode || t.key || "");
+    const energy = t.avgEnergy ?? 0.5;
+    await createFromSound({
+      mood: { energy, calmness: 1 - energy, tension: minor ? 0.5 : 0.3, brightness: minor ? 0.4 : 0.6 },
+      composerSettings: { complexity: t.plan?.intent?.complexity ?? 0.4, motifDensity: t.plan?.intent?.motifDensity ?? 0.4, harmonicMovement: 0.4 },
+      key: { tonic: tonic || "C", mode: minor ? "minor" : "major" },
+      tempo: Math.round(t.avgBpm),
+      progression: t.plan?.intent?.progression,
+      layers: t.plan?.layers ?? t.layerProfile,
+    }, t.title ?? "Saved track");
+    postToast(`Saved “${t.title ?? "track"}” as a sound.`, "success");
   }
 
   const discs = useMemo<DayDisc[]>(() => {
@@ -94,31 +101,25 @@ export default function Journey() {
                 {selected.date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
               </span>
               {selected.tracks.map((t, i) => (
-                <div key={t.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14, padding: 14 }}>
-                  <button
-                    type="button"
-                    disabled={!t.plan}
-                    onClick={() => { if (!t.plan) return; void audio.loadSessionPlan(t.plan, t.title, t.id); void recordFeedback("replay", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); }}
-                    aria-label="Play track"
-                    style={{
-                      flexShrink: 0, width: 40, height: 40, borderRadius: "50%",
-                      border: "1px solid var(--accent-border)", background: "var(--accent-soft)", color: "var(--accent)",
-                      cursor: t.plan ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    }}
-                  >
-                    <Play size={15} />
-                  </button>
+                <div key={t.id} style={{ ...card, display: "flex", alignItems: "center", gap: 12, padding: 12 }}>
+                  <Disc
+                    size={40}
+                    mood={t.plan?.globalMood ?? t.dominantMood}
+                    inserting={false}
+                    onClick={t.plan ? () => { void audio.loadSessionPlan(t.plan!, t.title, t.id); void recordFeedback("replay", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); } : undefined}
+                    style={{ flexShrink: 0 }}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-h)" }}>
-                      Track {i + 1} · <span style={{ textTransform: "capitalize", fontWeight: 500 }}>{t.dominantMood}</span>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-h)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {i + 1}. {t.title ?? "Untitled"}
                     </div>
-                    <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-                      {t.key} · {Math.round(t.avgBpm)} bpm · {trackTime(t.timestamp)}
+                    <div style={{ fontSize: 12.5, color: "var(--text-muted)", textTransform: "capitalize" }}>
+                      {t.dominantMood} · {t.key} · {Math.round(t.avgBpm)} bpm
                     </div>
                   </div>
                   <TrackFeedback track={{ sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }} opinion={opinionFor(t.id)} />
-                  <button type="button" disabled={isGenerating} onClick={() => void moreLikeThis(t)} aria-label="More like this" title="More like this" style={{ border: "none", background: "transparent", color: "var(--accent)", cursor: isGenerating ? "default" : "pointer", padding: 6, opacity: isGenerating ? 0.5 : 1 }}>
-                    <Sparkles size={15} />
+                  <button type="button" onClick={() => void saveAsSound(t)} aria-label="Save as a sound" title="Save as a sound" style={{ border: "none", background: "transparent", color: "var(--accent)", cursor: "pointer", padding: 6 }}>
+                    <Plus size={16} />
                   </button>
                   <button type="button" onClick={() => { void recordFeedback("delete", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); void deleteSession(t.id); }} aria-label="Delete track" style={{ border: "none", background: "transparent", color: "var(--text-faint)", cursor: "pointer", padding: 6 }}>
                     <Trash2 size={15} />

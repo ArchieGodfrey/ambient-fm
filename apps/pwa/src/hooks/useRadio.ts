@@ -62,17 +62,13 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     runningRef.current = false;
     playingRef.current = null; // tuning out isn't a dislike — don't score it
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    if (fadeTimerRef.current) { clearTimeout(fadeTimerRef.current); fadeTimerRef.current = null; }
     cancelHost();
     setHostText(null);
     setNowPlaying(null);
     setState("idle");
-    // Soft sign-off: fade the music down before cutting it, rather than a hard stop.
-    duckTo(-50, 1.1);
-    if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
-    fadeTimerRef.current = window.setTimeout(() => {
-      audio.stopPlayback();
-      unduck(0);
-    }, 1150);
+    audio.stopPlayback(); // stop the current track immediately
+    unduck(0.3);          // reset the duck so the next tune-in isn't quiet
   }, [audio]);
 
   const cycle = useCallback(async (first: boolean) => {

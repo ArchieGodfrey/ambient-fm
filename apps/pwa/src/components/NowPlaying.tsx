@@ -120,7 +120,7 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
           where it is (same element), just stops spinning; the screen fades to black
           and dims. No second disc, so nothing jumps. */}
       {locked ? (
-        <div onClick={guardTap} className="afm-fade" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 16, paddingBottom: 64, touchAction: "none" }}>
+        <div onClick={guardTap} className="afm-fade" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 16, paddingBottom: 64, touchAction: "none" }}>
           <button type="button" onClick={(e) => e.stopPropagation()} onPointerDown={holdStart} onPointerUp={holdEnd} onPointerLeave={holdEnd} onPointerCancel={holdEnd} aria-label="Hold to unlock"
             style={{ width: 56, height: 56, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
             <Lock size={20} />
