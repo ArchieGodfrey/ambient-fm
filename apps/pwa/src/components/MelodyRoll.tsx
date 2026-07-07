@@ -23,12 +23,7 @@ export default function MelodyRoll({ notes, pxPerSec = 64, height = 132 }: { not
         {Array.from({ length: Math.ceil(end) + 1 }, (_, s) => (
           <div key={s} style={{ position: "absolute", top: 0, bottom: 0, left: s * pxPerSec, width: 1, background: "color-mix(in srgb, var(--border) 55%, transparent)" }} />
         ))}
-        {notes.length === 0 ? (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-faint)", fontSize: 12 }}>
-            Play the piano to lay a melody — it appears here.
-          </div>
-        ) : (
-          notes.map((n, i) => {
+        {notes.map((n, i) => {
             const midi = Math.min(MAX_MIDI, Math.max(MIN_MIDI, noteToMidi(n.note)));
             const top = (MAX_MIDI - midi) * rowH;
             return (
@@ -39,8 +34,7 @@ export default function MelodyRoll({ notes, pxPerSec = 64, height = 132 }: { not
                 }}
               />
             );
-          })
-        )}
+        })}
       </div>
     </div>
   );
