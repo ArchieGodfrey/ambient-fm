@@ -63,9 +63,7 @@ export function initAudioGraph() {
   drone = createDrone();
   pad = createPad();
   texture = createTexture();
-  pulse = createPulse();
-
-  pulse.start();
+  pulse = createPulse(); // not started — the percussion track handles rhythm now
 }
 
 export function applyComposition(plan: CompositionPlan) {
@@ -76,6 +74,8 @@ export function applyComposition(plan: CompositionPlan) {
   const safePlan = normalizeCompositionPlan(plan);
 
   Tone.Transport.bpm.value = safePlan.bpm;
+  const tonic = safePlan.key.split(/\s+/)[0];
+  if (tonic) drone?.setNote(`${tonic}2`); // drone follows the key
   drone?.setIntensity(safePlan.layers.drone);
   pad?.setIntensity(safePlan.layers.pad);
   texture?.setIntensity(

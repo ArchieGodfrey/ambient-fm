@@ -12,5 +12,12 @@ export function createDrone() {
     setIntensity(v: number) {
       filter.frequency.value = 100 + v * 600;
     },
+    setNote(note: string) {
+      try {
+        osc.frequency.value = Tone.Frequency(note).toFrequency();
+      } catch {
+        /* keep current pitch */
+      }
+    },
   };
 }

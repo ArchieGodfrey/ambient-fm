@@ -53,6 +53,15 @@ export interface CompositionPlan {
   motifs: Motif[];
   phrases: Phrase[];
   intent?: CompositionIntent;
+  // Optional user-recorded melody, scheduled as a timed track over the soundscape.
+  melodyNotes?: { note: string; start: number; duration: number }[];
+  melodyInstrument?: string;
+  // Harmonic bed voiced over the section timeline (seconds): block chords + bass.
+  chordEvents?: { notes: string[]; start: number; duration: number }[];
+  bassEvents?: { note: string; start: number; duration: number }[];
+  percussionDensity?: number; // 0..1, drives a gated kick/snare/hat pattern
+  arpDensity?: number;        // 0..1, drives an arpeggio over the current chord
+  vocalLevel?: number;        // 0..1, drives a gated "aah" choir pad over the chords
 }
 
 export type { CompositionIntent };

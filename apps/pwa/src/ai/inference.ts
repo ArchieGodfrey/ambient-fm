@@ -1,7 +1,7 @@
 import { getLastSessionSummaries } from "../memory/getMemoryContext";
 import { applyMemoryBias } from "../memory/applyMemoryBias";
 import { dispatchRuntimeStatus, infer, isModelLoaded } from "../runtime/modelRuntime";
-import { buildPrompt, sanitizeJsonResponse, tryParseJsonWithRecovery } from "./prompt";
+import { buildPrompt, sanitizeJsonResponse, tryParseJsonWithRecovery, type CompositionDirection } from "./prompt";
 import { buildCompositionContext } from "./compositionContext";
 import { postToast } from "../utils/toast";
 import type { CompositionPlan } from "./types";
@@ -16,13 +16,13 @@ export type GeneratedComposition = {
   intent: CompositionIntent;
 };
 
-export async function generateComposition(events: StimulusEvent[], composerSettings: ComposerSettings): Promise<GeneratedComposition> {
+export async function generateComposition(events: StimulusEvent[], composerSettings: ComposerSettings, direction?: CompositionDirection): Promise<GeneratedComposition> {
   if (!isModelLoaded()) {
     throw new Error("Model not loaded. Load the model before generating a composition.");
   }
 
   const context = await buildCompositionContext(events, composerSettings);
-  const prompt = buildPrompt(context);
+  const prompt = buildPrompt(context, direction);
   dispatchRuntimeStatus({ stage: "infer-start", text: "Starting AI composition generation" });
 
   try {
@@ -36,31 +36,29 @@ export async function generateComposition(events: StimulusEvent[], composerSetti
     dispatchRuntimeStatus({ stage: "infer-parse", text: "Parsing AI response" });
 
     const sanitized = sanitizeJsonResponse(text);
-    let recovered: string | null = null;
+
+    // Parse step — only JSON parsing lives in this try, so a downstream
+    // plan-building error is never mislabeled as a "parse" failure.
+    let intent: CompositionIntent;
     try {
-      const intent = tryParseJsonWithRecovery(sanitized) as CompositionIntent;
-      const seed = createSeed();
-      const plan = buildCompositionPlanFromIntent(intent, composerSettings, seed);
-      plan.intent = intent;
-      const sessions = await getLastSessionSummaries();
-      const biasedPlan = applyMemoryBias(plan, sessions);
-      biasedPlan.seed = plan.seed;
-      biasedPlan.intent = intent;
-      dispatchRuntimeStatus({ stage: "infer-ready", text: "Composition ready" });
-      return { plan: biasedPlan, intent };
+      intent = tryParseJsonWithRecovery(sanitized) as CompositionIntent;
     } catch (parseError) {
-      recovered = sanitizeJsonResponse(sanitized);
-      const errorMessage = `Failed to parse AI JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}\nSanitized text:\n${sanitized}\nRecovered text:\n${recovered}\nRaw response:\n${text}`;
-      dispatchRuntimeStatus({
-        stage: "infer-error",
-        text: `AI data parse failed. Inspect rawResponse for details.`,
-        rawResponse: text,
-        sanitizedResponse: sanitized,
-        recoveredResponse: recovered,
-      });
+      const errorMessage = `Failed to parse AI JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}\nSanitized:\n${sanitized}\nRaw:\n${text}`;
+      dispatchRuntimeStatus({ stage: "infer-error", text: "AI response was not valid JSON.", rawResponse: text, sanitizedResponse: sanitized });
       console.error(errorMessage);
       throw new Error(errorMessage);
     }
+
+    // Build step — turning the intent into an audible plan (harmony, motifs, memory bias).
+    const seed = createSeed();
+    const plan = buildCompositionPlanFromIntent(intent, composerSettings, seed);
+    plan.intent = intent;
+    const sessions = await getLastSessionSummaries();
+    const biasedPlan = applyMemoryBias(plan, sessions);
+    biasedPlan.seed = plan.seed;
+    biasedPlan.intent = intent;
+    dispatchRuntimeStatus({ stage: "infer-ready", text: "Composition ready" });
+    return { plan: biasedPlan, intent };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("AI composer failed", error);
@@ -76,7 +74,7 @@ export function fallbackComposition(): CompositionPlan {
     bpm: 70,
     duration: 30,
     seed: createSeed(),
-    globalMood: "fallback",
+    globalMood: "ambient",
     sections: [
       {
         start: 0,

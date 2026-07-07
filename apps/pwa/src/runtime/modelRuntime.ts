@@ -5,6 +5,7 @@ import { GPULayer } from "../runtime/gpu/GPULayer";
 import { MLLayer } from "../runtime/ml/MLLayer";
 import { RuntimeKernel } from "../runtime/core/RuntimeKernel";
 import { Scheduler } from "../runtime/core/Scheduler";
+import type { RuntimeState } from "../runtime/core/types";
 import { assertColdStart, checkMemorySafety } from "../runtime/guards/safariGuards";
 import { appConfig, getSelectedModelId } from "./modelSelection";
 
@@ -112,7 +113,16 @@ export async function clearRuntime() {
 }
 
 export async function infer(prompt: string) {
-  return mlLayer.infer(prompt);
+  // Serialize inference on the shared mutex too, so LLM infer never overlaps a
+  // model load or a voice (TTS) render — one queue for all heavy GPU/compute work.
+  return scheduler.acquire("ml_infer", () => mlLayer.infer(prompt));
+}
+
+// Run a GPU/compute task under the shared runtime mutex, so it never overlaps a
+// model load (or another exclusive task like voice/TTS rendering). Used to keep
+// second-model work orchestrated with the LLM runtime.
+export function runExclusive<T>(label: RuntimeState, fn: () => Promise<T>): Promise<T> {
+  return scheduler.acquire(label, fn);
 }
 
 export async function isModelDownloaded() {

@@ -3,6 +3,9 @@ import type { WorkerInitPayload } from "../core/types";
 import { nanoid } from "nanoid";
 import { shouldInfer } from "../guards/safariGuards";
 
+// An OffscreenCanvas is transferable only once for the whole page lifetime.
+let canvasTransferred = false;
+
 export class MLLayer {
   private worker: Worker | null = null;
   private workerReady: Promise<void> | null = null;
@@ -130,11 +133,17 @@ export class MLLayer {
 
     const transfer: Transferable[] = [];
     const payload: Record<string, unknown> = { type: "init" };
-    if (initPayload?.canvas) {
+    // An OffscreenCanvas can only be transferred ONCE for the whole app lifetime —
+    // after transferControlToOffscreen + postMessage it is detached from the main
+    // thread. The worker may be (re)created across download/load/reset, so only
+    // include the canvas on the first transfer. The canvas is optional (used solely
+    // for an unused render context); inference requests its own GPU device.
+    if (initPayload?.canvas && !canvasTransferred) {
       payload.canvas = initPayload.canvas;
       payload.width = initPayload.width;
       payload.height = initPayload.height;
       transfer.push(initPayload.canvas);
+      canvasTransferred = true;
     }
 
     this.worker.postMessage(payload, transfer);

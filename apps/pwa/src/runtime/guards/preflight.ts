@@ -58,10 +58,14 @@ function validateGpuLimits(limits: GPUSupportedLimits, appConfig: AppConfig, sel
     );
   }
 
-  const minComputeStorage = Math.max(Math.round(availableBufferMB * 1024 * 0.02), 4 * 1024);
+  // Workgroup storage is a fixed hardware limit, unrelated to VRAM/buffer budget.
+  // WebGPU's spec baseline is 16384 bytes and WebLLM's shaders run within it, so
+  // require only that floor. (The old heuristic scaled this off buffer size and
+  // falsely rejected capable GPUs — e.g. demanding ~83KB on a 4GB-buffer Mac.)
+  const minComputeStorage = 16 * 1024;
   if (limits.maxComputeWorkgroupStorageSize < minComputeStorage) {
     failures.push(
-      `GPU compute workgroup storage is ${limits.maxComputeWorkgroupStorageSize} bytes, but the environment suggests at least ${minComputeStorage} bytes`,
+      `GPU compute workgroup storage is ${limits.maxComputeWorkgroupStorageSize} bytes, below the WebGPU minimum of ${minComputeStorage} bytes`,
     );
   }
 

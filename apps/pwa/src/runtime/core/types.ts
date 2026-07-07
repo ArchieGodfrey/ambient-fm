@@ -1,4 +1,4 @@
-export type RuntimeState = "idle" | "ml_load" | "ml_infer" | "gpu" | "audio";
+export type RuntimeState = "idle" | "ml_load" | "ml_infer" | "gpu" | "audio" | "tts";
 
 import type { AppConfig } from "@mlc-ai/web-llm";
 
