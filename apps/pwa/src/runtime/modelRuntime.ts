@@ -113,7 +113,9 @@ export async function clearRuntime() {
 }
 
 export async function infer(prompt: string) {
-  return mlLayer.infer(prompt);
+  // Serialize inference on the shared mutex too, so LLM infer never overlaps a
+  // model load or a Kokoro TTS render — one queue for all heavy GPU/compute work.
+  return scheduler.acquire("ml_infer", () => mlLayer.infer(prompt));
 }
 
 // Run a GPU/compute task under the shared runtime mutex, so it never overlaps a

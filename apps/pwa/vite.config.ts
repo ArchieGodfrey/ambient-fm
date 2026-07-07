@@ -5,6 +5,13 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   base: '/',
+  // Don't pre-bundle these together — otherwise kokoro-js gets its own inlined
+  // copy of @huggingface/transformers, so configuring `env` (our IndexedDB model
+  // cache) on a separately-imported transformers has no effect. Excluding them
+  // keeps a single shared transformers instance.
+  optimizeDeps: {
+    exclude: ['kokoro-js', '@huggingface/transformers'],
+  },
   plugins: [
     mkcert(),
     react(),

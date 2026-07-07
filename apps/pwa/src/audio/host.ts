@@ -58,6 +58,18 @@ export async function prepareLine(text: string): Promise<() => Promise<void>> {
   return () => speak(text);
 }
 
+// Prime speechSynthesis inside a user gesture — iOS blocks the first spoken
+// utterance unless it follows a real user action, and the DJ speaks later
+// (mid-cycle), so without this there's no voice at all on iPhone.
+export function unlockSpeech(): void {
+  if (!hostAvailable()) return;
+  try {
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+  } catch { /* ignore */ }
+}
+
 export function cancelHost(): void {
   try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
   stopKokoro();

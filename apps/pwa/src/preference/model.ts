@@ -1,5 +1,6 @@
 import type { SessionSummary } from "../memory/types";
 import type { Feedback } from "../feedback/types";
+import { effectiveFeedback } from "../feedback/feedback";
 
 // Phase 6b — the preference model. Blends what you've MADE (long-term track
 // analysis) with what you've LIKED (feedback), weighting each track by its net
@@ -30,9 +31,9 @@ export const NEUTRAL_PREFERENCE: PreferenceVector = {
 export function computePreference(sessions: SessionSummary[], feedback: Feedback[]): PreferenceVector {
   if (!sessions.length) return { ...NEUTRAL_PREFERENCE };
 
-  // Net feedback weight per track.
+  // Net feedback weight per track (latest explicit opinion only + all implicit).
   const fbScore = new Map<string, number>();
-  for (const f of feedback) fbScore.set(f.sessionId, (fbScore.get(f.sessionId) ?? 0) + f.weight);
+  for (const f of effectiveFeedback(feedback)) fbScore.set(f.sessionId, (fbScore.get(f.sessionId) ?? 0) + f.weight);
 
   let totalW = 0;
   let energy = 0, complexity = 0, tempo = 0, minor = 0;
@@ -59,7 +60,7 @@ export function computePreference(sessions: SessionSummary[], feedback: Feedback
   const rankedMoods = rank(moods);
   const rankedKeys = rank(keys);
 
-  const explicitCount = feedback.filter((f) => f.signal === "like" || f.signal === "dislike").length;
+  const explicitCount = effectiveFeedback(feedback).filter((f) => f.signal === "like" || f.signal === "dislike").length;
   const confidence = clamp01(sessions.length / 12 * 0.6 + explicitCount / 8 * 0.4);
 
   return {

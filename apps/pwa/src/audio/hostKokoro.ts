@@ -11,6 +11,7 @@ import { idbModelCache, clearModelCache } from "./kokoroCache";
 const MODEL = "onnx-community/Kokoro-82M-v1.0-ONNX";
 const VOICE = "af_heart";
 const ENABLED_KEY = "ambientfm-kokoro-enabled";
+const INSTALLED_KEY = "ambientfm-kokoro-installed"; // weights cached (persists across reloads)
 
 export type KokoroStatus = "idle" | "loading" | "ready" | "error";
 
@@ -27,6 +28,11 @@ export function setKokoroEnabled(v: boolean): void {
 }
 export function kokoroStatus(): KokoroStatus { return status; }
 export function kokoroReady(): boolean { return status === "ready" && !!model; }
+// Whether the weights have been downloaded before (cached in IndexedDB). Survives
+// reloads, unlike the in-memory `status`.
+export function kokoroInstalled(): boolean {
+  try { return localStorage.getItem(INSTALLED_KEY) === "1"; } catch { return false; }
+}
 
 // iOS Safari WebGPU is fragile and memory-limited; prefer WASM there (and
 // wherever WebGPU is absent). Desktop with WebGPU gets the faster fp32 path.
@@ -64,6 +70,7 @@ export async function loadKokoro(onProgress?: (p: number, text: string) => void)
       } as unknown as Parameters<typeof mod.KokoroTTS.from_pretrained>[1];
       model = (await mod.KokoroTTS.from_pretrained(MODEL, opts)) as unknown as KokoroModel;
       status = "ready";
+      try { localStorage.setItem(INSTALLED_KEY, "1"); } catch { /* ignore */ }
       return true;
     } catch (e) {
       console.warn("Kokoro load failed — using speechSynthesis", e);
@@ -100,6 +107,7 @@ export async function kokoroRender(text: string): Promise<string | null> {
 export async function clearKokoro(): Promise<void> {
   model = null;
   status = "idle";
+  try { localStorage.removeItem(INSTALLED_KEY); } catch { /* ignore */ }
   await clearModelCache();
   try {
     if ("caches" in window) {

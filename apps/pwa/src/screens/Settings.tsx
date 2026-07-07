@@ -61,14 +61,14 @@ export default function Settings() {
         <label style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, cursor: "pointer" }}>
           <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-h)" }}>Show debug log</span>
-            <span style={mutedNote}>Surface warnings and errors in an on-screen panel. Off by default — the disc shows burn progress.</span>
+            <span style={mutedNote}>Show warnings and errors in an on-screen panel.</span>
           </span>
           <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} style={{ width: 20, height: 20, accentColor: "var(--accent)", flexShrink: 0 }} />
         </label>
         <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
           <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-h)" }}>Reset & reload</span>
-            <span style={mutedNote}>Clears cached code/assets and reloads — fixes a stale UI after an update (installed on iPhone especially). Keeps your sounds and the downloaded models.</span>
+            <span style={mutedNote}>Reload with the latest version if the app seems out of date. Keeps your sounds and downloaded models.</span>
           </span>
           <button type="button" onClick={() => void resetApp()} style={{ ...ghostButton, flexShrink: 0 }}><RefreshCw size={15} /> Reset</button>
         </div>

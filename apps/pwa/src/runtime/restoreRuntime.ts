@@ -11,12 +11,15 @@ export async function restoreRuntime(options?: { startAudio?: boolean }) {
     return null;
   }
 
-  initAudioGraph();
-  initMotifs(last.plan.motifs);
+  // Only touch the audio graph / scheduler when actually starting playback.
+  // On load we restore for DISPLAY only (startAudio false) — building the graph
+  // or the composition runtime here made a stray note play on page load.
   if (options?.startAudio) {
+    initAudioGraph();
+    initMotifs(last.plan.motifs);
     await startAudio();
+    startCompositionRuntime(last.plan, last.cursorTime);
   }
-  startCompositionRuntime(last.plan, last.cursorTime);
 
   return last as RuntimeSnapshot;
 }

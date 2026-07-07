@@ -8,9 +8,10 @@ import { card, mutedNote, ghostButton, primaryButton } from "../ui/styles";
 // opt-in (an ~80MB model) so it never loads unprompted — until it's downloaded,
 // the station uses the device's built-in speech voice.
 export default function VoiceActions() {
-  const { enabled, status, progress, progressText, download, remove, test } = useKokoroManager();
+  const { enabled, status, installed, progress, progressText, download, remove, test } = useKokoroManager();
   const ready = status === "ready";
   const loading = status === "loading";
+  const have = ready || installed; // downloaded before (may need a quick load from cache)
 
   return (
     <div style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -18,12 +19,12 @@ export default function VoiceActions() {
         <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-h)" }}>Neural DJ voice (Kokoro)</span>
           <span style={mutedNote}>
-            A warmer host voice than the built-in one. ~80MB, downloaded once and cached, runs on-device.
-            {enabled && ready ? " Active." : " The station uses the built-in voice until this is downloaded."}
+            A warmer, more natural DJ voice. A one-time download that runs on your device.
+            {enabled && ready ? " Active." : " Until it's downloaded, the station uses the built-in voice."}
           </span>
         </span>
-        <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: ready ? "var(--accent)" : status === "error" ? "#c2506f" : "var(--text-faint)" }}>
-          {ready ? "Ready" : loading ? "Loading…" : status === "error" ? "Failed" : "Not installed"}
+        <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: ready || installed ? "var(--accent)" : status === "error" ? "#c2506f" : "var(--text-faint)" }}>
+          {ready ? "Ready" : loading ? "Loading…" : installed ? "Installed" : status === "error" ? "Failed" : "Not installed"}
         </span>
       </div>
 
@@ -41,22 +42,21 @@ export default function VoiceActions() {
       ) : null}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {!ready ? (
+        {!have ? (
           <button type="button" onClick={() => { unlockVoice(); unlockAudio(); void download(); }} disabled={loading} style={{ ...primaryButton, opacity: loading ? 0.6 : 1 }}>
             {loading ? <span className="afm-spin"><Loader size={15} /></span> : <Download size={15} />}
             {loading ? "Downloading…" : "Download voice"}
           </button>
         ) : (
           <>
-            <button type="button" onClick={() => { unlockVoice(); void test(); }} style={ghostButton}><Volume2 size={15} /> Test voice</button>
+            <button type="button" onClick={() => { unlockVoice(); void test(); }} disabled={loading} style={{ ...ghostButton, opacity: loading ? 0.6 : 1 }}>{loading ? <span className="afm-spin"><Loader size={15} /></span> : <Volume2 size={15} />} Test voice</button>
             <button type="button" onClick={() => void remove()} style={{ ...ghostButton, color: "#c2506f", borderColor: "#c2506f55" }}><Trash2 size={15} /> Remove</button>
           </>
         )}
       </div>
 
       <span style={{ ...mutedNote, fontSize: 11.5 }}>
-        On iPhone this runs in a lighter compatibility mode and Safari may not keep it cached between sessions
-        (so it can re-download). If it can't load, the built-in voice is used automatically.
+        If it can't load on your device, the built-in voice is used automatically.
       </span>
     </div>
   );

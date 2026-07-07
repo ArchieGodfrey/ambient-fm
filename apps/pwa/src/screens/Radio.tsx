@@ -6,7 +6,7 @@ import useFeedback from "../hooks/useFeedback";
 import { recordFeedback } from "../feedback/feedback";
 import { useAppStore } from "../store/useAppStore";
 import { unlockAudio } from "../audio/toneEngine";
-import { unlockVoice } from "../audio/host";
+import { unlockVoice, unlockSpeech } from "../audio/host";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
 // The station front door. Tune in → the composer runs an ongoing set, the DJ
@@ -29,9 +29,10 @@ export default function Radio() {
   const isError = /fail|error|not available|unavailable/i.test(displayStatus ?? "");
 
   const tuneIn = async () => {
-    // Unlock audio SYNCHRONOUSLY in the click (iOS) before the async model work.
+    // Unlock audio + voice SYNCHRONOUSLY in the click (iOS) before the async work.
     unlockAudio();
     unlockVoice();
+    unlockSpeech();
     setPreparing(true);
     try { await startRadio(); } finally { setPreparing(false); }
   };
