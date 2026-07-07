@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { startAudio, stopAudio, resumeAudioContext } from "../audio/toneEngine";
 import { generateComposition, isModelLoaded } from "../ai/composer";
+import type { CompositionDirection } from "../ai/prompt";
 import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop, subscribeRuntimeState } from "../audio/compositionRuntime";
 import { startComposer, stopComposer } from "../composer/runtime";
 import { postToast } from "../utils/toast";
@@ -116,7 +117,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     return unsubscribe;
   }, []);
 
-  async function runAIComposer(overrideEvents?: StimulusEvent[]) {
+  async function runAIComposer(overrideEvents?: StimulusEvent[], direction?: CompositionDirection) {
     if (!isModelLoaded()) {
       setStatus("Composer isn't ready yet — the model failed to load.");
       return;
@@ -127,7 +128,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     setStatus("Generating composition...");
 
     try {
-      const { plan: composition, intent } = await generateComposition(inputEvents, composerSettings);
+      const { plan: composition, intent } = await generateComposition(inputEvents, composerSettings, direction);
       setSharedPlan(composition);
       await saveSession(inputEvents, composition);
       await resumeAudioContext(); // model load may have suspended the context

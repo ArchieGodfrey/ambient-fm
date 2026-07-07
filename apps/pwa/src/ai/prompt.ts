@@ -5,7 +5,30 @@ function describeStimulus(stimulus: { source: string; label: string; strength: n
   return `${stimulus.source}:${subtype} (${stimulus.strength.toFixed(2)})`;
 }
 
-export function buildPrompt(context: CompositionContext) {
+export interface CompositionDirection {
+  key?: { tonic: string; mode: string };
+  progression?: number[];
+  moodWords?: string;
+  tempo?: number;
+  hasMelody?: boolean;
+  instruction?: string;
+  vibe?: string;
+}
+
+function directionText(d?: CompositionDirection): string {
+  if (!d) return "- none";
+  const lines: string[] = [];
+  if (d.vibe) lines.push(`- vibe: ${d.vibe}`);
+  if (d.key) lines.push(`- key: ${d.key.tonic} ${d.key.mode}`);
+  if (d.progression?.length) lines.push(`- chord degrees (0-indexed): ${d.progression.join(", ")}`);
+  if (d.tempo) lines.push(`- tempo: ${d.tempo} bpm`);
+  if (d.moodWords) lines.push(`- mood: ${d.moodWords}`);
+  if (d.hasMelody) lines.push("- the user recorded a melody; compose to complement it");
+  if (d.instruction) lines.push(`- how to fill the song: ${d.instruction}`);
+  return lines.length ? lines.join("\n") : "- none";
+}
+
+export function buildPrompt(context: CompositionContext, direction?: CompositionDirection) {
   const stimuliText = context.stimuli
     .map((stimulus) => `- ${describeStimulus(stimulus)}`)
     .join("\n");
@@ -35,8 +58,8 @@ MEMORY:
 - averageDensity: ${context.memory.averageDensity.toFixed(2)}
 - recurringMotifs: ${context.memory.recurringMotifs.length > 0 ? context.memory.recurringMotifs.join(", ") : "none"}
 
-USER PREFERENCES:
-- none
+USER DIRECTION (honour this closely — match the key, tempo, and mood it specifies):
+${directionText(direction)}
 
 COMPOSER SETTINGS:
 - complexity: ${context.composerSettings.complexity}

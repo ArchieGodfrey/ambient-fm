@@ -8,6 +8,7 @@ import useSessionHistory from "../hooks/useSessionHistory";
 import { getAvailableModels, getSelectedModelId, selectModel, isModelLoaded } from "../ai/composer";
 import { postToast } from "../utils/toast";
 import { resumeAudioContext } from "../audio/toneEngine";
+import type { CompositionDirection } from "../ai/prompt";
 import OffscreenCanvasHost from "../components/OffscreenCanvasHost";
 
 type WorkerInitPayload = { canvas: OffscreenCanvas; width: number; height: number };
@@ -62,7 +63,7 @@ function useSessionRuntime() {
     }
   }
 
-  async function handleGenerate() {
+  async function handleGenerate(direction?: CompositionDirection) {
     setIsGenerating(true);
     // Burning is a user gesture — resume the audio context now so the composition
     // nodes prepared below don't hit the browser autoplay warning.
@@ -78,7 +79,7 @@ function useSessionRuntime() {
           return;
         }
       }
-      await audio.runAIComposer();
+      await audio.runAIComposer(undefined, direction);
     } finally {
       // Keep the model loaded between burns — reloading each time was slow and
       // race-prone. The user can unload manually in Settings if needed.

@@ -48,6 +48,8 @@ export interface Sound {
   layers?: SoundLayers;   // per-layer levels 0..1
   melody?: MelodyTake[];  // recorded melody takes (timed notes with durations)
   melodyInstrument?: string; // timbre for the melody (see melodyInstruments)
+  vibe?: string;          // lyrical/poetic feel, steers the AI (Phase 2)
+  fillInstruction?: string; // how the AI should fill the song around the blocks
   parentId?: string;      // lineage: the sound this one was branched from
   createdAt: number;
   updatedAt: number;

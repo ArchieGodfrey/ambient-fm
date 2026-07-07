@@ -1,7 +1,7 @@
 import { getLastSessionSummaries } from "../memory/getMemoryContext";
 import { applyMemoryBias } from "../memory/applyMemoryBias";
 import { dispatchRuntimeStatus, infer, isModelLoaded } from "../runtime/modelRuntime";
-import { buildPrompt, sanitizeJsonResponse, tryParseJsonWithRecovery } from "./prompt";
+import { buildPrompt, sanitizeJsonResponse, tryParseJsonWithRecovery, type CompositionDirection } from "./prompt";
 import { buildCompositionContext } from "./compositionContext";
 import { postToast } from "../utils/toast";
 import type { CompositionPlan } from "./types";
@@ -16,13 +16,13 @@ export type GeneratedComposition = {
   intent: CompositionIntent;
 };
 
-export async function generateComposition(events: StimulusEvent[], composerSettings: ComposerSettings): Promise<GeneratedComposition> {
+export async function generateComposition(events: StimulusEvent[], composerSettings: ComposerSettings, direction?: CompositionDirection): Promise<GeneratedComposition> {
   if (!isModelLoaded()) {
     throw new Error("Model not loaded. Load the model before generating a composition.");
   }
 
   const context = await buildCompositionContext(events, composerSettings);
-  const prompt = buildPrompt(context);
+  const prompt = buildPrompt(context, direction);
   dispatchRuntimeStatus({ stage: "infer-start", text: "Starting AI composition generation" });
 
   try {
