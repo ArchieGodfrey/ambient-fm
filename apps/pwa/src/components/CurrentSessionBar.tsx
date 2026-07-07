@@ -4,7 +4,6 @@ import { useAppStore } from "../store/useAppStore";
 export default function CurrentSessionBar() {
   const plan = useAppStore((state) => state.currentPlan);
   const isPlaying = useAppStore((state) => state.isPlaying);
-  const status = useAppStore((state) => state.currentSessionStatus);
   const playToggle = useAppStore((state) => state.playToggle);
 
   return (
@@ -13,8 +12,10 @@ export default function CurrentSessionBar() {
         position: "fixed",
         left: 0,
         right: 0,
-        bottom: 55,
+        bottom: 64,
         zIndex: 20,
+        maxWidth: 480,
+        margin: "0 auto",
         display: "flex",
         justifyContent: "center",
         padding: "8px 12px",
