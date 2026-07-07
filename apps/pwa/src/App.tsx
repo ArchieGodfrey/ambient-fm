@@ -6,12 +6,10 @@ import Journey from "./screens/Journey";
 import YourSound from "./screens/YourSound";
 import Settings from "./screens/Settings";
 import CurrentSessionBar from "./components/CurrentSessionBar";
-import Toasts from "./components/Toasts";
-import useToastEvents from "./hooks/useToastEvents";
 
 const tabs = [
   { key: "today", label: "Today", Icon: Disc3, Screen: Today },
-  { key: "journey", label: "Journey", Icon: Library, Screen: Journey },
+  { key: "journey", label: "Library", Icon: Library, Screen: Journey },
   { key: "sound", label: "Your Sound", Icon: SlidersHorizontal, Screen: YourSound },
   { key: "settings", label: "Settings", Icon: SettingsIcon, Screen: Settings },
 ] as const;
@@ -20,12 +18,10 @@ type TabKey = (typeof tabs)[number]["key"];
 
 export default function App() {
   const [active, setActive] = useState<TabKey>("today");
-  const toasts = useToastEvents();
   const ActiveScreen = tabs.find((t) => t.key === active)!.Screen;
 
   return (
     <SessionProvider>
-      <Toasts toasts={toasts} />
       <main style={{ minHeight: "100svh", background: "var(--bg)" }}>
         <ActiveScreen />
       </main>

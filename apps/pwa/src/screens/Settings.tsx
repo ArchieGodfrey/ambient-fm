@@ -17,6 +17,18 @@ export default function Settings() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <span style={sectionLabel}>Model</span>
+        {model.status && model.status !== "Ready" ? (
+          <div
+            style={{
+              fontSize: 13, lineHeight: 1.5, padding: "12px 14px", borderRadius: "var(--radius)",
+              border: "1px solid", ...(/fail|error|too low|unavailable/i.test(model.status)
+                ? { color: "#c2506f", borderColor: "#c2506f55", background: "#c2506f14" }
+                : { color: "var(--text-muted)", borderColor: "var(--border)", background: "var(--surface)" }),
+            }}
+          >
+            {model.status}
+          </div>
+        ) : null}
         <ModelActions
           availableModels={availableModels}
           selectedModelId={selectedModelId}

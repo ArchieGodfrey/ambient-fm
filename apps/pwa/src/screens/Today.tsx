@@ -1,50 +1,53 @@
-import { Pause, Play, Sparkles } from "lucide-react";
+import { Flame, Pause, Play } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
+import useSessionHistory from "../hooks/useSessionHistory";
+import Disc from "../components/Disc";
 import { screen, screenEyebrow, screenTitle, primaryButton, mutedNote } from "../ui/styles";
 
 const dayLabel = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
+function isToday(ts: number) {
+  const d = new Date(ts);
+  const n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+}
+
 export default function Today() {
   const { audio, isGenerating, handleGenerate, displayStatus } = useSession();
+  const { sessions } = useSessionHistory();
   const plan = audio.plan;
-  const energy = plan ? Math.min(1, Math.max(0, (plan.bpm - 50) / 90)) : 0.4;
+  const tracksToday = sessions.filter((s) => isToday(s.timestamp)).length;
+  const isError = /fail|error|too low|not available|unavailable/i.test(displayStatus ?? "");
+
+  const trackLine = isGenerating
+    ? "burning a track…"
+    : tracksToday > 0
+      ? `${tracksToday} track${tracksToday > 1 ? "s" : ""} burnt today`
+      : "blank disc — nothing burnt yet";
 
   return (
     <div style={screen} className="afm-rise">
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <span style={screenEyebrow}>{dayLabel}</span>
-        <h1 style={screenTitle}>{plan ? "Your sound is ready" : "A quiet canvas"}</h1>
+        <h1 style={screenTitle}>Today's disc</h1>
       </div>
 
-      {/* Breathing mood orb — the living focal point */}
-      <div style={{ display: "flex", justifyContent: "center", padding: "24px 0 8px" }}>
-        <div
-          style={{
-            width: 200,
-            height: 200,
-            borderRadius: "50%",
-            background: `radial-gradient(circle at 35% 30%, var(--accent), transparent 72%), radial-gradient(circle at 70% 75%, var(--accent-soft), transparent 60%)`,
-            border: "1px solid var(--accent-border)",
-            boxShadow: "var(--shadow)",
-            animation: `afm-breathe ${(7 - energy * 3).toFixed(1)}s ease-in-out infinite`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div style={{ textAlign: "center", color: "var(--text-h)" }}>
-            <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.5 }}>{plan?.key ?? "—"}</div>
-            <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>
-              {plan ? `${plan.globalMood} · ${plan.bpm} bpm` : "no composition yet"}
-            </div>
-          </div>
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "18px 0 4px" }}>
+        <Disc
+          size={230}
+          spinning={audio.isPlaying}
+          burning={isGenerating}
+          label={plan?.key ?? "—"}
+          sublabel={plan ? plan.globalMood : "empty"}
+          onClick={plan ? () => void audio.handlePlayToggle() : undefined}
+        />
+        <p style={{ ...mutedNote, marginTop: 8 }}>{trackLine}</p>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
         <button type="button" style={{ ...primaryButton, opacity: isGenerating ? 0.7 : 1 }} disabled={isGenerating} onClick={() => void handleGenerate()}>
-          <Sparkles size={17} />
-          {isGenerating ? "Composing…" : plan ? "Compose again" : "Compose from this moment"}
+          <Flame size={17} />
+          {isGenerating ? "Burning…" : "Burn a track"}
         </button>
 
         {plan ? (
@@ -58,15 +61,24 @@ export default function Today() {
             }}
           >
             {audio.isPlaying ? <Pause size={16} /> : <Play size={16} />}
-            {audio.isPlaying ? "Pause" : "Listen"}
+            {audio.isPlaying ? "Stop the disc" : "Spin it up"}
           </button>
         ) : null}
 
-        <p style={{ ...mutedNote, textAlign: "center", minHeight: 20 }}>{displayStatus}</p>
+        {displayStatus ? (
+          <p
+            style={{
+              textAlign: "center", minHeight: 20, fontSize: 13, lineHeight: 1.5, maxWidth: 340,
+              color: isError ? "#c2506f" : "var(--text-muted)",
+            }}
+          >
+            {displayStatus}
+          </p>
+        ) : null}
       </div>
 
       <p style={{ ...mutedNote, textAlign: "center", marginTop: "auto" }}>
-        Soon you'll be able to capture a moment of your day and weave it into your sound.
+        Each day is a disc. Burn a track whenever the mood moves you — soon you'll capture a moment of your day and press it into the music.
       </p>
     </div>
   );

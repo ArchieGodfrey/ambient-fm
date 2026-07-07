@@ -14,6 +14,7 @@
   /* One personal accent — calm periwinkle, used sparingly */
   --accent: #6b62c9;
   --accent-soft: rgba(107, 98, 201, 0.12);
+  --accent-bg: rgba(107, 98, 201, 0.12);
   --accent-border: rgba(107, 98, 201, 0.28);
 
   --shadow: rgba(24, 20, 40, 0.06) 0 12px 30px -12px;
@@ -50,6 +51,7 @@
     --code-bg: #17151d;
     --accent: #9b93ea;
     --accent-soft: rgba(155, 147, 234, 0.16);
+    --accent-bg: rgba(155, 147, 234, 0.16);
     --accent-border: rgba(155, 147, 234, 0.3);
     --shadow: rgba(0, 0, 0, 0.5) 0 16px 40px -16px;
     --shadow-soft: rgba(0, 0, 0, 0.35) 0 8px 22px -10px;
@@ -101,6 +103,18 @@ button {
 @keyframes afm-breathe {
   0%, 100% { transform: scale(1); opacity: 0.9; }
   50% { transform: scale(1.05); opacity: 1; }
+}
+
+/* Disc rotation while playing */
+@keyframes afm-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+/* Laser "burn" sweep while a track is being written */
+@keyframes afm-burn-sweep {
+  0% { opacity: 0.15; transform: rotate(0deg); }
+  50% { opacity: 0.55; }
+  100% { opacity: 0.15; transform: rotate(360deg); }
 }
 
 .toast-message {
