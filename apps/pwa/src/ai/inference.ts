@@ -74,7 +74,7 @@ export function fallbackComposition(): CompositionPlan {
     bpm: 70,
     duration: 30,
     seed: createSeed(),
-    globalMood: "fallback",
+    globalMood: "ambient",
     sections: [
       {
         start: 0,

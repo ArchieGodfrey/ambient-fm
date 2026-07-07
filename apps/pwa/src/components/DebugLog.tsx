@@ -1,11 +1,20 @@
-import { useState, type CSSProperties } from "react";
+import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 
 export default function DebugLog() {
   const logs = useAppStore((s) => s.logs);
   const clearLogs = useAppStore((s) => s.clearLogs);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
+  const autoExpanded = useRef(false);
+
+  // Start collapsed; pop open once, on the first log entry.
+  useEffect(() => {
+    if (!autoExpanded.current && logs.length > 0) {
+      autoExpanded.current = true;
+      setCollapsed(false);
+    }
+  }, [logs.length]);
 
   const errors = logs.filter((l) => l.level === "error").length;
   const warns = logs.length - errors;

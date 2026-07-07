@@ -1,4 +1,4 @@
-import { Disc3, Pause } from "lucide-react";
+import { Play, Pause } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import Disc from "./Disc";
 
@@ -50,8 +50,8 @@ export default function CurrentSessionBar() {
           fontSize: 13, fontWeight: 600,
         }}
       >
-        {isPlaying ? <Pause size={16} /> : <Disc3 size={16} />}
-        {isPlaying ? "Stop" : "Spin"}
+        {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+        {isPlaying ? "Stop" : "Play"}
       </button>
     </div>
   );

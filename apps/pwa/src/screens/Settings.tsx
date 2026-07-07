@@ -52,8 +52,8 @@ export default function Settings() {
         <span style={sectionLabel}>Developer</span>
         <label style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, cursor: "pointer" }}>
           <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-h)" }}>Show progress steps</span>
-            <span style={mutedNote}>Reveal the verbal step-by-step while burning. Off by default — the disc shows progress.</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-h)" }}>Show debug log</span>
+            <span style={mutedNote}>Surface warnings and errors in an on-screen panel. Off by default — the disc shows burn progress.</span>
           </span>
           <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} style={{ width: 20, height: 20, accentColor: "var(--accent)", flexShrink: 0 }} />
         </label>
