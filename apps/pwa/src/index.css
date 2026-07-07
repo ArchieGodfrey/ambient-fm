@@ -10,6 +10,8 @@
   --surface-muted: #efeef3;
   --border: #e6e4ec;
   --code-bg: #f1f0f5;
+  --key-white: #ffffff;
+  --key-white-dim: #e9e7ef;
 
   /* One personal accent — calm periwinkle, used sparingly */
   --accent: #6b62c9;
@@ -50,6 +52,8 @@
     --surface-muted: #131218;
     --border: #2a2833;
     --code-bg: #17151d;
+    --key-white: #d6d3df;
+    --key-white-dim: #a7a4b3;
     --accent: #9b93ea;
     --accent-soft: rgba(155, 147, 234, 0.16);
     --accent-bg: rgba(155, 147, 234, 0.16);
@@ -69,6 +73,8 @@
   --surface-muted: #131218;
   --border: #2a2833;
   --code-bg: #17151d;
+    --key-white: #d6d3df;
+    --key-white-dim: #a7a4b3;
   --accent: #9b93ea;
   --accent-soft: rgba(155, 147, 234, 0.16);
   --accent-bg: rgba(155, 147, 234, 0.16);

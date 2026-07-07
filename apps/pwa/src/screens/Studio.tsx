@@ -213,23 +213,25 @@ export default function Studio({ sound, onClose, onSave, onDelete }: StudioProps
       <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         <div style={{ maxWidth: 680, margin: "0 auto", padding: "14px 16px 10px", display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-            <button type="button" onClick={onClose} aria-label="Close" style={iconBtn}><X size={18} /></button>
+            <button type="button" onClick={() => { if (!dirty || confirm("Discard unsaved changes?")) onClose(); }} aria-label="Close" style={iconBtn}><X size={18} /></button>
             <input value={draft.name} onChange={(e) => patch({ name: e.target.value })} style={{ flex: 1, minWidth: 0, textAlign: "center", border: "none", background: "transparent", color: "var(--text-h)", fontSize: 17, fontWeight: 700 }} />
             <button type="button" onClick={() => { if (confirm(`Delete “${draft.name}”? This can't be undone.`)) { onDelete(); onClose(); } }} aria-label="Delete sound" style={{ ...iconBtn, color: "#c2506f" }}><Trash2 size={17} /></button>
             <button type="button" onClick={() => void save()} disabled={!dirty} aria-label="Save" style={{ ...iconBtn, background: dirty ? "var(--accent-soft)" : "var(--surface)", color: dirty ? "var(--accent)" : "var(--text-faint)" }}><Save size={17} /></button>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
-            <Disc size={64} spinning={audio.isPlaying} burning={isGenerating} mood={describeMood(draft.mood)} inserting={false} />
-            <button type="button" onClick={togglePreview} style={{ ...pill, background: "var(--accent)", color: "#fff", border: "none" }}>
-              {previewing ? <Pause size={16} /> : <Play size={16} />}{previewing ? "Stop" : "Listen"}
-            </button>
-            <button type="button" onClick={() => void elevate()} disabled={isGenerating} style={{ ...pill, background: "var(--surface)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
-              <Sparkles size={16} />{isGenerating ? "Elevating…" : "Elevate"}
-            </button>
-            <button type="button" onClick={() => void burnToTrack()} disabled={isGenerating} style={{ ...pill, background: "var(--accent)", color: "#fff", border: "none" }}>
-              <Flame size={16} />{isGenerating ? "Burning…" : "Burn to track"}
-            </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <Disc size={76} spinning={audio.isPlaying} burning={isGenerating} mood={describeMood(draft.mood)} inserting={false} />
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+              <button type="button" onClick={togglePreview} style={{ ...stackBtn, background: "var(--accent)", color: "#fff", border: "none" }}>
+                {previewing ? <Pause size={16} /> : <Play size={16} />}{previewing ? "Stop" : "Listen"}
+              </button>
+              <button type="button" onClick={() => void elevate()} disabled={isGenerating} style={{ ...stackBtn, background: "var(--surface)", color: "var(--accent)", border: "1px solid var(--accent-border)", opacity: isGenerating ? 0.6 : 1 }}>
+                <Sparkles size={16} />{isGenerating ? "Elevating…" : "Elevate"}
+              </button>
+              <button type="button" onClick={() => void burnToTrack()} disabled={isGenerating} style={{ ...stackBtn, background: "var(--accent)", color: "#fff", border: "none", opacity: isGenerating ? 0.6 : 1 }}>
+                <Flame size={16} />{isGenerating ? "Burning…" : "Burn"}
+              </button>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -345,6 +347,7 @@ export default function Studio({ sound, onClose, onSave, onDelete }: StudioProps
 
 const iconBtn: CSSProperties = { border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", borderRadius: "50%", width: 40, height: 40, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
 const pill: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 20px", borderRadius: "var(--radius-pill)", fontWeight: 600, cursor: "pointer" };
+const stackBtn: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "9px 14px", borderRadius: "var(--radius-pill)", fontWeight: 600, fontSize: 14, cursor: "pointer" };
 const panel: CSSProperties = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 16, minHeight: 150 };
 const chip: CSSProperties = { border: "1px solid var(--border)", borderRadius: "var(--radius-pill)", background: "var(--surface)", color: "var(--text)", fontSize: 13, padding: "8px 14px", cursor: "pointer" };
 const activeChip: CSSProperties = { borderColor: "var(--accent)", background: "var(--accent-soft)", color: "var(--accent)", fontWeight: 700 };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { startAudio, stopAudio, resumeAudioContext } from "../audio/toneEngine";
 import { playInsert, playEject } from "../audio/discSound";
+import { takeFloor } from "../audio/playbackFloor";
 import { generateComposition, isModelLoaded } from "../ai/composer";
 import type { CompositionDirection } from "../ai/prompt";
 import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop, subscribeRuntimeState } from "../audio/compositionRuntime";
@@ -232,12 +233,14 @@ export default function useAudioComposer(events: StimulusEvent[]) {
   }
 
   const loadSessionPlan = useCallback(async (planInput: CompositionPlan, title?: string, sessionId?: string) => {
+    takeFloor(stopPlayback); // claim the floor — stops the radio / any other playback
     setSharedPlan(planInput);
     setCurrentTitle(title ?? null);
     setCurrentSessionId(sessionId ?? null);
     setCurrentSessionSaved(true);
 
     try {
+      playInsert();
       await startAudio();
       setIsPlaying(true);
       setStoreIsPlaying(true); // keep the transport bar's Play/Stop in sync
@@ -252,7 +255,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
 
     startCompositionRuntime(planInput);
     startRuntimeLoop();
-  }, [setCurrentTitle, setCurrentSessionId]);
+  }, [setCurrentTitle, setCurrentSessionId, stopPlayback]);
 
   const loadStaticPlan = useCallback((planInput: CompositionPlan) => {
     setSharedPlan(planInput);

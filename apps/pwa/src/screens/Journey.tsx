@@ -100,32 +100,29 @@ export default function Journey() {
               <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>
                 {selected.date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
               </span>
-              {selected.tracks.map((t, i) => (
-                <div key={t.id} style={{ ...card, display: "flex", alignItems: "center", gap: 12, padding: 12 }}>
-                  <Disc
-                    size={40}
-                    mood={t.plan?.globalMood ?? t.dominantMood}
-                    inserting={false}
-                    onClick={t.plan ? () => { void audio.loadSessionPlan(t.plan!, t.title, t.id); void recordFeedback("replay", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); } : undefined}
-                    style={{ flexShrink: 0 }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-h)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {i + 1}. {t.title ?? "Untitled"}
+              {selected.tracks.map((t, i) => {
+                const play = () => { if (!t.plan) return; void audio.loadSessionPlan(t.plan, t.title, t.id); void recordFeedback("replay", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); };
+                return (
+                  <div key={t.id} onClick={play} style={{ ...card, display: "flex", alignItems: "center", gap: 12, padding: 12, cursor: t.plan ? "pointer" : "default" }}>
+                    <Disc size={40} mood={t.plan?.globalMood ?? t.dominantMood} inserting={false} style={{ flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-h)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {i + 1}. {t.title ?? "Untitled"}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: "var(--text-muted)", textTransform: "capitalize" }}>
+                        {t.dominantMood} · {t.key} · {Math.round(t.avgBpm)} bpm
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12.5, color: "var(--text-muted)", textTransform: "capitalize" }}>
-                      {t.dominantMood} · {t.key} · {Math.round(t.avgBpm)} bpm
-                    </div>
+                    <TrackFeedback track={{ sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }} opinion={opinionFor(t.id)} />
+                    <button type="button" onClick={(e) => { e.stopPropagation(); void saveAsSound(t); }} aria-label="Save as a sound" title="Save as a sound" style={{ border: "none", background: "transparent", color: "var(--accent)", cursor: "pointer", padding: 6 }}>
+                      <Plus size={16} />
+                    </button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); void recordFeedback("delete", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); void deleteSession(t.id); }} aria-label="Delete track" style={{ border: "none", background: "transparent", color: "var(--text-faint)", cursor: "pointer", padding: 6 }}>
+                      <Trash2 size={15} />
+                    </button>
                   </div>
-                  <TrackFeedback track={{ sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }} opinion={opinionFor(t.id)} />
-                  <button type="button" onClick={() => void saveAsSound(t)} aria-label="Save as a sound" title="Save as a sound" style={{ border: "none", background: "transparent", color: "var(--accent)", cursor: "pointer", padding: 6 }}>
-                    <Plus size={16} />
-                  </button>
-                  <button type="button" onClick={() => { void recordFeedback("delete", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); void deleteSession(t.id); }} aria-label="Delete track" style={{ border: "none", background: "transparent", color: "var(--text-faint)", cursor: "pointer", padding: 6 }}>
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : null}
         </>

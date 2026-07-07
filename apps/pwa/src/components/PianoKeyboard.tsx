@@ -37,8 +37,8 @@ export default function PianoKeyboard({ octaves = [4, 5], scale = [], onDown, on
           style={{
             flex: 1, minWidth: 0, height: "100%",
             border: "1px solid var(--border)", borderRadius: "0 0 7px 7px",
-            background: inScale(w.pc) ? "var(--surface-strong)" : "var(--surface-muted)",
-            color: "var(--text-faint)", cursor: "pointer",
+            background: inScale(w.pc) ? "var(--key-white)" : "var(--key-white-dim)",
+            color: "#6b6775", cursor: "pointer",
             display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 6, fontSize: 9,
           }}
         >

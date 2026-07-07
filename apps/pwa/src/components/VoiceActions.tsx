@@ -1,13 +1,13 @@
-import { Download, Volume2, Trash2, Loader } from "lucide-react";
+import { Download, Volume2, Square, Trash2, Loader } from "lucide-react";
 import useVoiceManager from "../hooks/useVoiceManager";
 import { unlockVoice } from "../audio/host";
 import { unlockAudio } from "../audio/toneEngine";
 import { card, mutedNote, ghostButton, primaryButton } from "../ui/styles";
 
-// Download / test / remove the on-device Piper DJ voice. Optional — until it's
+// Download / preview / remove the on-device Piper DJ voice. Optional — until it's
 // downloaded, the host shows as on-screen captions (no system voice).
 export default function VoiceActions() {
-  const { enabled, status, installed, progress, progressText, download, remove, test } = useVoiceManager();
+  const { enabled, status, installed, previewing, progress, progressText, download, remove, preview } = useVoiceManager();
   const ready = status === "ready";
   const loading = status === "loading";
   const have = ready || installed;
@@ -48,7 +48,7 @@ export default function VoiceActions() {
           </button>
         ) : (
           <>
-            <button type="button" onClick={() => { unlockVoice(); unlockAudio(); void test(); }} disabled={loading} style={{ ...ghostButton, opacity: loading ? 0.6 : 1 }}>{loading ? <span className="afm-spin"><Loader size={15} /></span> : <Volume2 size={15} />} Test voice</button>
+            <button type="button" onClick={() => { unlockVoice(); unlockAudio(); void preview(); }} disabled={loading} style={{ ...ghostButton, opacity: loading ? 0.6 : 1, ...(previewing ? { background: "var(--accent-soft)", color: "var(--accent)", borderColor: "var(--accent-border)" } : {}) }}>{loading ? <span className="afm-spin"><Loader size={15} /></span> : previewing ? <Square size={15} /> : <Volume2 size={15} />} {previewing ? "Stop" : "Preview"}</button>
             <button type="button" onClick={() => void remove()} style={{ ...ghostButton, color: "#c2506f", borderColor: "#c2506f55" }}><Trash2 size={15} /> Remove</button>
           </>
         )}

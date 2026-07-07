@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
 import {
-  voiceEnabled, setVoiceEnabled, voiceStatus, voiceInstalled, voiceReady, loadVoice, clearVoice, voiceRender, voicePlay,
+  voiceEnabled, setVoiceEnabled, voiceStatus, voiceInstalled, voiceReady, loadVoice, clearVoice, voiceRender, voicePlay, stopVoice,
   type VoiceStatus,
 } from "../audio/hostPiper";
+import { takeFloor, releaseFloor } from "../audio/playbackFloor";
 import { postToast } from "../utils/toast";
 
 // Manages the Piper DJ voice for Settings: download (with progress), test, remove.
@@ -12,6 +13,7 @@ export default function useVoiceManager() {
   const [installed, setInstalled] = useState(voiceInstalled());
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState("");
+  const [previewing, setPreviewing] = useState(false);
 
   const download = useCallback(async () => {
     setStatus("loading");
@@ -35,7 +37,15 @@ export default function useVoiceManager() {
     postToast("DJ voice removed.", "success");
   }, []);
 
-  const test = useCallback(async () => {
+  const stopPreview = useCallback(() => {
+    stopVoice();
+    setPreviewing(false);
+    releaseFloor(stopPreview);
+  }, []);
+
+  // Preview the DJ voice — toggles play/stop.
+  const preview = useCallback(async () => {
+    if (previewing) { stopPreview(); return; }
     setVoiceEnabled(true);
     setEnabled(true);
     if (!voiceReady()) {
@@ -45,9 +55,13 @@ export default function useVoiceManager() {
       setInstalled(voiceInstalled());
     }
     const buf = await voiceRender("This is your station host. Good to have you tuned in.");
-    if (buf) await voicePlay(buf);
-    else postToast("Voice isn't ready yet.", "error");
-  }, []);
+    if (!buf) { postToast("Voice isn't ready yet.", "error"); return; }
+    takeFloor(stopPreview); // stop the radio / other playback while previewing
+    setPreviewing(true);
+    await voicePlay(buf);   // resolves when it finishes (or is stopped)
+    setPreviewing(false);
+    releaseFloor(stopPreview);
+  }, [previewing, stopPreview]);
 
-  return { enabled, status, installed, progress, progressText, download, remove, test };
+  return { enabled, status, installed, previewing, progress, progressText, download, remove, preview };
 }

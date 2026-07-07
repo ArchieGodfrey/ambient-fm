@@ -4,6 +4,7 @@ import usePreference from "./usePreference";
 import type useAudioComposer from "./useAudioComposer";
 import { prepareLine, cancelHost, voiceAudible, maybeAutoLoadVoice } from "../audio/host";
 import { duckTo, unduck } from "../audio/toneEngine";
+import { takeFloor, releaseFloor } from "../audio/playbackFloor";
 import { hostWelcome, hostGreeting, hostFiller, hostIntro } from "../ai/hostScript";
 import { soundToDirection } from "../sounds/soundDirection";
 import { recordFeedback, type TrackRef } from "../feedback/feedback";
@@ -36,6 +37,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
   eventsRef.current = events;
 
   const runningRef = useRef(false);
+  const runIdRef = useRef(0); // bumped on every tune in/out; a stale cycle bails
   const timerRef = useRef<number | null>(null);
   const fadeTimerRef = useRef<number | null>(null);
   const countRef = useRef(0);
@@ -60,6 +62,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
 
   const tuneOut = useCallback(() => {
     runningRef.current = false;
+    runIdRef.current += 1; // invalidate any in-flight/scheduled cycle
     playingRef.current = null; // tuning out isn't a dislike — don't score it
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
     if (fadeTimerRef.current) { clearTimeout(fadeTimerRef.current); fadeTimerRef.current = null; }
@@ -67,12 +70,14 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     setHostText(null);
     setNowPlaying(null);
     setState("idle");
+    releaseFloor(tuneOut);
     audio.stopPlayback(); // stop the current track immediately
     unduck(0.3);          // reset the duck so the next tune-in isn't quiet
   }, [audio]);
 
-  const cycle = useCallback(async (first: boolean) => {
-    if (!runningRef.current) return;
+  const cycle = useCallback(async (first: boolean, rid: number) => {
+    const live = () => runIdRef.current === rid && runningRef.current;
+    if (!live()) return;
     // The track that was on air played to its natural end → a "complete" signal.
     if (playingRef.current) { void recordFeedback("complete", playingRef.current); playingRef.current = null; }
     const { sound, name, yours } = pickSource();
@@ -86,7 +91,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     const preLine = first ? hostWelcome(eventsRef.current) : greetingDue ? hostGreeting(eventsRef.current) : hostFiller(eventsRef.current);
     setHostText(preLine);
     const playPre = await prepareLine(preLine);
-    if (!runningRef.current) return;
+    if (!live()) return;
 
     // Generate the next track; the pre-rendered voice plays over it.
     setState("generating");
@@ -94,7 +99,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     const voicePromise = playPre();
     const result = await genPromise;
     await voicePromise;
-    if (!runningRef.current) return;
+    if (!live()) return;
     if (!result) { tuneOut(); return; }
 
     // Introduce the new track over the bed, then bring it up to full.
@@ -103,9 +108,9 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     const introLine = hostIntro(result.title, result.plan, { soundName: name, yours });
     setHostText(introLine);
     const playIntro = await prepareLine(introLine);
-    if (!runningRef.current) return;
+    if (!live()) return;
     await playIntro();
-    if (!runningRef.current) return;
+    if (!live()) return;
 
     setHostText(null);
     setState("playing");
@@ -115,17 +120,20 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     countRef.current += 1;
 
     const ms = Math.max(MIN_TRACK_MS, Math.round((result.plan.duration ?? 120) * 1000));
-    timerRef.current = window.setTimeout(() => void cycle(false), ms);
+    timerRef.current = window.setTimeout(() => void cycle(false, rid), ms);
   }, [audio, pickSource, tuneOut]);
 
   const tuneIn = useCallback(() => {
     if (runningRef.current) return;
     if (fadeTimerRef.current) { clearTimeout(fadeTimerRef.current); fadeTimerRef.current = null; }
     runningRef.current = true;
+    runIdRef.current += 1;
+    const rid = runIdRef.current;
     countRef.current = 0;
     maybeAutoLoadVoice(); // warm (or first-time download) the DJ voice
-    void cycle(true);
-  }, [cycle]);
+    takeFloor(tuneOut);   // claim the playback floor — stops any preview/manual playback
+    void cycle(true, rid);
+  }, [cycle, tuneOut]);
 
   return { state, hostText, nowPlaying, tuneIn, tuneOut, isOn: state !== "idle", voiceAudible: voiceAudible() };
 }
