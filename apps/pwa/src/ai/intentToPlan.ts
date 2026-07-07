@@ -33,10 +33,10 @@ export function buildCompositionPlanFromIntent(
     ? [...intent.progression, intent.progression[0]].slice(0, 5)
     : intent.progression;
   const scale = getScale(intent.key.tonic, intent.key.mode);
-  const progression = resolveProgression(intent.key, effectiveProgression, complexity > 0.5);
+  const progression = resolveProgression(intent.key, effectiveProgression, complexity > 0.35);
   const bpm = Math.round(60 + intent.energy * 40);
   const evolutionProfile = buildEvolutionProfile(intent, complexity);
-  const duration = 60 + Math.round((complexity + intent.energy) * 30);
+  const duration = 90 + Math.round((complexity + intent.energy) * 30);
   const motifs = progression.map((chord, index) => {
     const { notes, rhythm } = generateMotif(scale, chord.notes, motifDensity, planSeed, index, intent.energy, complexity);
     return {
@@ -99,6 +99,7 @@ export function buildCompositionPlanFromIntent(
     bassEvents,
     percussionDensity: clamp(intent.energy, 0, 1),
     arpDensity: clamp(motifDensity * 0.6 + complexity * 0.4, 0, 1),
+    vocalLevel: clamp(complexity * 0.6 + (1 - intent.energy) * 0.3, 0, 1),
     texture: {
       density: Math.min(1, Math.max(0, motifDensity)),
       brightness: Math.min(1, Math.max(0, 0.5 + complexity * 0.3)),

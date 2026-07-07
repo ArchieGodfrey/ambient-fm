@@ -57,7 +57,8 @@ export function hostFiller(events: StimulusEvent[]): string {
   return options[events.length % options.length];
 }
 
-export function hostIntro(title: string, plan: Pick<CompositionPlan, "globalMood" | "key">): string {
+export function hostIntro(title: string, plan: Pick<CompositionPlan, "globalMood" | "key">, soundName?: string): string {
   const mood = String(plan.globalMood ?? "ambient");
-  return `Coming up, ${article(mood)} ${mood} piece${plan.key ? ` in ${plan.key}` : ""} — this one's called ${title}.`;
+  const from = soundName ? ` from your ${soundName} sound` : "";
+  return `Coming up, ${article(mood)} ${mood} piece${plan.key ? ` in ${plan.key}` : ""}${from} — this one's called ${title}.`;
 }

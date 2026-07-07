@@ -209,6 +209,20 @@ both masks the compute pause and provides the segue.
     Today (move it out of `screens/Today.tsx` into `NowPlaying`, mini-discs → text rows).
   - Keep per-track save; frame the day's disc as the session's set.
 
+### Shipped / decided
+- **Voice:** Kokoro-82M neural TTS (kokoro-js, WebGPU/WASM), lazy-loaded, rendered
+  to a clip BEFORE generation (GPU) and played via HTMLAudio DURING it; falls back
+  to Web Speech if Kokoro can't load. iOS behaviour still to verify on device.
+- **Sound selection:** the DJ auto-picks — a fresh capture drives the track if the
+  mic's been used recently, otherwise a random saved Sound. No selector on the
+  station; bespoke/manual generation lives in the Studio only.
+- **Track length:** ≥ 120s (plan duration 90–150s, floored in the loop).
+- **Vocals verdict:** real in-browser singing synthesis isn't practical offline yet.
+  Near-term = a synthesized "aah" choir pad (formant bandpass + vibrato over the
+  chord, gated by a complexity-driven `vocalLevel`); real sung vocals remain the
+  Phase 5 north star (would need a heavier model or sample library).
+- **Sign-off:** "Tune out" fades the mix before stopping (no hard cut).
+
 ### Open questions (resolved recommendations)
 - Cross-fade vs. host-bridge → **host-bridge** (masks the suspension; simpler).
 - Save cadence → **keep per-track save** (safer than deferring to stop), framed as the set.

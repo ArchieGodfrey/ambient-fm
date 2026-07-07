@@ -61,6 +61,7 @@ export interface CompositionPlan {
   bassEvents?: { note: string; start: number; duration: number }[];
   percussionDensity?: number; // 0..1, drives a gated kick/snare/hat pattern
   arpDensity?: number;        // 0..1, drives an arpeggio over the current chord
+  vocalLevel?: number;        // 0..1, drives a gated "aah" choir pad over the chords
 }
 
 export type { CompositionIntent };

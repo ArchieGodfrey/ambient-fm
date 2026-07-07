@@ -258,7 +258,7 @@ export function startCompositionRuntime(planInput: CompositionPlan, startOffset 
   plan = planInput;
   startScheduler(planInput);
   setMelody(planInput.melodyNotes, planInput.melodyInstrument); // recorded melody track (if any)
-  setHarmony(planInput.chordEvents, planInput.bassEvents, planInput.arpDensity); // chord + bass + arp bed
+  setHarmony(planInput.chordEvents, planInput.bassEvents, planInput.arpDensity, planInput.vocalLevel); // chord + bass + arp + choir bed
   setPercussion(planInput.percussionDensity); // gated drum pattern
   startTime = performance.now() - startOffset * 1000;
 

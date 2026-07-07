@@ -1,15 +1,14 @@
-import { Radio as RadioIcon, Square, Mic, Check, Play } from "lucide-react";
+import { Radio as RadioIcon, Power, Mic, Square, Play } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
-import useSounds from "../hooks/useSounds";
 import useCapture from "../hooks/useCapture";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
 // The station front door. Tune in → the composer runs an ongoing set, the DJ
-// host bridging each track change. The disc + tracklist live one tap deeper in
-// the expanded now-playing view (tap the bottom bar).
+// host bridging each change and choosing what to compose from (a fresh capture,
+// else a random saved Sound). Bespoke/manual generation lives in the Studio now.
+// The disc + tracklist are one tap deeper, in the expanded now-playing view.
 export default function Radio() {
   const { radio, startRadio, displayStatus } = useSession();
-  const { sounds, activeSound, setActiveSound } = useSounds();
   const { recording, start, stop } = useCapture();
 
   const on = radio.isOn;
@@ -27,37 +26,15 @@ export default function Radio() {
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <span style={screenEyebrow}>Radio</span>
         <h1 style={screenTitle}>Your station</h1>
+        <p style={mutedNote}>Tune in for an endless set. The DJ picks from your sounds — or the room around you, when you're capturing.</p>
       </div>
 
-      {/* Which sound the station composes from */}
-      {sounds.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={{ ...mutedNote, fontSize: 12 }}>Building from your sound</span>
-          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
-            {sounds.map((s) => {
-              const sel = s.id === activeSound?.id;
-              return (
-                <button key={s.id} type="button" onClick={() => setActiveSound(s.id)}
-                  style={{
-                    flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: 6,
-                    padding: "7px 13px", borderRadius: "var(--radius-pill)", cursor: "pointer", fontSize: 13, fontWeight: 600,
-                    border: "1px solid " + (sel ? "var(--accent)" : "var(--border)"),
-                    background: sel ? "var(--accent)" : "var(--surface)", color: sel ? "#fff" : "var(--text-muted)",
-                  }}>
-                  {sel ? <Check size={13} /> : null}{s.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
       {/* On-air indicator + tune-in control */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: "26px 0 10px" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: "40px 0 10px" }}>
         <div
           className={on ? "afm-onair" : undefined}
           style={{
-            width: 132, height: 132, borderRadius: "50%",
+            width: 136, height: 136, borderRadius: "50%",
             display: "flex", alignItems: "center", justifyContent: "center",
             border: "2px solid " + (on ? "var(--accent)" : "var(--border)"),
             background: on ? "var(--accent-soft)" : "var(--surface)",
@@ -65,10 +42,10 @@ export default function Radio() {
             transition: "all 0.3s ease",
           }}
         >
-          <RadioIcon size={54} strokeWidth={1.6} />
+          <RadioIcon size={56} strokeWidth={1.6} />
         </div>
 
-        <div style={{ textAlign: "center", minHeight: 46 }}>
+        <div style={{ textAlign: "center", minHeight: 56 }}>
           <div style={{ fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700, color: on ? "var(--accent)" : "var(--text-faint)" }}>
             {statusLine}
           </div>
@@ -83,31 +60,40 @@ export default function Radio() {
           ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={() => (on ? radio.tuneOut() : void startRadio())}
-          disabled={busy}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 9,
-            padding: "13px 26px", borderRadius: "var(--radius-pill)", cursor: busy ? "default" : "pointer",
-            border: "none", fontSize: 15, fontWeight: 700,
-            background: on ? "var(--surface)" : "var(--accent)",
-            color: on ? "var(--text)" : "#fff",
-            boxShadow: on ? "none" : "var(--shadow)",
-            outline: on ? "1px solid var(--border)" : "none",
-            opacity: busy ? 0.7 : 1,
-          }}
-        >
-          {on ? <Square size={17} /> : <Play size={17} />}
-          {on ? "Stop the station" : busy ? "Tuning in…" : "Tune in"}
-        </button>
+        {on ? (
+          <button
+            type="button"
+            onClick={() => radio.tuneOut()}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "11px 22px", borderRadius: "var(--radius-pill)", cursor: "pointer",
+              border: "1px solid var(--border)", background: "transparent", color: "var(--text-muted)",
+              fontSize: 14, fontWeight: 600,
+            }}
+          >
+            <Power size={15} />
+            Tune out
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void startRadio()}
+            disabled={busy}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 9,
+              padding: "14px 30px", borderRadius: "var(--radius-pill)", cursor: busy ? "default" : "pointer",
+              border: "none", background: "var(--accent)", color: "#fff",
+              fontSize: 15, fontWeight: 700, boxShadow: "var(--shadow)", opacity: busy ? 0.7 : 1,
+            }}
+          >
+            <Play size={17} />
+            {busy ? "Tuning in…" : "Tune in"}
+          </button>
+        )}
 
         {!radio.ttsAvailable ? (
-          <p style={{ ...mutedNote, fontSize: 11.5, textAlign: "center" }}>
-            Voice host unavailable on this device — captions still show between tracks.
-          </p>
+          <p style={{ ...mutedNote, fontSize: 11.5, textAlign: "center" }}>Voice host unavailable here — captions still show between tracks.</p>
         ) : null}
-
         {displayStatus && isError ? (
           <p style={{ textAlign: "center", fontSize: 13, color: "#c2506f", maxWidth: 320 }}>{displayStatus}</p>
         ) : null}
@@ -124,7 +110,7 @@ export default function Radio() {
           {recording ? <Square size={14} /> : <Mic size={14} />}
           {recording ? "Listening… tap to stop" : "Capture the room"}
         </button>
-        <p style={{ ...mutedNote, textAlign: "center", fontSize: 12 }}>Captured moments colour what the station composes next.</p>
+        <p style={{ ...mutedNote, textAlign: "center", fontSize: 12 }}>When you capture, the next track is composed from that moment.</p>
       </div>
     </div>
   );
