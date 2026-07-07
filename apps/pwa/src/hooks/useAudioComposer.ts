@@ -22,6 +22,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
   const setPlayToggle = useAppStore((state) => state.setPlayToggle);
   const composerSettings = useAppStore((state) => state.composerSettings);
   const setCurrentTitle = useAppStore((state) => state.setCurrentTitle);
+  const setCurrentSessionId = useAppStore((state) => state.setCurrentSessionId);
   const [isPlaying, setIsPlaying] = useState(false);
   const [aiStatus, setAIStatus] = useState("Ready");
   const [status, setStatus] = useState("Ready");
@@ -58,7 +59,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     }
   }
 
-  async function saveSession(events: StimulusEvent[], plan: CompositionPlan, title?: string) {
+  async function saveSession(events: StimulusEvent[], plan: CompositionPlan, title?: string): Promise<string | null> {
     try {
       const summary = analyzeSession(crypto.randomUUID(), events, plan);
       summary.plan = plan;
@@ -69,8 +70,10 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("session-saved"));
       }
+      return summary.id;
     } catch (error) {
       console.error("Failed to save session summary", error);
+      return null;
     }
   }
 
@@ -123,7 +126,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     return unsubscribe;
   }, []);
 
-  type Composed = { plan: CompositionPlan; intent: CompositionIntent; title: string };
+  type Composed = { plan: CompositionPlan; intent: CompositionIntent; title: string; sessionId: string | null };
 
   // Compose a track (generate + name + persist) WITHOUT starting playback, so
   // callers (esp. the radio) can narrate the intro before the track comes in.
@@ -142,8 +145,8 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       // the recorded melody, explicit layers, tempo — so it's truly "your sound".
       if (sound) applySoundToPlan(composition, sound);
       const title = await generateTrackNameLLM(composition, { vibe: sound?.vibe ?? direction?.vibe, moodWords: direction?.moodWords });
-      await saveSession(inputEvents, composition, title);
-      return { plan: composition, intent, title };
+      const sessionId = await saveSession(inputEvents, composition, title);
+      return { plan: composition, intent, title, sessionId };
     } catch (error) {
       console.error("Failed to generate composition", error);
       const message = error instanceof Error ? error.message : String(error);
@@ -178,9 +181,10 @@ export default function useAudioComposer(events: StimulusEvent[]) {
   }
 
   // Start (or restart) playback of an already-composed plan.
-  const playComposed = useCallback(async (composition: CompositionPlan, intent?: CompositionIntent, title?: string | null) => {
+  const playComposed = useCallback(async (composition: CompositionPlan, intent?: CompositionIntent, title?: string | null, sessionId?: string | null) => {
     setSharedPlan(composition);
     setCurrentTitle(title ?? null);
+    setCurrentSessionId(sessionId ?? null);
     setCurrentSessionSaved(true);
     try {
       await startAudio();
@@ -195,7 +199,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       postToast(`Audio failed: ${error instanceof Error ? error.message : String(error)}`, "error");
       setStatus("Audio failed");
     }
-  }, [setSharedPlan, setCurrentTitle, setStoreIsPlaying]);
+  }, [setSharedPlan, setCurrentTitle, setCurrentSessionId, setStoreIsPlaying]);
 
   // Stop everything (used by the radio's tune-out and manual stop).
   const stopPlayback = useCallback(() => {
@@ -214,6 +218,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     if (!result) return null;
     setSharedPlan(result.plan);
     setCurrentTitle(result.title);
+    setCurrentSessionId(result.sessionId);
     await resumeAudioContext(); // model load may have suspended the context
     startCompositionRuntime(result.plan);
     startComposer(result.intent);
@@ -221,9 +226,10 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     return result;
   }
 
-  const loadSessionPlan = useCallback(async (planInput: CompositionPlan, title?: string) => {
+  const loadSessionPlan = useCallback(async (planInput: CompositionPlan, title?: string, sessionId?: string) => {
     setSharedPlan(planInput);
     setCurrentTitle(title ?? null);
+    setCurrentSessionId(sessionId ?? null);
     setCurrentSessionSaved(true);
 
     try {
@@ -241,7 +247,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
 
     startCompositionRuntime(planInput);
     startRuntimeLoop();
-  }, [setCurrentTitle]);
+  }, [setCurrentTitle, setCurrentSessionId]);
 
   const loadStaticPlan = useCallback((planInput: CompositionPlan) => {
     setSharedPlan(planInput);
@@ -259,9 +265,10 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     setStoreIsPlaying(false);
     setSharedPlan(null);
     setCurrentTitle(null);
+    setCurrentSessionId(null);
     setCurrentSessionSaved(true);
     setStatus("Tray empty");
-  }, [setSharedPlan, setCurrentTitle, setStoreIsPlaying]);
+  }, [setSharedPlan, setCurrentTitle, setCurrentSessionId, setStoreIsPlaying]);
 
   const restoreSession = useCallback(async () => {
     try {

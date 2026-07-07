@@ -1,8 +1,10 @@
 import { useRef, useState } from "react";
-import { ChevronDown, Pause, Play, Lock } from "lucide-react";
+import { ChevronDown, Pause, Play, Lock, Heart, X } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { useSession } from "../session/SessionProvider";
 import useSessionHistory from "../hooks/useSessionHistory";
+import useFeedback from "../hooks/useFeedback";
+import { recordFeedback } from "../feedback/feedback";
 import Disc from "./Disc";
 
 function isToday(ts: number) {
@@ -18,10 +20,14 @@ const clock = (ts: number) => new Date(ts).toLocaleTimeString(undefined, { hour:
 export default function NowPlaying({ onClose }: { onClose: () => void }) {
   const plan = useAppStore((s) => s.currentPlan);
   const title = useAppStore((s) => s.currentTitle);
+  const sessionId = useAppStore((s) => s.currentSessionId);
   const isPlaying = useAppStore((s) => s.isPlaying);
   const playToggle = useAppStore((s) => s.playToggle);
   const { audio, radio } = useSession();
   const { sessions } = useSessionHistory();
+  const { opinionFor } = useFeedback();
+  const opinion = opinionFor(sessionId ?? undefined);
+  const trackRef = () => ({ sessionId: sessionId ?? "", mood: plan?.globalMood, key: plan?.key, bpm: plan?.bpm });
   const [locked, setLocked] = useState(false);
   const holdTimer = useRef<number | null>(null);
   const lastTap = useRef(0);
@@ -52,6 +58,20 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
           <div style={{ fontSize: 13.5, color: "var(--text-muted)", marginTop: 4, textTransform: "capitalize" }}>{sub}</div>
         </div>
 
+        {/* Like / dislike — shapes what the station leans toward over time */}
+        {sessionId ? (
+          <div style={{ display: "flex", gap: 12 }}>
+            <button type="button" aria-label="Like" onClick={() => recordFeedback("like", trackRef())}
+              style={{ ...reactBtn, ...(opinion === "like" ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" } : {}) }}>
+              <Heart size={18} fill={opinion === "like" ? "#fff" : "none"} />
+            </button>
+            <button type="button" aria-label="Not for me" onClick={() => recordFeedback("dislike", trackRef())}
+              style={{ ...reactBtn, ...(opinion === "dislike" ? { background: "#c2506f", color: "#fff", borderColor: "#c2506f" } : {}) }}>
+              <X size={18} />
+            </button>
+          </div>
+        ) : null}
+
         {/* Host caption while the station bridges tracks */}
         {radio.isOn && radio.hostText ? (
           <p style={{ fontSize: 14, color: "var(--text)", maxWidth: 360, textAlign: "center", lineHeight: 1.5, fontStyle: "italic" }}>“{radio.hostText}”</p>
@@ -76,7 +96,7 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
             const loaded = plan?.seed != null && t.plan?.seed === plan.seed;
             return (
               <button key={t.id} type="button" disabled={!t.plan}
-                onClick={() => t.plan && void audio.loadSessionPlan(t.plan, t.title)}
+                onClick={() => { if (!t.plan) return; void audio.loadSessionPlan(t.plan, t.title, t.id); void recordFeedback("replay", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
                   padding: "11px 8px", border: "none", borderRadius: 10, cursor: t.plan ? "pointer" : "default",
@@ -113,3 +133,4 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
 }
 
 const roundBtn = { border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", borderRadius: "50%", width: 40, height: 40, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } as const;
+const reactBtn = { border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-muted)", borderRadius: "50%", width: 44, height: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.15s ease" } as const;

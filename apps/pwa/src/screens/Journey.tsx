@@ -4,6 +4,7 @@ import useSessionHistory from "../hooks/useSessionHistory";
 import { useSession } from "../session/SessionProvider";
 import Disc from "../components/Disc";
 import CapturesSection from "../components/CapturesSection";
+import { recordFeedback } from "../feedback/feedback";
 import { screen, screenEyebrow, screenTitle, card, mutedNote } from "../ui/styles";
 import type { SessionSummary } from "../memory/types";
 
@@ -86,7 +87,7 @@ export default function Journey() {
                   <button
                     type="button"
                     disabled={!t.plan}
-                    onClick={() => t.plan && void audio.loadSessionPlan(t.plan)}
+                    onClick={() => { if (!t.plan) return; void audio.loadSessionPlan(t.plan, t.title, t.id); void recordFeedback("replay", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); }}
                     aria-label="Play track"
                     style={{
                       flexShrink: 0, width: 40, height: 40, borderRadius: "50%",
@@ -104,7 +105,7 @@ export default function Journey() {
                       {t.key} · {Math.round(t.avgBpm)} bpm · {trackTime(t.timestamp)}
                     </div>
                   </div>
-                  <button type="button" onClick={() => void deleteSession(t.id)} aria-label="Delete track" style={{ border: "none", background: "transparent", color: "var(--text-faint)", cursor: "pointer", padding: 6 }}>
+                  <button type="button" onClick={() => { void recordFeedback("delete", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); void deleteSession(t.id); }} aria-label="Delete track" style={{ border: "none", background: "transparent", color: "var(--text-faint)", cursor: "pointer", padding: 6 }}>
                     <Trash2 size={15} />
                   </button>
                 </div>

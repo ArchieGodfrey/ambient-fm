@@ -9,6 +9,7 @@ interface AppState {
   addEvent: (event: StimulusEvent) => void;
   currentPlan: CompositionPlan | null;
   currentTitle: string | null;
+  currentSessionId: string | null;
   currentIsPlaying: boolean;
   isPlaying: boolean;
   currentSessionStatus: string;
@@ -17,6 +18,7 @@ interface AppState {
   setComposerSettings: (settings: ComposerSettings) => void;
   setCurrentPlan: (plan: CompositionPlan | null) => void;
   setCurrentTitle: (title: string | null) => void;
+  setCurrentSessionId: (id: string | null) => void;
   setIsPlaying: (value: boolean) => void;
   setCurrentSessionStatus: (status: string) => void;
   setPlayToggle: ((toggle: (() => Promise<void> | void) | null) => void);
@@ -53,6 +55,7 @@ export const useAppStore = create<AppState>((set) => ({
   events: [],
   currentPlan: null,
   currentTitle: null,
+  currentSessionId: null,
   currentIsPlaying: false,
   isPlaying: false,
   currentSessionStatus: "Ready",
@@ -68,6 +71,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   setCurrentPlan: (plan) => set({ currentPlan: plan }),
   setCurrentTitle: (title) => set({ currentTitle: title }),
+  setCurrentSessionId: (id) => set({ currentSessionId: id }),
   setIsPlaying: (value) => set({ isPlaying: value }),
   setCurrentSessionStatus: (status) => set({ currentSessionStatus: status }),
   setPlayToggle: (toggle) => set({ playToggle: toggle }),

@@ -5,6 +5,7 @@ import { prepareLine, cancelHost, hostAvailable, preloadKokoro } from "../audio/
 import { duckTo, unduck } from "../audio/toneEngine";
 import { hostWelcome, hostGreeting, hostFiller, hostIntro } from "../ai/hostScript";
 import { soundToDirection } from "../sounds/soundDirection";
+import { recordFeedback, type TrackRef } from "../feedback/feedback";
 import type { Sound } from "../sounds/types";
 import type { StimulusEvent } from "../types";
 
@@ -34,6 +35,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
   const timerRef = useRef<number | null>(null);
   const fadeTimerRef = useRef<number | null>(null);
   const countRef = useRef(0);
+  const playingRef = useRef<TrackRef | null>(null); // the track currently on air
   const [state, setState] = useState<RadioState>("idle");
   const [hostText, setHostText] = useState<string | null>(null);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying>(null);
@@ -50,6 +52,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
 
   const tuneOut = useCallback(() => {
     runningRef.current = false;
+    playingRef.current = null; // tuning out isn't a dislike — don't score it
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
     cancelHost();
     setHostText(null);
@@ -66,6 +69,8 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
 
   const cycle = useCallback(async (first: boolean) => {
     if (!runningRef.current) return;
+    // The track that was on air played to its natural end → a "complete" signal.
+    if (playingRef.current) { void recordFeedback("complete", playingRef.current); playingRef.current = null; }
     const { sound, name } = pickSource();
     const direction = sound ? soundToDirection(sound) : undefined;
     const greetingDue = first || countRef.current % HOST_GREETING_EVERY === 0;
@@ -100,7 +105,8 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
 
     setHostText(null);
     setState("playing");
-    await audio.playComposed(result.plan, result.intent, result.title);
+    await audio.playComposed(result.plan, result.intent, result.title, result.sessionId);
+    playingRef.current = { sessionId: result.sessionId ?? "", mood: String(result.plan.globalMood ?? ""), key: result.plan.key, bpm: result.plan.bpm };
     unduck();
     countRef.current += 1;
 

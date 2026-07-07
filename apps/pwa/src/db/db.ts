@@ -5,6 +5,7 @@ import type { SessionSummary } from "../memory/types";
 import type { RuntimeSnapshot } from "../memory/runtimeSnapshots";
 import type { Sound } from "../sounds/types";
 import type { Recording } from "../capture/types";
+import type { Feedback } from "../feedback/types";
 
 class AmbientDB extends Dexie {
   events!: Table<StimulusEvent, string>;
@@ -13,6 +14,7 @@ class AmbientDB extends Dexie {
   stimulusConfigs!: Table<StimulusConfig, string>;
   sounds!: Table<Sound, string>;
   recordings!: Table<Recording, string>;
+  feedback!: Table<Feedback, string>;
 
   constructor() {
     super("ambient_db");
@@ -59,6 +61,16 @@ class AmbientDB extends Dexie {
       stimulusConfigs: "id",
       sounds: "id, updatedAt, name",
       recordings: "id, ts"
+    });
+
+    this.version(8).stores({
+      events: "id, timestamp",
+      sessions: "id, timestamp, dominantMood",
+      runtimeSnapshots: "id, timestamp",
+      stimulusConfigs: "id",
+      sounds: "id, updatedAt, name",
+      recordings: "id, ts",
+      feedback: "id, ts, sessionId, signal"
     });
   }
 }
