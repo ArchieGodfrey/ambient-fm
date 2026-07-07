@@ -9,6 +9,7 @@ import { getAvailableModels, getSelectedModelId, selectModel, isModelLoaded } fr
 import { postToast } from "../utils/toast";
 import { resumeAudioContext } from "../audio/toneEngine";
 import type { CompositionDirection } from "../ai/prompt";
+import { generateVibeText } from "../ai/vibe";
 import OffscreenCanvasHost from "../components/OffscreenCanvasHost";
 
 type WorkerInitPayload = { canvas: OffscreenCanvas; width: number; height: number };
@@ -87,6 +88,14 @@ function useSessionRuntime() {
     }
   }
 
+  async function generateVibe(opts: { moodWords: string; key?: string; tempo?: number; instruction?: string }): Promise<string> {
+    if (!isModelLoaded()) {
+      const loaded = await model.loadModelAction();
+      if (!loaded) throw new Error("Composer failed to load");
+    }
+    return generateVibeText(opts);
+  }
+
   async function selectModelAction(modelId: string) {
     if (modelId === selectedModelId) return;
     await model.resetRuntimeAction();
@@ -127,6 +136,7 @@ function useSessionRuntime() {
     audio,
     isGenerating,
     handleGenerate,
+    generateVibe,
     refreshStimuli,
     availableModels,
     selectedModelId,

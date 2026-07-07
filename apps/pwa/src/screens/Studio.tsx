@@ -54,8 +54,9 @@ interface StudioProps {
 }
 
 export default function Studio({ sound, onClose, onSave }: StudioProps) {
-  const { audio, handleGenerate, isGenerating } = useSession();
+  const { audio, handleGenerate, isGenerating, generateVibe } = useSession();
   const setComposerSettings = useAppStore((s) => s.setComposerSettings);
+  const [writingVibe, setWritingVibe] = useState(false);
 
   const [draft, setDraft] = useState<Sound>(() => ({
     ...sound,
@@ -139,6 +140,17 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
   async function save() {
     await onSave({ name: draft.name, mood: draft.mood, composerSettings: draft.composerSettings, tempo: draft.tempo, key: draft.key, progression: draft.progression, layers: draft.layers, melody: draft.melody, melodyInstrument: draft.melodyInstrument, vibe: draft.vibe, fillInstruction: draft.fillInstruction });
     setDirty(false);
+  }
+  async function writeVibe() {
+    setWritingVibe(true);
+    try {
+      const text = await generateVibe({ moodWords: describeMood(draft.mood), key: `${draft.key!.tonic} ${draft.key!.mode}`, tempo: draft.tempo, instruction: draft.fillInstruction?.trim() || undefined });
+      if (text) patch({ vibe: text });
+    } catch {
+      /* fall back to the deterministic Suggest */
+    } finally {
+      setWritingVibe(false);
+    }
   }
   async function elevate() {
     setComposerSettings(draft.composerSettings);
@@ -259,7 +271,10 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>Vibe</span>
-                    <button type="button" onClick={() => patch({ vibe: describeVibe(draft.mood, draft.key, draft.tempo) })} style={{ ...chip, padding: "5px 10px", fontSize: 12 }}>Suggest</button>
+                    <span style={{ display: "flex", gap: 6 }}>
+                      <button type="button" onClick={() => patch({ vibe: describeVibe(draft.mood, draft.key, draft.tempo) })} style={{ ...chip, padding: "5px 10px", fontSize: 12 }}>Suggest</button>
+                      <button type="button" onClick={() => void writeVibe()} disabled={writingVibe} style={{ ...chip, padding: "5px 10px", fontSize: 12, borderColor: "var(--accent-border)", color: "var(--accent)" }}>{writingVibe ? "Writing…" : "✨ AI"}</button>
+                    </span>
                   </div>
                   <textarea value={draft.vibe ?? ""} onChange={(e) => patch({ vibe: e.target.value })} rows={2} placeholder="A calm, dim drift…"
                     style={{ width: "100%", resize: "vertical", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-h)", fontSize: 13, fontFamily: "inherit" }} />
