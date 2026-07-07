@@ -114,7 +114,50 @@ Replace the 3 developer tabs (Now/Mood/Sessions) with a journey shell:
 - **Phase 3 — Sound Memories:** synthesise/mix the recording as a layer; save memory =
   composition + recording + sound + context; the Journey timeline + replay.
 - **Phase 4 — Adapt & Remix:** Sound lineage; remix/extend a memory into a new mood.
-- **Phase 5 (later) — Melodies & vocals:** richer intent schema + vocal synthesis.
+- **Phase 5 (later) — Melodies & vocals:** richer intent schema + vocal synthesis (see below).
+
+## Phase 5 experiment plan — Vocals from generated lyrics
+
+Goal: a track can *sing* — the LLM writes lyrics from the track's mood/vibe/theme,
+and a voice performs them over the music, in time. Builds directly on the Kokoro
+voice already shipped for the DJ host. Explicitly an **experiment**: keep a
+reliable baseline and gate the ambitious modes behind it.
+
+### Pipeline
+1. **Lyric generation:** LLM writes short, structured lyrics (e.g. 2 verses + a
+   refrain) from the track's mood/key/vibe + the day's stimulus — reuse the
+   `ai/vibe.ts` / `ai/hostScript.ts` prompt pattern. Store on the plan/session
+   (`lyrics: { section, lines[] }`), shown as karaoke-style captions in NowPlaying.
+2. **Timing/alignment:** map lines → sections and words/syllables → beats. Kokoro
+   can emit token/word timings; where it can't, distribute syllables across the
+   section's beats by count. This alignment is the crux of sounding musical.
+3. **Vocalization** — a spectrum, cheapest/most-reliable first:
+   - **E2 · Spoken-word:** Kokoro renders the lines as speech, placed at section
+     starts, ducked into the mix (talk-over / spoken-word aesthetic). Works with
+     what we have today; the reliable baseline.
+   - **E3 · Pseudo-singing:** pitch-shift/time-stretch the Kokoro render so
+     syllables land on the melody's notes and hold for their durations
+     (Tone.PitchShift or an offline phase-vocoder). Approximate singing; expect
+     artifacts — A/B against E2.
+   - **E4 · Real singing synthesis (stretch):** a dedicated singing-voice model.
+     No good fully-offline in-browser option today (heavy); likely needs a hosted
+     model or a sampled vocal library — revisit as the ecosystem matures.
+
+### Sub-phases (each shippable/evaluable)
+- **E1 — Lyrics only:** generate + display lyric captions synced to sections. No
+  audio. Validate lyric quality, structure, and mood-fit first.
+- **E2 — Spoken-word vocals:** the baseline above + karaoke caption sync.
+- **E3 — Pseudo-singing:** melody-aligned pitch/time-warp, opt-in and A/B-tested.
+- **E4 — Evaluate real SVS / hosted options.**
+
+### Constraints & risks
+- **Scheduling:** vocals must be rendered ahead of time (during the track's
+  generation window) and go through the same GPU serialization as LLM + Kokoro DJ
+  (never three GPU jobs at once) — see the orchestration work.
+- **Alignment quality** is the make-or-break for anything past spoken-word.
+- **Mobile budget:** lyric inference + vocal render + music on a phone is tight;
+  measure, and let vocals be an opt-in per Sound.
+- **Uncanniness:** pseudo-singing can sound wrong; keep spoken-word selectable.
 
 ## Session experience (Phase 2, in progress)
 A dedicated space where listening, capturing and composing interleave.

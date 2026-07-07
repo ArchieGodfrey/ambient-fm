@@ -50,7 +50,8 @@ export default function DebugLog() {
             logs.slice().reverse().map((l, i) => (
               <div key={i} style={{ display: "flex", gap: 8, padding: "4px 12px", borderBottom: "1px solid color-mix(in srgb, var(--border) 40%, transparent)" }}>
                 <span style={{ flexShrink: 0, color: l.level === "error" ? "#e06a86" : "#d9a441", fontWeight: 700, textTransform: "uppercase" }}>{l.level === "error" ? "err" : "warn"}</span>
-                <span style={{ color: "var(--text)", wordBreak: "break-word", flex: 1 }}>{l.message}</span>
+                <span style={{ flexShrink: 0, color: "var(--text-faint)" }}>{new Date(l.ts).toLocaleTimeString(undefined, { hour12: false })}</span>
+                <span style={{ color: "var(--text)", wordBreak: "break-word", whiteSpace: "pre-wrap", flex: 1 }}>{l.message}</span>
               </div>
             ))
           )}

@@ -33,6 +33,16 @@ export interface DebugLogEntry {
   ts: number;
 }
 
+// Persist the debug log to localStorage so it survives a reload — critical for
+// diagnosing crashes (e.g. iOS tab crashes) where the in-memory log is lost.
+const LOG_KEY = "ambientfm-debuglog";
+function loadLogs(): DebugLogEntry[] {
+  try { return JSON.parse(localStorage.getItem(LOG_KEY) ?? "[]"); } catch { return []; }
+}
+function saveLogs(logs: DebugLogEntry[]) {
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(logs.slice(-80))); } catch { /* quota/full */ }
+}
+
 const DEFAULT_COMPOSER_SETTINGS: ComposerSettings = {
   complexity: 0.4,
   motifDensity: 0.4,
@@ -63,7 +73,11 @@ export const useAppStore = create<AppState>((set) => ({
   setPlayToggle: (toggle) => set({ playToggle: toggle }),
   debug: false,
   setDebug: (value) => set({ debug: value }),
-  logs: [],
-  pushLog: (entry) => set((state) => ({ logs: [...state.logs.slice(-59), entry] })),
-  clearLogs: () => set({ logs: [] }),
+  logs: loadLogs(),
+  pushLog: (entry) => set((state) => {
+    const logs = [...state.logs.slice(-79), entry];
+    saveLogs(logs);
+    return { logs };
+  }),
+  clearLogs: () => { saveLogs([]); set({ logs: [] }); },
 }));

@@ -1,4 +1,5 @@
 import ModelActions from "../components/ModelActions";
+import VoiceActions from "../components/VoiceActions";
 import RuntimeDiagnostics from "../components/RuntimeDiagnostics";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
@@ -46,6 +47,11 @@ export default function Settings() {
           onDelete={model.deleteModelAction}
           onResetRuntime={model.resetRuntimeAction}
         />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <span style={sectionLabel}>Voice host</span>
+        <VoiceActions />
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
