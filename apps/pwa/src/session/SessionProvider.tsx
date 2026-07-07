@@ -5,7 +5,7 @@ import { useAppStore } from "../store/useAppStore";
 import useModelManager from "../hooks/useModelManager";
 import useAudioComposer from "../hooks/useAudioComposer";
 import useSessionHistory from "../hooks/useSessionHistory";
-import { getAvailableModels, getSelectedModelId, selectModel } from "../ai/composer";
+import { getAvailableModels, getSelectedModelId, selectModel, isModelLoaded } from "../ai/composer";
 import { postToast } from "../utils/toast";
 import { resumeAudioContext } from "../audio/toneEngine";
 import OffscreenCanvasHost from "../components/OffscreenCanvasHost";
@@ -68,14 +68,15 @@ function useSessionRuntime() {
     // nodes prepared below don't hit the browser autoplay warning.
     await resumeAudioContext();
     try {
-      if (!model.modelDownloaded) {
-        const downloaded = await model.downloadModelAction();
-        if (!downloaded) return;
-      }
-      const loaded = model.modelLoaded || (await model.loadModelAction());
-      if (!loaded) {
-        setAppStatus("Composer failed to prepare.");
-        return;
+      // loadModel downloads-if-needed AND loads in a single runtime init, so we
+      // avoid the download→teardown→load race that left the model unloaded.
+      // Gate on the real runtime state, not the (possibly stale) React flag.
+      if (!isModelLoaded()) {
+        const loaded = await model.loadModelAction();
+        if (!loaded) {
+          setAppStatus("Composer failed to prepare.");
+          return;
+        }
       }
       await audio.runAIComposer();
     } finally {
