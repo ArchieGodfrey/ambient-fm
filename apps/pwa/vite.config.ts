@@ -5,6 +5,12 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   base: '/',
+  // Pre-bundle the voice deps so piper-tts-web's runtime `import("onnxruntime-web")`
+  // (a bare specifier) resolves in the browser — otherwise the dynamic import
+  // fails with "error importing a module script".
+  optimizeDeps: {
+    include: ['@mintplex-labs/piper-tts-web', 'onnxruntime-web'],
+  },
   plugins: [
     mkcert(),
     react(),
