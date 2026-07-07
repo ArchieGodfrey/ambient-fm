@@ -1,12 +1,14 @@
+import * as Tone from "tone";
 import { runExclusive } from "../runtime/modelRuntime";
 import { idbModelCache, clearModelCache } from "./kokoroCache";
 
 // Kokoro-82M neural TTS (kokoro-js → transformers.js). OPT-IN: it never loads
 // until the user downloads it in Settings — loading an 82M model unprompted can
-// crash memory-constrained devices (iOS). When enabled it renders to a WAV blob
-// played via HTMLAudio (independent of the suspended Tone context), and rendering
-// is serialized through the shared runtime mutex so it never collides with the
-// LLM. Falls back to Web Speech everywhere it isn't ready.
+// crash memory-constrained devices (iOS). Rendered PCM is played through the
+// (already-unlocked) WebAudio context via a BufferSource routed straight to the
+// hardware destination — reliable on iOS, unlike an HTMLAudioElement, and it
+// bypasses the duck so the voice sits on top. Rendering is serialized through
+// the shared runtime mutex. Falls back to Web Speech everywhere it isn't ready.
 
 const MODEL = "onnx-community/Kokoro-82M-v1.0-ONNX";
 const VOICE = "af_heart";
@@ -14,8 +16,10 @@ const ENABLED_KEY = "ambientfm-kokoro-enabled";
 const INSTALLED_KEY = "ambientfm-kokoro-installed"; // weights cached (persists across reloads)
 
 export type KokoroStatus = "idle" | "loading" | "ready" | "error";
+export type Clip = { samples: Float32Array; rate: number };
 
-type KokoroModel = { generate: (t: string, o: { voice: string }) => Promise<{ toBlob: () => Blob }> };
+type RawAudio = { toBlob: () => Blob; audio: Float32Array; sampling_rate: number };
+type KokoroModel = { generate: (t: string, o: { voice: string }) => Promise<RawAudio> };
 let model: KokoroModel | null = null;
 let status: KokoroStatus = "idle";
 let loadPromise: Promise<boolean> | null = null;
@@ -92,11 +96,11 @@ export function preloadKokoro(): void {
 // Render text → object URL of a WAV blob, or null if Kokoro isn't ready. Does
 // NOT trigger a load (that's explicit, via Settings/preload) so a live line
 // never blocks on a big download — callers fall back to Web Speech meanwhile.
-export async function kokoroRender(text: string): Promise<string | null> {
+export async function kokoroRender(text: string): Promise<Clip | null> {
   if (!kokoroEnabled() || !kokoroReady() || !model || !text.trim()) return null;
   try {
     const audio = await runExclusive("tts", () => model!.generate(text, { voice: VOICE }));
-    return URL.createObjectURL(audio.toBlob());
+    return { samples: audio.audio, rate: audio.sampling_rate };
   } catch (e) {
     console.warn("Kokoro render failed", e);
     return null;
@@ -117,44 +121,37 @@ export async function clearKokoro(): Promise<void> {
   } catch { /* ignore */ }
 }
 
-// A SINGLE reused audio element. iOS only allows programmatic playback on an
-// element that was first played inside a user gesture — so we unlock this one on
-// the tune-in / test click, then reuse it for every clip. Creating a fresh
-// `new Audio()` per clip (post-await) is silently blocked on iOS.
-const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAIA+AAABAAgAZGF0YQAAAAA=";
-let voiceEl: HTMLAudioElement | null = null;
-let url: string | null = null;
+// Kept for call-site compatibility; WebAudio unlock is handled by unlockAudio()
+// (Tone.start) in the same gesture, so nothing extra is needed here.
+export function unlockVoice(): void { /* no-op */ }
 
-function ensureVoiceEl(): HTMLAudioElement | null {
-  if (!voiceEl && typeof Audio !== "undefined") voiceEl = new Audio();
-  return voiceEl;
-}
+let current: AudioBufferSourceNode | null = null;
 
-// Call synchronously from a user gesture to unlock media playback on iOS.
-export function unlockVoice(): void {
-  const el = ensureVoiceEl();
-  if (!el) return;
-  try {
-    el.src = SILENT_WAV;
-    void el.play().then(() => el.pause()).catch(() => { /* blocked; nothing to do */ });
-  } catch { /* ignore */ }
-}
-
-export function kokoroPlay(clipUrl: string): Promise<void> {
-  const el = ensureVoiceEl();
-  if (!el) return Promise.resolve();
+// Play rendered PCM through the WebAudio context, straight to the hardware
+// destination (bypasses the duck so the voice sits above the bed). The context
+// is unlocked by unlockAudio() in the tune-in/test gesture, so this works on iOS.
+export function kokoroPlay(clip: Clip): Promise<void> {
   stopKokoro();
-  url = clipUrl;
   return new Promise((resolve) => {
-    const done = () => { stopKokoro(); resolve(); };
-    el.onended = done;
-    el.onerror = done;
-    el.src = clipUrl;
-    void el.play().catch(done);
+    try {
+      const ctx = Tone.getContext().rawContext as unknown as AudioContext;
+      void ctx.resume?.();
+      const buf = ctx.createBuffer(1, clip.samples.length, clip.rate);
+      buf.getChannelData(0).set(clip.samples);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.onended = () => { current = null; resolve(); };
+      current = src;
+      src.start();
+    } catch (e) {
+      console.warn("Kokoro playback failed", e);
+      resolve();
+    }
   });
 }
 
 export function stopKokoro(): void {
-  try { voiceEl?.pause(); } catch { /* ignore */ }
-  if (url) { URL.revokeObjectURL(url); url = null; }
+  try { current?.stop(); } catch { /* already stopped */ }
+  current = null;
 }

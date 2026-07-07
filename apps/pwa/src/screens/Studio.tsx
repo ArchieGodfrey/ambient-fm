@@ -214,7 +214,7 @@ export default function Studio({ sound, onClose, onSave, onDelete }: StudioProps
         <div style={{ maxWidth: 680, margin: "0 auto", padding: "14px 16px 10px", display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
             <button type="button" onClick={onClose} aria-label="Close" style={iconBtn}><X size={18} /></button>
-            <input value={draft.name} onChange={(e) => patch({ name: e.target.value })} style={{ flex: 1, textAlign: "center", border: "none", background: "transparent", color: "var(--text-h)", fontSize: 17, fontWeight: 700 }} />
+            <input value={draft.name} onChange={(e) => patch({ name: e.target.value })} style={{ flex: 1, minWidth: 0, textAlign: "center", border: "none", background: "transparent", color: "var(--text-h)", fontSize: 17, fontWeight: 700 }} />
             <button type="button" onClick={() => { if (confirm(`Delete “${draft.name}”? This can't be undone.`)) { onDelete(); onClose(); } }} aria-label="Delete sound" style={{ ...iconBtn, color: "#c2506f" }}><Trash2 size={17} /></button>
             <button type="button" onClick={() => void save()} disabled={!dirty} aria-label="Save" style={{ ...iconBtn, background: dirty ? "var(--accent-soft)" : "var(--surface)", color: dirty ? "var(--accent)" : "var(--text-faint)" }}><Save size={17} /></button>
           </div>
