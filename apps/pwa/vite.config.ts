@@ -108,6 +108,7 @@ export default defineConfig({
   preview: {
     https: true,
     host: '0.0.0.0',
-    port: 4173,
+    port: 5173, // same port the proxy forwards (25652 → 5173), so preview replaces dev
+    strictPort: true,
   }
 })
