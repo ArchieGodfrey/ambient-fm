@@ -35,6 +35,11 @@ export function buildCompositionPlanFromIntent(
   const scale = getScale(intent.key.tonic, intent.key.mode);
   const progression = resolveProgression(intent.key, effectiveProgression, complexity > 0.35);
   const bpm = Math.round(60 + intent.energy * 40);
+  // A real mood word (not a fixed string) so each disc is tinted by how it feels.
+  const minor = intent.key.mode === "minor";
+  const globalMood = intent.energy > 0.66 ? "energised"
+    : intent.energy < 0.4 ? (minor ? "ambient" : "calm")
+    : (minor ? "tense" : "focused");
   const evolutionProfile = buildEvolutionProfile(intent, complexity);
   const duration = 90 + Math.round((complexity + intent.energy) * 30);
   const motifs = progression.map((chord, index) => {
@@ -92,7 +97,7 @@ export function buildCompositionPlanFromIntent(
     bpm,
     duration,
     seed: planSeed,
-    globalMood: "intent-driven",
+    globalMood,
     evolutionProfile,
     sections,
     chordEvents,

@@ -77,9 +77,9 @@
   --shadow-soft: rgba(0, 0, 0, 0.35) 0 8px 22px -10px;
 }
 
-/* Icons in buttons/links: render as block so they vertically center in
-   flex rows instead of sitting on the text baseline. */
-button svg, a svg { display: block; }
+/* Icons in buttons/links: vertically center with the label instead of sitting
+   on the text baseline, without forcing them onto their own line. */
+button svg, a svg { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 
 * {
   box-sizing: border-box;

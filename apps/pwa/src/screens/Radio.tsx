@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Radio as RadioIcon, Power, Mic, Square, Play, Download, Loader, Heart, X } from "lucide-react";
+import { Radio as RadioIcon, Power, Mic, Square, Play, Download, Heart, X } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import useCapture from "../hooks/useCapture";
 import useFeedback from "../hooks/useFeedback";
@@ -39,10 +39,17 @@ export default function Radio() {
   };
 
   const statusLine =
-    radio.state === "generating" ? "composing the next track…"
+    preparing ? "tuning in…"
+    : radio.state === "generating" ? "composing the next track…"
     : radio.state === "announcing" ? "on air"
     : radio.state === "playing" ? "on air — now playing"
     : "off air";
+
+  // Circular progress ring around the radio icon while preparing/composing.
+  const ringR = 74;
+  const ringC = 2 * Math.PI * ringR;
+  const prog = model.modelProgress ?? 0;
+  const determinate = prog > 0.001;
 
   return (
     <div style={screen} className="afm-rise">
@@ -54,18 +61,28 @@ export default function Radio() {
 
       {/* On-air indicator + tune-in control */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: "40px 0 10px" }}>
-        <div
-          className={on ? "afm-onair" : undefined}
-          style={{
-            width: 136, height: 136, borderRadius: "50%",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            border: "2px solid " + (on ? "var(--accent)" : "var(--border)"),
-            background: on ? "var(--accent-soft)" : "var(--surface)",
-            color: on ? "var(--accent)" : "var(--text-muted)",
-            transition: "all 0.3s ease",
-          }}
-        >
-          <RadioIcon size={56} strokeWidth={1.6} />
+        <div style={{ position: "relative", width: 136, height: 136 }}>
+          <div
+            className={on && !busy ? "afm-onair" : undefined}
+            style={{
+              width: 136, height: 136, borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              border: "2px solid " + (on || busy ? "var(--accent)" : "var(--border)"),
+              background: on ? "var(--accent-soft)" : "var(--surface)",
+              color: on || busy ? "var(--accent)" : "var(--text-muted)",
+              transition: "all 0.3s ease",
+            }}
+          >
+            <RadioIcon size={56} strokeWidth={1.6} />
+          </div>
+          {busy ? (
+            <svg width={156} height={156} viewBox="0 0 156 156" className={determinate ? undefined : "afm-spin"} style={{ position: "absolute", inset: -10 }}>
+              <circle cx="78" cy="78" r={ringR} fill="none" stroke="var(--border)" strokeWidth="3" />
+              <circle cx="78" cy="78" r={ringR} fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round"
+                strokeDasharray={ringC} strokeDashoffset={determinate ? ringC * (1 - prog) : ringC * 0.72}
+                transform="rotate(-90 78 78)" style={{ transition: determinate ? "stroke-dashoffset 0.3s ease" : undefined }} />
+            </svg>
+          ) : null}
         </div>
 
         <div style={{ textAlign: "center", minHeight: 56 }}>
@@ -111,43 +128,25 @@ export default function Radio() {
             <Power size={15} />
             Tune out
           </button>
-        ) : (
+        ) : busy ? null : (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, width: "100%" }}>
             <button
               type="button"
               onClick={() => void tuneIn()}
-              disabled={busy}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 9,
-                padding: "14px 30px", borderRadius: "var(--radius-pill)", cursor: busy ? "default" : "pointer",
+                padding: "14px 30px", borderRadius: "var(--radius-pill)", cursor: "pointer",
                 border: "none", background: "var(--accent)", color: "#fff",
-                fontSize: 15, fontWeight: 700, boxShadow: "var(--shadow)", opacity: busy ? 0.7 : 1,
+                fontSize: 15, fontWeight: 700, boxShadow: "var(--shadow)",
               }}
             >
-              {busy ? <span className="afm-spin"><Loader size={17} /></span> : needsDownload ? <Download size={17} /> : <Play size={17} />}
-              {busy ? "Preparing…" : needsDownload ? "Download & tune in" : "Tune in"}
+              {needsDownload ? <Download size={17} /> : <Play size={17} />}
+              {needsDownload ? "Download & tune in" : "Tune in"}
             </button>
-
-            {/* Pre-click: tell the user a one-time download is needed first */}
-            {needsDownload && !busy ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)", textAlign: "center", maxWidth: 320 }}>
-                <Download size={13} />
-                First tune-in downloads the composer (one time, a few hundred MB — give it a minute).
+            {needsDownload ? (
+              <span style={{ ...mutedNote, fontSize: 12, textAlign: "center", maxWidth: 320 }}>
+                First tune-in downloads the composer + voice (one time). The music eases in when it's ready.
               </span>
-            ) : null}
-
-            {/* While preparing, show the download/load progress */}
-            {busy && !on ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "min(320px, 90%)" }}>
-                {model.modelProgress && model.modelProgress > 0 ? (
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface-muted)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.round(model.modelProgress * 100)}%`, background: "var(--accent)", transition: "width 0.2s ease" }} />
-                  </div>
-                ) : (
-                  <div className="afm-bar-indet" style={{ height: 6, borderRadius: 3, background: "var(--surface-muted)" }} />
-                )}
-                <span style={{ ...mutedNote, fontSize: 11.5, textAlign: "center" }}>{model.progressText || displayStatus || "preparing the composer…"}</span>
-              </div>
             ) : null}
           </div>
         )}

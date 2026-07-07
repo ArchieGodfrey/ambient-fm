@@ -39,10 +39,12 @@ export default function Disc({
 }: DiscProps) {
   const labelSize = size * 0.46;
   const hue = moodHue(mood);
+  // Iridescence kept in a band around the mood hue (not a full spectrum) so each
+  // disc reads as its mood's colour rather than the same rainbow.
   const iridescent = `conic-gradient(from 210deg,
-    hsla(${hue}, 80%, 68%, 0.55), hsla(${(hue + 60) % 360}, 80%, 68%, 0.5),
-    hsla(${(hue + 150) % 360}, 80%, 68%, 0.5), hsla(${(hue + 220) % 360}, 80%, 68%, 0.5),
-    hsla(${(hue + 300) % 360}, 80%, 68%, 0.5), hsla(${hue}, 80%, 68%, 0.55))`;
+    hsla(${hue}, 80%, 68%, 0.6), hsla(${(hue + 40) % 360}, 80%, 66%, 0.5),
+    hsla(${(hue + 12) % 360}, 80%, 66%, 0.5), hsla(${(hue + 52) % 360}, 80%, 66%, 0.5),
+    hsla(${(hue + 22) % 360}, 80%, 66%, 0.5), hsla(${hue}, 80%, 68%, 0.6))`;
 
   // Progress ring geometry
   const stroke = Math.max(4, size * 0.03);
@@ -54,8 +56,11 @@ export default function Disc({
     <div
       onClick={onClick}
       style={{
+        // No outer box-shadow/glow: it extends past the round box and gets clipped
+        // to a square by scroll containers (the library rack, etc.). The disc keeps
+        // its depth from the iridescence + label inset.
         position: "relative", width: size, height: size, borderRadius: "50%",
-        cursor: onClick ? "pointer" : "default", boxShadow: `var(--shadow), 0 0 34px -12px hsla(${hue}, 70%, 55%, 0.5)`,
+        cursor: onClick ? "pointer" : "default",
         flexShrink: 0, animation: inserting ? "afm-insert 0.55s cubic-bezier(0.22, 1, 0.36, 1) both" : undefined,
         ...style,
       }}

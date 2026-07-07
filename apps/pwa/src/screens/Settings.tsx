@@ -3,17 +3,15 @@ import ModelActions from "../components/ModelActions";
 import VoiceActions from "../components/VoiceActions";
 import ThemeToggle from "../components/ThemeToggle";
 import SystemHealth from "../components/SystemHealth";
-import RuntimeDiagnostics from "../components/RuntimeDiagnostics";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
 import { resetApp } from "../utils/resetApp";
 import { screen, screenEyebrow, screenTitle, sectionLabel, card, mutedNote, ghostButton } from "../ui/styles";
 
 export default function Settings() {
-  const { model, audio, availableModels, selectedModelId, selectModelAction } = useSession();
+  const { model, availableModels, selectedModelId, selectModelAction } = useSession();
   const debug = useAppStore((s) => s.debug);
   const setDebug = useAppStore((s) => s.setDebug);
-  const rt = audio.runtimeState;
 
   return (
     <div style={screen} className="afm-rise">
@@ -84,18 +82,6 @@ export default function Settings() {
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <span style={sectionLabel}>Diagnostics</span>
         <SystemHealth />
-        <RuntimeDiagnostics
-          gpuStatus={model.gpuStatus}
-          gpuLimits={model.gpuLimits}
-          runtimeCursor={rt.cursor}
-          activeSection={rt.activeSection}
-          runtimeIntensity={rt.intensity}
-          runtimeDrift={rt.drift}
-          runtimeUptime={rt.runtimeUptime}
-          frameDelay={rt.frameDelay}
-          audioRestartCount={rt.audioRestartCount}
-          snapshotCount={rt.snapshotCount}
-        />
       </div>
     </div>
   );

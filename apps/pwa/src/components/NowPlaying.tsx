@@ -45,22 +45,24 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
   const holdEnd = () => { if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; } };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--bg)", display: "flex", flexDirection: "column", alignItems: "center", overflowY: "auto" }} className="afm-rise">
-      <div style={{ width: "100%", maxWidth: 520, padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 60, background: locked ? "#000" : "var(--bg)", transition: "background 0.4s ease", display: "flex", flexDirection: "column", alignItems: "center", overflowY: "auto" }} className="afm-rise">
+      {/* Header kept mounted (opacity 0 when locked) so the disc doesn't shift. */}
+      <div style={{ width: "100%", maxWidth: 520, padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, opacity: locked ? 0 : 1, pointerEvents: locked ? "none" : "auto", transition: "opacity 0.4s ease" }}>
         <button type="button" onClick={onClose} aria-label="Collapse" style={roundBtn}><ChevronDown size={20} /></button>
         <span style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", color: "var(--text-faint)", fontWeight: 600 }}>{radio.isOn ? "On air" : "Now playing"}</span>
         <button type="button" onClick={() => setLocked(true)} aria-label="Lock" style={roundBtn}><Lock size={18} /></button>
       </div>
 
       <div style={{ width: "100%", maxWidth: 520, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 22, padding: "10px 24px 20px" }}>
-        <Disc size={248} spinning={isPlaying && !locked} mood={plan?.globalMood} inserting={false} />
+        {/* Disc + title stay in place; locked = 50% brightness, spin stopped. */}
+        <Disc size={248} spinning={isPlaying && !locked} mood={plan?.globalMood} inserting={false} style={{ opacity: locked ? 0.5 : 1, transition: "opacity 0.4s ease" }} />
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 24, fontWeight: 700, color: "var(--text-h)", letterSpacing: -0.5 }}>{heading}</div>
-          <div style={{ fontSize: 13.5, color: "var(--text-muted)", marginTop: 4, textTransform: "capitalize" }}>{sub}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: locked ? "rgba(255,255,255,0.55)" : "var(--text-h)", letterSpacing: -0.5, transition: "color 0.4s ease" }}>{heading}</div>
+          {!locked ? <div style={{ fontSize: 13.5, color: "var(--text-muted)", marginTop: 4, textTransform: "capitalize" }}>{sub}</div> : null}
         </div>
 
         {/* Like / dislike — shapes what the station leans toward over time */}
-        {sessionId ? (
+        {sessionId && !locked ? (
           <div style={{ display: "flex", gap: 12 }}>
             <button type="button" aria-label="Like" onClick={() => recordFeedback("like", trackRef())}
               style={{ ...reactBtn, ...(opinion === "like" ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" } : {}) }}>
@@ -74,12 +76,12 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
         ) : null}
 
         {/* Host caption while the station bridges tracks */}
-        {radio.isOn && radio.hostText ? (
+        {radio.isOn && radio.hostText && !locked ? (
           <p style={{ fontSize: 14, color: "var(--text)", maxWidth: 360, textAlign: "center", lineHeight: 1.5, fontStyle: "italic" }}>“{radio.hostText}”</p>
         ) : null}
 
         {/* Manual transport only when the station is off (the radio owns playback while on air) */}
-        {!radio.isOn ? (
+        {!radio.isOn && !locked ? (
           <button type="button" onClick={() => playToggle?.()} disabled={!playToggle} aria-label={isPlaying ? "Stop" : "Play"}
             style={{ width: 62, height: 62, borderRadius: "50%", border: "none", background: "var(--accent)", color: "#fff", cursor: playToggle ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow)" }}>
             {isPlaying ? <Pause size={25} /> : <Play size={25} />}
@@ -88,7 +90,7 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Today's disc as a plain text tracklist — tap a row to play it */}
-      {tracksToday.length > 0 ? (
+      {tracksToday.length > 0 && !locked ? (
         <div style={{ width: "100%", maxWidth: 520, padding: "0 20px 32px", display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={{ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-faint)", fontWeight: 600, padding: "6px 8px" }}>
             Today's disc · {tracksToday.length} track{tracksToday.length > 1 ? "s" : ""}
@@ -120,7 +122,7 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
           where it is (same element), just stops spinning; the screen fades to black
           and dims. No second disc, so nothing jumps. */}
       {locked ? (
-        <div onClick={guardTap} className="afm-fade" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 16, paddingBottom: 64, touchAction: "none" }}>
+        <div onClick={guardTap} style={{ position: "fixed", inset: 0, background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 16, paddingBottom: 64, touchAction: "none" }}>
           <button type="button" onClick={(e) => e.stopPropagation()} onPointerDown={holdStart} onPointerUp={holdEnd} onPointerLeave={holdEnd} onPointerCancel={holdEnd} aria-label="Hold to unlock"
             style={{ width: 56, height: 56, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
             <Lock size={20} />
