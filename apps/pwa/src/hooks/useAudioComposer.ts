@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from "react";
-import { startAudio, stopAudio } from "../audio/toneEngine";
+import { startAudio, stopAudio, resumeAudioContext } from "../audio/toneEngine";
 import { generateComposition, fallbackComposition } from "../ai/composer";
 import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop, subscribeRuntimeState } from "../audio/compositionRuntime";
 import { startComposer, stopComposer } from "../composer/runtime";
@@ -131,6 +131,7 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
       const { plan: composition, intent } = await generateComposition(inputEvents, composerSettings);
       setSharedPlan(composition);
       await saveSession(inputEvents, composition);
+      await resumeAudioContext(); // model load may have suspended the context
       startCompositionRuntime(composition);
       startComposer(intent);
       setStatus(`Composition generated: ${composition.key}`);
@@ -141,6 +142,7 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
       setStatus(`AI composition failed: ${message}`);
       const fallback = fallbackComposition();
       setSharedPlan(fallback);
+      await resumeAudioContext();
       startCompositionRuntime(fallback);
       startComposer({
         key: { tonic: "C", mode: "minor" },

@@ -20,6 +20,15 @@ interface AppState {
   setPlayToggle: ((toggle: (() => Promise<void> | void) | null) => void);
   debug: boolean;
   setDebug: (value: boolean) => void;
+  logs: DebugLogEntry[];
+  pushLog: (entry: DebugLogEntry) => void;
+  clearLogs: () => void;
+}
+
+export interface DebugLogEntry {
+  level: "warn" | "error";
+  message: string;
+  ts: number;
 }
 
 const DEFAULT_COMPOSER_SETTINGS: ComposerSettings = {
@@ -50,4 +59,7 @@ export const useAppStore = create<AppState>((set) => ({
   setPlayToggle: (toggle) => set({ playToggle: toggle }),
   debug: false,
   setDebug: (value) => set({ debug: value }),
+  logs: [],
+  pushLog: (entry) => set((state) => ({ logs: [...state.logs.slice(-59), entry] })),
+  clearLogs: () => set({ logs: [] }),
 }));

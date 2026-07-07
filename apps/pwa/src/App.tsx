@@ -6,6 +6,8 @@ import Journey from "./screens/Journey";
 import YourSound from "./screens/YourSound";
 import Settings from "./screens/Settings";
 import CurrentSessionBar from "./components/CurrentSessionBar";
+import DebugLog from "./components/DebugLog";
+import { useAppStore } from "./store/useAppStore";
 
 const tabs = [
   { key: "today", label: "Today", Icon: Disc3, Screen: Today },
@@ -18,10 +20,12 @@ type TabKey = (typeof tabs)[number]["key"];
 
 export default function App() {
   const [active, setActive] = useState<TabKey>("today");
+  const debug = useAppStore((s) => s.debug);
   const ActiveScreen = tabs.find((t) => t.key === active)!.Screen;
 
   return (
     <SessionProvider>
+      {debug ? <DebugLog /> : null}
       <main className="afm-main">
         <ActiveScreen />
       </main>
