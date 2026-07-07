@@ -59,6 +59,8 @@ export interface CompositionPlan {
   // Harmonic bed voiced over the section timeline (seconds): block chords + bass.
   chordEvents?: { notes: string[]; start: number; duration: number }[];
   bassEvents?: { note: string; start: number; duration: number }[];
+  percussionDensity?: number; // 0..1, drives a gated kick/snare/hat pattern
+  arpDensity?: number;        // 0..1, drives an arpeggio over the current chord
 }
 
 export type { CompositionIntent };

@@ -97,6 +97,8 @@ export function buildCompositionPlanFromIntent(
     sections,
     chordEvents,
     bassEvents,
+    percussionDensity: clamp(intent.energy, 0, 1),
+    arpDensity: clamp(motifDensity * 0.6 + complexity * 0.4, 0, 1),
     texture: {
       density: Math.min(1, Math.max(0, motifDensity)),
       brightness: Math.min(1, Math.max(0, 0.5 + complexity * 0.3)),

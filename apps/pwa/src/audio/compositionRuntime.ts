@@ -8,6 +8,7 @@ import { saveSnapshot, type RuntimeSnapshot } from "../memory/runtimeSnapshots";
 import { composerState } from "../composer/composerState";
 import { setMelody, stopMelody } from "./melodyTrack";
 import { setHarmony, stopHarmony } from "./harmonyTrack";
+import { setPercussion, stopPercussion } from "./percussionTrack";
 
 export type CompositionRuntimeSnapshot = {
   cursor: number;
@@ -257,7 +258,8 @@ export function startCompositionRuntime(planInput: CompositionPlan, startOffset 
   plan = planInput;
   startScheduler(planInput);
   setMelody(planInput.melodyNotes, planInput.melodyInstrument); // recorded melody track (if any)
-  setHarmony(planInput.chordEvents, planInput.bassEvents); // chord + bass bed
+  setHarmony(planInput.chordEvents, planInput.bassEvents, planInput.arpDensity); // chord + bass + arp bed
+  setPercussion(planInput.percussionDensity); // gated drum pattern
   startTime = performance.now() - startOffset * 1000;
 
   const cursor = getCursor();
@@ -303,6 +305,7 @@ export function stopRuntimeLoop() {
   stopPhrase();
   stopMelody();
   stopHarmony();
+  stopPercussion();
   stopCheckpointing();
 }
 
