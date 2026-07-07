@@ -46,8 +46,32 @@ if (import.meta.env.DEV) {
 
 console.log('gpu main:', !!navigator.gpu);
 
+// If something throws before the app is up (e.g. a stale PWA bundle serving a
+// removed function → "undefined is not a function"), show a recoverable overlay
+// with the error + a Reset button — otherwise iOS users are stuck with no way to
+// reach Settings. Only fires for BOOT errors; later runtime errors just log.
+let booted = false;
+window.addEventListener('error', (e) => {
+  if (booted) return;
+  booted = true;
+  const root = document.getElementById('root');
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#111;color:#eee;font:14px system-ui,-apple-system;padding:28px 22px;display:flex;flex-direction:column;gap:14px;overflow:auto';
+  const msg = `${e.message || 'Unknown error'}${e.filename ? `\n${e.filename}:${e.lineno}` : ''}`;
+  box.innerHTML = `<div style="font-weight:700;font-size:16px">Couldn't start</div><div style="opacity:.75;white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px">${msg.replace(/</g, '&lt;')}</div><div style="opacity:.7">This is usually an out-of-date copy. Reset to load the latest.</div>`;
+  const btn = document.createElement('button');
+  btn.textContent = 'Reset & reload';
+  btn.style.cssText = 'align-self:flex-start;padding:11px 18px;border-radius:22px;border:1px solid #555;background:#2a2a2a;color:#fff;font-weight:600';
+  btn.onclick = () => import('./utils/resetApp').then((m) => m.resetApp()).catch(() => location.reload());
+  box.appendChild(btn);
+  (root ?? document.body).appendChild(box);
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
   </StrictMode>,
 )
+
+// Mark boot complete on the next frame — after this, errors are runtime (logged), not boot.
+requestAnimationFrame(() => { requestAnimationFrame(() => { booted = true; }); })
