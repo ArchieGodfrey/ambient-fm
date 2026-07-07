@@ -1,9 +1,11 @@
+import { RefreshCw } from "lucide-react";
 import ModelActions from "../components/ModelActions";
 import VoiceActions from "../components/VoiceActions";
 import RuntimeDiagnostics from "../components/RuntimeDiagnostics";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
-import { screen, screenEyebrow, screenTitle, sectionLabel, card, mutedNote } from "../ui/styles";
+import { resetApp } from "../utils/resetApp";
+import { screen, screenEyebrow, screenTitle, sectionLabel, card, mutedNote, ghostButton } from "../ui/styles";
 
 export default function Settings() {
   const { model, audio, availableModels, selectedModelId, selectModelAction } = useSession();
@@ -63,6 +65,13 @@ export default function Settings() {
           </span>
           <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} style={{ width: 20, height: 20, accentColor: "var(--accent)", flexShrink: 0 }} />
         </label>
+        <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+          <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-h)" }}>Reset & reload</span>
+            <span style={mutedNote}>Clears cached code/assets and reloads — fixes a stale UI after an update (installed on iPhone especially). Keeps your sounds and the downloaded models.</span>
+          </span>
+          <button type="button" onClick={() => void resetApp()} style={{ ...ghostButton, flexShrink: 0 }}><RefreshCw size={15} /> Reset</button>
+        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

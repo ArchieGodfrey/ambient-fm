@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { Radio as RadioIcon, Power, Mic, Square, Play, Download, Loader } from "lucide-react";
+import { Radio as RadioIcon, Power, Mic, Square, Play, Download, Loader, Heart, X } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import useCapture from "../hooks/useCapture";
+import useFeedback from "../hooks/useFeedback";
+import { recordFeedback } from "../feedback/feedback";
+import { useAppStore } from "../store/useAppStore";
 import { unlockAudio } from "../audio/toneEngine";
 import { unlockVoice } from "../audio/host";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
@@ -13,7 +16,11 @@ import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 export default function Radio() {
   const { radio, startRadio, displayStatus, model } = useSession();
   const { recording, start, stop } = useCapture();
+  const { opinionFor } = useFeedback();
+  const sessionId = useAppStore((s) => s.currentSessionId);
+  const plan = useAppStore((s) => s.currentPlan);
   const [preparing, setPreparing] = useState(false);
+  const opinion = opinionFor(sessionId ?? undefined);
 
   const on = radio.isOn;
   // The composer model must be downloaded (once) + loaded before it can play.
@@ -73,6 +80,20 @@ export default function Radio() {
             </p>
           ) : null}
         </div>
+
+        {/* React to the current track — shapes your emerging sound */}
+        {radio.state === "playing" && sessionId ? (
+          <div style={{ display: "flex", gap: 12 }}>
+            <button type="button" aria-label="Like" onClick={() => recordFeedback("like", { sessionId, mood: plan?.globalMood, key: plan?.key, bpm: plan?.bpm })}
+              style={{ ...reactBtn, ...(opinion === "like" ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" } : {}) }}>
+              <Heart size={17} fill={opinion === "like" ? "#fff" : "none"} />
+            </button>
+            <button type="button" aria-label="Not for me" onClick={() => recordFeedback("dislike", { sessionId, mood: plan?.globalMood, key: plan?.key, bpm: plan?.bpm })}
+              style={{ ...reactBtn, ...(opinion === "dislike" ? { background: "#c2506f", color: "#fff", borderColor: "#c2506f" } : {}) }}>
+              <X size={17} />
+            </button>
+          </div>
+        ) : null}
 
         {on ? (
           <button
@@ -153,3 +174,5 @@ export default function Radio() {
     </div>
   );
 }
+
+const reactBtn = { border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-muted)", borderRadius: "50%", width: 44, height: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.15s ease" } as const;
