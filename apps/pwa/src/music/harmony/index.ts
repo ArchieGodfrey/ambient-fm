@@ -28,16 +28,24 @@ export function getScale(tonic: string, mode: "major" | "minor" | string): strin
 }
 
 export function getTriad(scale: string[], degree: number): string[] {
-  const n = scale.length;
-  const d = ((degree % n) + n) % n; // wrap negatives / out-of-range degrees
-  return [scale[d], scale[(d + 2) % n], scale[(d + 4) % n]];
+  return getChord(scale, degree, false);
 }
 
-export function resolveProgression(key: MusicalKey, progression: number[]): Chord[] {
+// Build a diatonic chord: root/3rd/5th, optionally adding the diatonic 7th for
+// richer, less "primary-colour" harmony.
+export function getChord(scale: string[], degree: number, seventh = false): string[] {
+  const n = scale.length;
+  const d = ((degree % n) + n) % n; // wrap negatives / out-of-range degrees
+  const notes = [scale[d], scale[(d + 2) % n], scale[(d + 4) % n]];
+  if (seventh) notes.push(scale[(d + 6) % n]);
+  return notes;
+}
+
+export function resolveProgression(key: MusicalKey, progression: number[], seventh = false): Chord[] {
   const scale = getScale(key.tonic, key.mode);
   return progression.map((degree) => ({
     degree,
-    symbol: `${key.tonic}${key.mode === "minor" ? "m" : ""}${(((degree % 7) + 7) % 7) + 1}`,
-    notes: getTriad(scale, degree),
+    symbol: `${key.tonic}${key.mode === "minor" ? "m" : ""}${(((degree % 7) + 7) % 7) + 1}${seventh ? "7" : ""}`,
+    notes: getChord(scale, degree, seventh),
   })) as Chord[];
 }
