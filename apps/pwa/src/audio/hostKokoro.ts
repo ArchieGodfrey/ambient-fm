@@ -47,7 +47,10 @@ function isIOS(): boolean {
   const nav = navigator as unknown as { platform?: string; maxTouchPoints?: number };
   return /iP(hone|ad|od)/.test(ua) || (nav.platform === "MacIntel" && (nav.maxTouchPoints ?? 0) > 1);
 }
-export function kokoroSupported(): boolean { return true; }
+// Kokoro's transformers.js v3 stack has an unresolved iOS memory leak (crashes
+// the tab) and an ~800MB footprint that can't share an iPhone with WebLLM, so
+// it's desktop-only; iOS uses the system speechSynthesis voice.
+export function kokoroSupported(): boolean { return !isIOS(); }
 
 function detectDevice(): "webgpu" | "wasm" {
   if (isIOS()) return "wasm";
@@ -56,6 +59,7 @@ function detectDevice(): "webgpu" | "wasm" {
 }
 
 export async function loadKokoro(onProgress?: (p: number, text: string) => void): Promise<boolean> {
+  if (!kokoroSupported()) { status = "error"; return false; } // iOS: never touch the ML stack (crashes)
   if (kokoroReady()) return true;
   if (loadPromise) return loadPromise;
   status = "loading";
