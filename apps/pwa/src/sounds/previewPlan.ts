@@ -1,7 +1,6 @@
 import type { CompositionIntent } from "../ai/intentSchema";
 import type { CompositionPlan } from "../ai/types";
 import { buildCompositionPlanFromIntent } from "../ai/intentToPlan";
-import { getScale } from "../music/harmony";
 import { createSeed } from "../utils/randomField";
 import { DEFAULT_COMPOSER_SETTINGS, DEFAULT_MOOD, type Sound, type SoundMood } from "./types";
 import type { ComposerSettings } from "../features/composer/types";
@@ -50,18 +49,17 @@ export function buildSoundscape(sound: Partial<Sound>): CompositionPlan {
   if (sound.tempo) plan.bpm = sound.tempo;
   if (sound.layers) plan.layers = { ...plan.layers, ...sound.layers };
 
-  // A tapped melody replaces the pad motif's notes so it actually plays through
-  // the existing motif engine (which references motifs by id from phrases).
-  if (sound.melody?.length) {
-    const scale = getScale(intent.key.tonic, intent.key.mode);
-    const notes = sound.melody.map((d) => `${scale[((d % 7) + 7) % 7]}4`);
-    const rhythm = notes.map(() => 0.5);
+  // A tapped melody (note names) replaces the pad motif's notes so it actually
+  // plays through the existing motif engine (which references motifs by id).
+  const melody = (sound.melody ?? []).filter((n): n is string => typeof n === "string");
+  if (melody.length) {
+    const rhythm = melody.map(() => 0.5);
     const pad = plan.motifs.find((m) => m.layer === "pad");
     if (pad) {
-      pad.notes = notes;
+      pad.notes = melody;
       pad.rhythm = rhythm;
     } else {
-      plan.motifs.push({ id: "melody", layer: "pad", notes, rhythm });
+      plan.motifs.push({ id: "melody", layer: "pad", notes: melody, rhythm });
     }
   }
 

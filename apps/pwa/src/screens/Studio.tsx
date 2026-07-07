@@ -3,7 +3,9 @@ import { X, Pause, Play, Sparkles, Save } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
 import Disc from "../components/Disc";
+import PianoKeyboard from "../components/PianoKeyboard";
 import { buildSoundscape, describeMood } from "../sounds/previewPlan";
+import { auditionNote } from "../audio/audition";
 import { getScale } from "../music/harmony";
 import {
   DEFAULT_KEY, DEFAULT_PROGRESSION, DEFAULT_LAYERS, TONICS,
@@ -60,6 +62,15 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
   previewingRef.current = previewing;
 
   const patch = (p: Partial<Sound>) => { setDraft((d) => ({ ...d, ...p })); setDirty(true); };
+
+  function tapNote(note: string) {
+    void auditionNote(note); // instant feedback
+    setDraft((d) => ({ ...d, melody: [...(d.melody ?? []), note] }));
+    setDirty(true);
+  }
+  function removeNote(index: number) {
+    patch({ melody: (draft.melody ?? []).filter((_, j) => j !== index) });
+  }
 
   // Live refine while previewing.
   useEffect(() => {
@@ -162,24 +173,32 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
 
         {/* Melody */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <span style={sectionLabel}>Melody — tap to compose</span>
-          <div style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, minHeight: 30 }}>
-              {draft.melody!.length === 0 ? <span style={mutedNote}>Tap the notes below to lay a simple melody.</span> : (
+          <span style={sectionLabel}>Melody — play it in</span>
+          <div style={{ ...card, display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Editable note groups (bars of 4) */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, minHeight: 34, alignItems: "center" }}>
+              {(draft.melody ?? []).length === 0 ? (
+                <span style={mutedNote}>Play the keys below — your notes appear here in bars, tap one to remove it.</span>
+              ) : (
                 <>
-                  {draft.melody!.map((deg, i) => <span key={i} style={{ ...chip, padding: "6px 10px", background: "var(--surface-muted)" }}>{scale[((deg % 7) + 7) % 7]}</span>)}
+                  {Array.from({ length: Math.ceil((draft.melody ?? []).length / 4) }, (_, g) => (
+                    <div key={g} style={{ display: "flex", gap: 4, padding: "4px 6px", borderRadius: 8, background: "var(--surface-muted)", border: "1px solid var(--border)" }}>
+                      {(draft.melody ?? []).slice(g * 4, g * 4 + 4).map((note, ni) => {
+                        const idx = g * 4 + ni;
+                        return (
+                          <button key={idx} type="button" onClick={() => removeNote(idx)} title="Remove"
+                            style={{ border: "none", background: "var(--surface)", color: "var(--text-h)", borderRadius: 6, padding: "5px 8px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                            {note}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
                   <button type="button" onClick={() => patch({ melody: [] })} style={{ ...chip, padding: "6px 10px", color: "var(--text-muted)" }}>clear</button>
                 </>
               )}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
-              {scale.map((note, deg) => (
-                <button key={deg} type="button" onClick={() => draft.melody!.length < 16 && patch({ melody: [...draft.melody!, deg] })}
-                  style={{ padding: "16px 0", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-h)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                  {note}
-                </button>
-              ))}
-            </div>
+            <PianoKeyboard scale={scale} onPlay={tapNote} />
           </div>
         </div>
 

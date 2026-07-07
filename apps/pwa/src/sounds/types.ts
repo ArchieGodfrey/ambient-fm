@@ -31,7 +31,7 @@ export interface Sound {
   key?: SoundKey;
   progression?: number[]; // chord scale-degrees (0-6)
   layers?: SoundLayers;   // per-layer levels 0..1
-  melody?: number[];      // tapped scale-degree sequence (0-6)
+  melody?: string[];      // tapped melody as note names (e.g. "C4", "E4")
   parentId?: string;      // lineage: the sound this one was branched from
   createdAt: number;
   updatedAt: number;
