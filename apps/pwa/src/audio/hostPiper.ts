@@ -30,23 +30,47 @@ export function voiceInstalled(): boolean {
 }
 export function voiceSupported(): boolean { return true; } // Piper runs everywhere (WASM/CPU)
 
-// Download + cache the voice model (idempotent). Reports 0..1 progress.
+// Full error detail for the debug log (name/message/first stack frames).
+function errStr(e: unknown): string {
+  if (e instanceof Error) return `${e.name}: ${e.message}${e.stack ? ` | ${e.stack.split("\n").slice(1, 3).join(" ")}` : ""}`;
+  try { return JSON.stringify(e); } catch { return String(e); }
+}
+
+type Session = { predict: (text: string) => Promise<Blob> };
+let session: Session | null = null;
+
+// Use the MAIN-THREAD TtsSession — the worker-based predict() throws "error
+// importing a module script" in Vite dev (a dependency's module-worker can't
+// resolve its bare imports). Main-thread ORT imports ARE rewritten by Vite.
+// pipe library logs to console (captured by the debug panel) for diagnosis.
+async function ensureSession(onProgress?: (p: number, text: string) => void): Promise<Session> {
+  if (session) return session;
+  const mod = await import("@mintplex-labs/piper-tts-web");
+  session = (await mod.TtsSession.create({
+    voiceId: VOICE_ID,
+    logger: (text: string) => console.warn("[piper]", text),
+    progress: (p: { url: string; total: number; loaded: number }) => {
+      if (p?.total > 0) onProgress?.(Math.min(1, p.loaded / p.total), `${Math.round((p.loaded / p.total) * 100)}%`);
+    },
+  })) as unknown as Session;
+  return session;
+}
+
+// Prepare (download + init) the voice. Reports 0..1 progress.
 export function loadVoice(onProgress?: (p: number, text: string) => void): Promise<boolean> {
   if (voiceReady()) return Promise.resolve(true);
   if (loadPromise) return loadPromise;
   status = "loading";
   loadPromise = (async () => {
     try {
-      const { download } = await import("@mintplex-labs/piper-tts-web");
-      await download(VOICE_ID, (p: { url: string; total: number; loaded: number }) => {
-        if (p.total > 0) onProgress?.(Math.min(1, p.loaded / p.total), `${Math.round((p.loaded / p.total) * 100)}%`);
-      });
+      await ensureSession(onProgress);
       status = "ready";
       try { localStorage.setItem(INSTALLED_KEY, "1"); } catch { /* ignore */ }
       return true;
     } catch (e) {
-      console.warn("Voice load failed — using system speech", e);
+      console.warn("Voice load failed:", errStr(e));
       status = "error";
+      session = null;
       return false;
     } finally {
       loadPromise = null;
@@ -64,14 +88,14 @@ export function preloadVoice(): void {
 export async function voiceRender(text: string): Promise<AudioBuffer | null> {
   if (!voiceEnabled() || !text.trim()) return null;
   try {
-    const { predict } = await import("@mintplex-labs/piper-tts-web");
-    const blob = await runExclusive("tts", () => predict({ text, voiceId: VOICE_ID }));
+    const s = await ensureSession();
+    const blob = await runExclusive("tts", () => s.predict(text));
     status = "ready";
     try { localStorage.setItem(INSTALLED_KEY, "1"); } catch { /* ignore */ }
     const ctx = Tone.getContext().rawContext as unknown as AudioContext;
     return await ctx.decodeAudioData(await blob.arrayBuffer());
   } catch (e) {
-    console.warn("Voice render failed", e);
+    console.warn("Voice render failed:", errStr(e));
     return null;
   }
 }
@@ -104,6 +128,7 @@ export function stopVoice(): void {
 
 export async function clearVoice(): Promise<void> {
   status = "idle";
+  session = null;
   try { localStorage.removeItem(INSTALLED_KEY); } catch { /* ignore */ }
   try {
     const { remove } = await import("@mintplex-labs/piper-tts-web");
