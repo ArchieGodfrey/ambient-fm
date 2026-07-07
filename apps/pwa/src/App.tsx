@@ -22,35 +22,23 @@ export default function App() {
 
   return (
     <SessionProvider>
-      <main style={{ minHeight: "100svh", background: "var(--bg)" }}>
+      <main className="afm-main">
         <ActiveScreen />
       </main>
 
       <CurrentSessionBar />
 
-      <nav
-        style={{
-          position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 30,
-          height: 64, maxWidth: 480, margin: "0 auto",
-          display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
-          background: "color-mix(in srgb, var(--surface-strong) 82%, transparent)",
-          backdropFilter: "blur(14px)", borderTop: "1px solid var(--border)",
-        }}
-      >
+      <nav className="afm-nav">
         {tabs.map(({ key, label, Icon }) => {
           const on = key === active;
           return (
             <button
               key={key}
               type="button"
+              data-active={on}
               onClick={() => setActive(key)}
-              style={{
-                border: "none", background: "transparent", cursor: "pointer",
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
-                color: on ? "var(--accent)" : "var(--text-faint)",
-                fontSize: 10.5, fontWeight: on ? 600 : 500, letterSpacing: 0.2, padding: 0,
-                transition: "color 0.2s ease",
-              }}
+              className="afm-nav-btn"
+              style={{ color: on ? "var(--accent)" : "var(--text-faint)", fontWeight: on ? 600 : 500 }}
             >
               <Icon size={20} strokeWidth={on ? 2.4 : 2} />
               {label}

@@ -1,10 +1,13 @@
 import ModelActions from "../components/ModelActions";
 import RuntimeDiagnostics from "../components/RuntimeDiagnostics";
 import { useSession } from "../session/SessionProvider";
-import { screen, screenEyebrow, screenTitle, sectionLabel, mutedNote } from "../ui/styles";
+import { useAppStore } from "../store/useAppStore";
+import { screen, screenEyebrow, screenTitle, sectionLabel, card, mutedNote } from "../ui/styles";
 
 export default function Settings() {
   const { model, audio, availableModels, selectedModelId, selectModelAction } = useSession();
+  const debug = useAppStore((s) => s.debug);
+  const setDebug = useAppStore((s) => s.setDebug);
   const rt = audio.runtimeState;
 
   return (
@@ -43,6 +46,17 @@ export default function Settings() {
           onDelete={model.deleteModelAction}
           onResetRuntime={model.resetRuntimeAction}
         />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <span style={sectionLabel}>Developer</span>
+        <label style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, cursor: "pointer" }}>
+          <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-h)" }}>Show progress steps</span>
+            <span style={mutedNote}>Reveal the verbal step-by-step while burning. Off by default — the disc shows progress.</span>
+          </span>
+          <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} style={{ width: 20, height: 20, accentColor: "var(--accent)", flexShrink: 0 }} />
+        </label>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

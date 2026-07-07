@@ -60,6 +60,7 @@ export default function Journey() {
                   <Disc
                     size={128}
                     spinning={on && audio.isPlaying}
+                    mood={d.tracks[0]?.dominantMood}
                     label={d.date.toLocaleDateString(undefined, { day: "numeric" })}
                     sublabel={d.date.toLocaleDateString(undefined, { month: "short" })}
                     onClick={() => setSelectedKey(d.key)}

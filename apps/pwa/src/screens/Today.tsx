@@ -1,6 +1,7 @@
 import { Flame, Pause, Play } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import useSessionHistory from "../hooks/useSessionHistory";
+import { useAppStore } from "../store/useAppStore";
 import Disc from "../components/Disc";
 import { screen, screenEyebrow, screenTitle, primaryButton, mutedNote } from "../ui/styles";
 
@@ -13,8 +14,9 @@ function isToday(ts: number) {
 }
 
 export default function Today() {
-  const { audio, isGenerating, handleGenerate, displayStatus } = useSession();
+  const { audio, model, isGenerating, handleGenerate, displayStatus } = useSession();
   const { sessions } = useSessionHistory();
+  const debug = useAppStore((s) => s.debug);
   const plan = audio.plan;
   const tracksToday = sessions.filter((s) => isToday(s.timestamp)).length;
   const isError = /fail|error|too low|not available|unavailable/i.test(displayStatus ?? "");
@@ -34,9 +36,12 @@ export default function Today() {
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "18px 0 4px" }}>
         <Disc
+          key={isGenerating ? "burning" : plan?.key ?? "empty"}
           size={230}
           spinning={audio.isPlaying}
           burning={isGenerating}
+          progress={model.modelProgress}
+          mood={plan?.globalMood}
           label={plan?.key ?? "—"}
           sublabel={plan ? plan.globalMood : "empty"}
           onClick={plan ? () => void audio.handlePlayToggle() : undefined}
@@ -65,7 +70,7 @@ export default function Today() {
           </button>
         ) : null}
 
-        {displayStatus ? (
+        {displayStatus && (isError || debug) ? (
           <p
             style={{
               textAlign: "center", minHeight: 20, fontSize: 13, lineHeight: 1.5, maxWidth: 340,

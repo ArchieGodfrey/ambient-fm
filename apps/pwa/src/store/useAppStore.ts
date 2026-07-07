@@ -18,6 +18,8 @@ interface AppState {
   setIsPlaying: (value: boolean) => void;
   setCurrentSessionStatus: (status: string) => void;
   setPlayToggle: ((toggle: (() => Promise<void> | void) | null) => void);
+  debug: boolean;
+  setDebug: (value: boolean) => void;
 }
 
 const DEFAULT_COMPOSER_SETTINGS: ComposerSettings = {
@@ -46,4 +48,6 @@ export const useAppStore = create<AppState>((set) => ({
   setIsPlaying: (value) => set({ isPlaying: value }),
   setCurrentSessionStatus: (status) => set({ currentSessionStatus: status }),
   setPlayToggle: (toggle) => set({ playToggle: toggle }),
+  debug: false,
+  setDebug: (value) => set({ debug: value }),
 }));

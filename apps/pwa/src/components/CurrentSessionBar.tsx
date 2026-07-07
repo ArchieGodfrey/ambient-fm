@@ -8,14 +8,8 @@ export default function CurrentSessionBar() {
 
   return (
     <div
+      className="afm-transport"
       style={{
-        position: "fixed",
-        left: 0,
-        right: 0,
-        bottom: 64,
-        zIndex: 20,
-        maxWidth: 480,
-        margin: "0 auto",
         display: "flex",
         justifyContent: "center",
         padding: "8px 12px",
