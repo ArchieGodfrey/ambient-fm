@@ -154,6 +154,29 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     }
   }
 
+  // Generate a plan/intent from the AI WITHOUT saving a track or playing — used
+  // by the Studio's "Elevate" to fill in a sound's unset fields from the vibe.
+  async function composePlanOnly(overrideEvents?: StimulusEvent[], direction?: CompositionDirection, sound?: Partial<Sound>): Promise<{ plan: CompositionPlan; intent: CompositionIntent } | null> {
+    if (!isModelLoaded()) {
+      setStatus("Composer isn't ready yet — the model failed to load.");
+      return null;
+    }
+    setAIStatus("Filling in your sound...");
+    setStatus("Filling in your sound...");
+    try {
+      const settings = sound?.composerSettings ?? composerSettings;
+      const { plan, intent } = await generateComposition(overrideEvents ?? events, settings, direction);
+      if (sound) applySoundToPlan(plan, sound);
+      return { plan, intent };
+    } catch (error) {
+      console.error("Failed to fill in sound", error);
+      setStatus(`Fill-in failed: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    } finally {
+      setAIStatus("Ready");
+    }
+  }
+
   // Start (or restart) playback of an already-composed plan.
   const playComposed = useCallback(async (composition: CompositionPlan, intent?: CompositionIntent, title?: string | null) => {
     setSharedPlan(composition);
@@ -266,6 +289,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     handlePlayToggle,
     runAIComposer,
     composeTrack,
+    composePlanOnly,
     playComposed,
     stopPlayback,
     loadSessionPlan,

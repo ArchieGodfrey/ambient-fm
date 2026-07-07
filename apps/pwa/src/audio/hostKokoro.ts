@@ -1,4 +1,5 @@
 import { runExclusive } from "../runtime/modelRuntime";
+import { idbModelCache, clearModelCache } from "./kokoroCache";
 
 // Kokoro-82M neural TTS (kokoro-js → transformers.js). OPT-IN: it never loads
 // until the user downloads it in Settings — loading an 82M model unprompted can
@@ -43,6 +44,14 @@ export async function loadKokoro(onProgress?: (p: number, text: string) => void)
   status = "loading";
   loadPromise = (async () => {
     try {
+      // Route model caching through IndexedDB (Safari's Cache API put fails on
+      // the HF responses). Must be set before from_pretrained fetches anything.
+      try {
+        const { env } = await import("@huggingface/transformers");
+        env.useBrowserCache = false;
+        env.useCustomCache = true;
+        env.customCache = idbModelCache as unknown as typeof env.customCache;
+      } catch { /* fall back to default caching */ }
       const mod = await import("kokoro-js");
       const device = detectDevice();
       const opts = {
@@ -91,6 +100,7 @@ export async function kokoroRender(text: string): Promise<string | null> {
 export async function clearKokoro(): Promise<void> {
   model = null;
   status = "idle";
+  await clearModelCache();
   try {
     if ("caches" in window) {
       const keys = await caches.keys();

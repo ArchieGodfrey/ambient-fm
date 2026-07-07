@@ -275,6 +275,58 @@ both masks the compute pause and provides the segue.
   mic/GPU respectively; keep capture opt-in and paused during the generation window.
 - iOS `speechSynthesis` reliability under context suspension → **prototype on device in 3b.**
 
+## Phase 6 (new) — The emergent "Your Sound" + feedback engine
+
+Today's Sounds are **inspiration**: user-authored palettes you shape, elevate
+(AI fills them in), and burn into tracks; the radio draws on them. Phase 6 adds a
+*distinct, un-editable* **"Your Sound"** — a living signature that the app forms
+for you and that slowly evolves. You don't edit it; it's earned.
+
+- **What it is:** a read-only Sound (visually distinct — e.g. a special disc) that
+  represents "you, in sound right now." It is never hand-edited; it's recomputed.
+- **What shapes it:**
+  1. **Recent stimulus** — captures (room audio features), time/weather, recency.
+  2. **Long-term track analysis** — aggregate the plans/sessions you've made:
+     common keys, tempos, moods, layer balances, complexity, which motifs recur.
+  3. **A feedback/recommendation engine** — the crucial new piece. Signals:
+     explicit (a thumbs up/down or ❤ on the now-playing track), and implicit
+     (played to the end vs. skipped early, replayed, burned-and-kept vs. deleted,
+     tuned out during). These weight the aggregation toward what you actually like.
+- **How it evolves:** a periodic recompute (on app open / after N new signals)
+  blends long-term preference (slow-moving centroid) with recent stimulus (fast-
+  moving) — so it has a stable core that drifts over weeks, plus day-to-day colour.
+  Show the drift ("your sound is getting brighter / calmer lately").
+- **Where it plugs in:** it becomes a first-class source the **radio** can pick
+  ("now, something in *your sound*"), and a starting point users can *branch* from
+  in the Studio (branch = editable copy; the original stays emergent).
+
+### The feedback engine (foundational — build first)
+- **Data:** a `Feedback` store — `{ id, ts, trackId/sessionId, signal, weight }`
+  where signal ∈ like/dislike/skip/complete/replay/keep/delete, each with a weight.
+- **Capture points:** ❤/✕ on NowPlaying + the radio; the station already knows
+  play-through vs. skip and tune-outs; the Library already has keep/delete.
+- **Model:** a preference vector over the musical features we already generate
+  (mood dims, key/mode tendency, tempo band, layer balances, complexity, density,
+  arp/percussion/vocal levels). Update via weighted moving average per signal.
+- **Uses beyond Your Sound:** bias the radio's Sound/҂capture pick and the AI
+  `direction`; re-rank the Library; "more like this" from any track.
+
+### Sub-phases
+- **6a — Feedback capture + store:** ❤/✕ controls, wire implicit signals
+  (complete/skip/replay/keep/delete), persist. No behaviour change yet — just
+  collect and show a simple "what you like" summary.
+- **6b — Preference model:** aggregate signals + long-term track analysis into a
+  preference vector; visualise it.
+- **6c — Emergent Your Sound:** synthesize the read-only Sound from preference +
+  recent stimulus; recompute periodically; branchable; show its drift.
+- **6d — Close the loop:** the radio and Elevate/Burn read the preference vector
+  to steer generation; "more like this" everywhere.
+
+### Risks
+- Cold start (no history) — fall back to authored Sounds / mood defaults.
+- Over-fitting to a few signals — use slow moving averages + require a minimum.
+- Feedback fatigue — lean on implicit signals; keep explicit ones one-tap and rare.
+
 ## Deferred experiments (follow-up)
 - **More musical, non-slider bed inputs:** e.g. a chord wheel, draggable layer
   meters, an XY mood pad — make the "bed" controls feel as native as the piano.

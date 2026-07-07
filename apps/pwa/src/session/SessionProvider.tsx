@@ -80,13 +80,28 @@ function useSessionRuntime() {
         const loaded = await model.loadModelAction();
         if (!loaded) {
           setAppStatus("Composer failed to prepare.");
-          return;
+          return null;
         }
       }
-      await audio.runAIComposer(undefined, direction, sound);
+      return await audio.runAIComposer(undefined, direction, sound);
     } finally {
       // Keep the model loaded between burns — reloading each time was slow and
       // race-prone. The user can unload manually in Settings if needed.
+      setIsGenerating(false);
+    }
+  }
+
+  // Elevate: use the AI to fill in a sound (from its vibe + settings) without
+  // making a track. Returns the proposed plan/intent for the caller to map back.
+  async function elevateSound(direction?: CompositionDirection, sound?: Partial<Sound>) {
+    setIsGenerating(true);
+    try {
+      if (!isModelLoaded()) {
+        const loaded = await model.loadModelAction();
+        if (!loaded) { setAppStatus("Composer failed to prepare."); return null; }
+      }
+      return await audio.composePlanOnly(undefined, direction, sound);
+    } finally {
       setIsGenerating(false);
     }
   }
@@ -161,6 +176,7 @@ function useSessionRuntime() {
     audio,
     isGenerating,
     handleGenerate,
+    elevateSound,
     radio,
     startRadio,
     generateVibe,

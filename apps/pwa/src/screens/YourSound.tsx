@@ -23,7 +23,7 @@ export default function YourSound() {
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <span style={screenEyebrow}>Your sound</span>
           <h1 style={screenTitle}>Your sounds</h1>
-          <p style={mutedNote}>Open a sound to shape it in the studio — tempo, key, chords, layers and a melody you tap in — and hear it come alive.</p>
+          <p style={mutedNote}>Sounds are inspiration — shape one in the studio, let the AI elevate it, then burn it to a track. The radio draws on them too.</p>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 18 }}>

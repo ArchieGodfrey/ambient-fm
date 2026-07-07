@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { X, Pause, Play, Sparkles, Save, Square, Trash2 } from "lucide-react";
+import { X, Pause, Play, Flame, Sparkles, Save, Square, Trash2 } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
+import { postToast } from "../utils/toast";
 import Disc from "../components/Disc";
 import PianoKeyboard from "../components/PianoKeyboard";
 import MelodyRoll from "../components/MelodyRoll";
@@ -55,7 +56,7 @@ interface StudioProps {
 }
 
 export default function Studio({ sound, onClose, onSave }: StudioProps) {
-  const { audio, handleGenerate, isGenerating, generateVibe } = useSession();
+  const { audio, handleGenerate, elevateSound, isGenerating, generateVibe } = useSession();
   const setComposerSettings = useAppStore((s) => s.setComposerSettings);
   const [writingVibe, setWritingVibe] = useState(false);
 
@@ -153,10 +154,8 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
       setWritingVibe(false);
     }
   }
-  async function elevate() {
-    setComposerSettings(draft.composerSettings);
-    await save();
-    const direction: CompositionDirection = {
+  function draftDirection(): CompositionDirection {
+    return {
       key: draft.key,
       progression: draft.progression,
       tempo: draft.tempo,
@@ -165,7 +164,33 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
       instruction: draft.fillInstruction?.trim() || undefined,
       vibe: draft.vibe?.trim() || undefined,
     };
-    await handleGenerate(direction, draft);
+  }
+
+  // Elevate: let the AI complete the sound from the vibe + what you've set,
+  // filling in the fields you left at their defaults. It doesn't make a track —
+  // it fleshes out the inspiration so you can tweak it or burn it.
+  async function elevate() {
+    setComposerSettings(draft.composerSettings);
+    await save();
+    const result = await elevateSound(draftDirection(), draft);
+    if (!result) return;
+    const { plan, intent } = result;
+    const filled: Partial<typeof draft> = {};
+    if (draft.key?.tonic === DEFAULT_KEY.tonic && draft.key?.mode === DEFAULT_KEY.mode) filled.key = { tonic: intent.key.tonic, mode: intent.key.mode };
+    if (JSON.stringify(draft.progression) === JSON.stringify(DEFAULT_PROGRESSION)) filled.progression = intent.progression;
+    if (draft.tempo == null) filled.tempo = plan.bpm;
+    if (!draft.layers || JSON.stringify(draft.layers) === JSON.stringify(DEFAULT_LAYERS)) filled.layers = { ...plan.layers };
+    patch(filled);
+    postToast("Filled in your sound — tweak it, or burn it to a track.", "success");
+  }
+
+  // Burn this sound into an actual track on today's disc. Sounds themselves are
+  // just inspiration — this is how you commit one to a playable, saved track.
+  async function burnToTrack() {
+    setComposerSettings(draft.composerSettings);
+    await save();
+    const result = await handleGenerate(draftDirection(), draft);
+    if (result) postToast(`Burned “${result.title}” to today's disc.`, "success");
   }
 
   const scale = getScale(draft.key!.tonic, draft.key!.mode);
@@ -199,6 +224,9 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
             </button>
             <button type="button" onClick={() => void elevate()} disabled={isGenerating} style={{ ...pill, background: "var(--surface)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
               <Sparkles size={16} />{isGenerating ? "Elevating…" : "Elevate"}
+            </button>
+            <button type="button" onClick={() => void burnToTrack()} disabled={isGenerating} style={{ ...pill, background: "var(--accent)", color: "#fff", border: "none" }}>
+              <Flame size={16} />{isGenerating ? "Burning…" : "Burn to track"}
             </button>
           </div>
 
@@ -288,7 +316,7 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
                   <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>How the AI fills the song</span>
                   <input value={draft.fillInstruction ?? ""} onChange={(e) => patch({ fillInstruction: e.target.value })} placeholder="e.g. build slowly, keep it sparse"
                     style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-h)", fontSize: 13 }} />
-                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Listen = deterministic from your blocks · Elevate = the AI fills honouring this.</span>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Listen = preview from your blocks · Elevate = AI fills in the rest · Burn = commit it to a track.</span>
                 </label>
               </div>
             ) : null}
