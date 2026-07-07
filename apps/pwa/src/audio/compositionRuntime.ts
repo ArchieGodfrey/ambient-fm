@@ -255,7 +255,7 @@ function tick() {
 export function startCompositionRuntime(planInput: CompositionPlan, startOffset = 0) {
   plan = planInput;
   startScheduler(planInput);
-  setMelody(planInput.melodyNotes); // schedule the recorded melody track (if any)
+  setMelody(planInput.melodyNotes, planInput.melodyInstrument); // recorded melody track (if any)
   startTime = performance.now() - startOffset * 1000;
 
   const cursor = getCursor();

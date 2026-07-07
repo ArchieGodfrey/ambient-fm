@@ -63,7 +63,10 @@ export function buildSoundscape(sound: Partial<Sound>): CompositionPlan {
     }
     offset += takeLen + 0.4;
   }
-  if (melodyNotes.length) plan.melodyNotes = melodyNotes;
+  if (melodyNotes.length) {
+    plan.melodyNotes = melodyNotes;
+    plan.melodyInstrument = sound.melodyInstrument;
+  }
 
   plan.intent = intent;
   plan.globalMood = describeMood(mood);
