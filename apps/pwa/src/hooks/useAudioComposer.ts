@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { startAudio, stopAudio, resumeAudioContext } from "../audio/toneEngine";
+import { playInsert, playEject } from "../audio/discSound";
 import { generateComposition, isModelLoaded } from "../ai/composer";
 import type { CompositionDirection } from "../ai/prompt";
 import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop, subscribeRuntimeState } from "../audio/compositionRuntime";
@@ -87,6 +88,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
 
   const handlePlayToggle = useCallback(async () => {
     if (isPlaying) {
+      playEject();
       stopAudio();
       stopRuntimeLoop();
       stopComposer();
@@ -98,6 +100,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     }
 
     try {
+      playInsert();
       await startAudio();
       if (plan) {
         startCompositionRuntime(plan);
@@ -187,6 +190,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     setCurrentSessionId(sessionId ?? null);
     setCurrentSessionSaved(true);
     try {
+      playInsert(); // disc-seat "chunk" as the track comes in (also masks the start transient)
       await startAudio();
       startCompositionRuntime(composition);
       startRuntimeLoop();
@@ -203,6 +207,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
 
   // Stop everything (used by the radio's tune-out and manual stop).
   const stopPlayback = useCallback(() => {
+    playEject();
     stopAudio();
     stopRuntimeLoop();
     stopComposer();

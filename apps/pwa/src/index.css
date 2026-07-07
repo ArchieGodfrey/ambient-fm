@@ -149,8 +149,6 @@ button {
   50% { box-shadow: 0 0 0 14px transparent; }
 }
 .afm-onair { animation: afm-onair 2.2s ease-in-out infinite; }
-@keyframes afm-fade { from { opacity: 0; } to { opacity: 1; } }
-.afm-fade { animation: afm-fade 0.4s ease both; }
 @keyframes afm-spin { to { transform: rotate(360deg); } }
 .afm-spin { animation: afm-spin 0.9s linear infinite; display: inline-flex; }
 @keyframes afm-indet { 0% { left: -40%; } 100% { left: 100%; } }
