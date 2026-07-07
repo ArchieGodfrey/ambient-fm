@@ -11,6 +11,7 @@ import { runExclusive } from "../runtime/modelRuntime";
 const VOICE_ID = "en_US-hfc_female-medium"; // warm, natural; ~medium quality/size
 const ENABLED_KEY = "ambientfm-voice-enabled";
 const INSTALLED_KEY = "ambientfm-voice-installed";
+const AUTOTRIED_KEY = "ambientfm-voice-autotried"; // first-tune-in auto-download attempted
 
 export type VoiceStatus = "idle" | "loading" | "ready" | "error";
 
@@ -79,8 +80,23 @@ export function loadVoice(onProgress?: (p: number, text: string) => void): Promi
   return loadPromise;
 }
 
-export function preloadVoice(): void {
-  if (voiceEnabled() && status === "idle" && voiceInstalled()) void loadVoice();
+function autoTried(): boolean {
+  try { return localStorage.getItem(AUTOTRIED_KEY) === "1"; } catch { return false; }
+}
+function markAutoTried(): void {
+  try { localStorage.setItem(AUTOTRIED_KEY, "1"); } catch { /* ignore */ }
+}
+
+// Called on tune-in: warm the cached voice, or — the FIRST time only —
+// auto-download it alongside the composer model. A prior Remove is respected
+// (autoTried stays set) so we never re-download against the user's wishes.
+export function maybeAutoLoadVoice(): void {
+  if (voiceReady() || status === "loading") return;
+  if (voiceInstalled()) { void loadVoice(); return; } // warm the cached model
+  if (autoTried()) return;                             // user removed it before
+  markAutoTried();
+  setVoiceEnabled(true);
+  void loadVoice();
 }
 
 // Render text → a decoded AudioBuffer, or null if unavailable. Serialized through
@@ -129,7 +145,7 @@ export function stopVoice(): void {
 export async function clearVoice(): Promise<void> {
   status = "idle";
   session = null;
-  try { localStorage.removeItem(INSTALLED_KEY); } catch { /* ignore */ }
+  try { localStorage.removeItem(INSTALLED_KEY); localStorage.setItem(AUTOTRIED_KEY, "1"); } catch { /* ignore */ }
   try {
     const { remove } = await import("@mintplex-labs/piper-tts-web");
     await remove(VOICE_ID);

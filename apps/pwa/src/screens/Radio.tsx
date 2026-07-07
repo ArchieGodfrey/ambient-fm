@@ -6,7 +6,7 @@ import useFeedback from "../hooks/useFeedback";
 import { recordFeedback } from "../feedback/feedback";
 import { useAppStore } from "../store/useAppStore";
 import { unlockAudio } from "../audio/toneEngine";
-import { unlockVoice } from "../audio/host";
+import { unlockVoice, maybeAutoLoadVoice } from "../audio/host";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
 // The station front door. Tune in → the composer runs an ongoing set, the DJ
@@ -33,6 +33,7 @@ export default function Radio() {
     // async work, so the voice can play later.
     unlockAudio();
     unlockVoice();
+    maybeAutoLoadVoice(); // download the DJ voice alongside the model (first time)
     setPreparing(true);
     try { await startRadio(); } finally { setPreparing(false); }
   };

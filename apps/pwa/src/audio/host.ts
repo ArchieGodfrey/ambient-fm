@@ -1,11 +1,11 @@
-import { voiceRender, voicePlay, stopVoice, preloadVoice, unlockVoice, voiceEnabled } from "./hostPiper";
+import { voiceRender, voicePlay, stopVoice, maybeAutoLoadVoice, unlockVoice, voiceEnabled } from "./hostPiper";
 
 // The DJ host voice: Piper neural TTS, on-device. We deliberately do NOT fall
 // back to the platform Web Speech voice (too disruptive / inconsistent) — when
 // the neural voice isn't available, the line simply shows as an on-screen
 // caption (subtitles) for a readable beat, with no audio.
 
-export { preloadVoice, unlockVoice };
+export { maybeAutoLoadVoice, unlockVoice };
 
 // Whether the DJ can be heard right now (else it's captions-only).
 export function voiceAudible(): boolean {

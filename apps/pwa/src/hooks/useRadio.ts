@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import useSounds from "./useSounds";
 import usePreference from "./usePreference";
 import type useAudioComposer from "./useAudioComposer";
-import { prepareLine, cancelHost, voiceAudible, preloadVoice } from "../audio/host";
+import { prepareLine, cancelHost, voiceAudible, maybeAutoLoadVoice } from "../audio/host";
 import { duckTo, unduck } from "../audio/toneEngine";
 import { hostWelcome, hostGreeting, hostFiller, hostIntro } from "../ai/hostScript";
 import { soundToDirection } from "../sounds/soundDirection";
@@ -127,7 +127,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     if (fadeTimerRef.current) { clearTimeout(fadeTimerRef.current); fadeTimerRef.current = null; }
     runningRef.current = true;
     countRef.current = 0;
-    preloadVoice(); // warm the neural voice while the first track composes
+    maybeAutoLoadVoice(); // warm (or first-time download) the DJ voice
     void cycle(true);
   }, [cycle]);
 
