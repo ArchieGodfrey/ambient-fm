@@ -49,19 +49,21 @@ export function buildSoundscape(sound: Partial<Sound>): CompositionPlan {
   if (sound.tempo) plan.bpm = sound.tempo;
   if (sound.layers) plan.layers = { ...plan.layers, ...sound.layers };
 
-  // A tapped melody (note names) replaces the pad motif's notes so it actually
-  // plays through the existing motif engine (which references motifs by id).
-  const melody = (sound.melody ?? []).filter((n): n is string => typeof n === "string");
-  if (melody.length) {
-    const rhythm = melody.map(() => 0.5);
-    const pad = plan.motifs.find((m) => m.layer === "pad");
-    if (pad) {
-      pad.notes = melody;
-      pad.rhythm = rhythm;
-    } else {
-      plan.motifs.push({ id: "melody", layer: "pad", notes: melody, rhythm });
+  // Flatten recorded takes into a single timed melody, concatenating takes with
+  // a small gap. Played as a dedicated timed track (see melodyTrack) that honours
+  // the recorded timing and hold durations.
+  const takes = sound.melody ?? [];
+  const melodyNotes: { note: string; start: number; duration: number }[] = [];
+  let offset = 0;
+  for (const take of takes) {
+    let takeLen = 0;
+    for (const n of take.notes) {
+      melodyNotes.push({ note: n.note, start: offset + n.start, duration: n.duration });
+      takeLen = Math.max(takeLen, n.start + n.duration);
     }
+    offset += takeLen + 0.4;
   }
+  if (melodyNotes.length) plan.melodyNotes = melodyNotes;
 
   plan.intent = intent;
   plan.globalMood = describeMood(mood);

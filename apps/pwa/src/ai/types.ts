@@ -53,6 +53,8 @@ export interface CompositionPlan {
   motifs: Motif[];
   phrases: Phrase[];
   intent?: CompositionIntent;
+  // Optional user-recorded melody, scheduled as a timed track over the soundscape.
+  melodyNotes?: { note: string; start: number; duration: number }[];
 }
 
 export type { CompositionIntent };

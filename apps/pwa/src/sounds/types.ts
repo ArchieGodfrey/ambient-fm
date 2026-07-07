@@ -20,6 +20,21 @@ export interface SoundLayers {
   texture: number;
 }
 
+// A recorded note: pitch, start time and hold duration (seconds, relative to
+// the take it belongs to).
+export interface MelodyNote {
+  note: string;
+  start: number;
+  duration: number;
+}
+
+// One recorded take/phrase. The user can record several and delete them
+// individually; playback concatenates them.
+export interface MelodyTake {
+  id: string;
+  notes: MelodyNote[];
+}
+
 export interface Sound {
   id: string;
   name: string;
@@ -31,7 +46,7 @@ export interface Sound {
   key?: SoundKey;
   progression?: number[]; // chord scale-degrees (0-6)
   layers?: SoundLayers;   // per-layer levels 0..1
-  melody?: string[];      // tapped melody as note names (e.g. "C4", "E4")
+  melody?: MelodyTake[];  // recorded melody takes (timed notes with durations)
   parentId?: string;      // lineage: the sound this one was branched from
   createdAt: number;
   updatedAt: number;

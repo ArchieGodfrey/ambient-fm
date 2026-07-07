@@ -6,6 +6,7 @@ import { field, getTick } from "../music/random/randomField";
 import { startScheduler, tick as schedulerTick } from "./sectionScheduler";
 import { saveSnapshot, type RuntimeSnapshot } from "../memory/runtimeSnapshots";
 import { composerState } from "../composer/composerState";
+import { setMelody, stopMelody } from "./melodyTrack";
 
 export type CompositionRuntimeSnapshot = {
   cursor: number;
@@ -254,6 +255,7 @@ function tick() {
 export function startCompositionRuntime(planInput: CompositionPlan, startOffset = 0) {
   plan = planInput;
   startScheduler(planInput);
+  setMelody(planInput.melodyNotes); // schedule the recorded melody track (if any)
   startTime = performance.now() - startOffset * 1000;
 
   const cursor = getCursor();
@@ -297,6 +299,7 @@ export function stopRuntimeLoop() {
     rafId = null;
   }
   stopPhrase();
+  stopMelody();
   stopCheckpointing();
 }
 

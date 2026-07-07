@@ -1,26 +1,39 @@
+import type { PointerEvent as ReactPointerEvent } from "react";
+
 const WHITE = ["C", "D", "E", "F", "G", "A", "B"];
 const BLACK_AFTER: Record<string, string> = { C: "C#", D: "D#", F: "F#", G: "G#", A: "A#" };
 
 interface PianoKeyboardProps {
   octaves?: number[];
   scale?: string[]; // pitch classes to highlight (e.g. from the current key)
-  onPlay: (note: string) => void;
+  onDown: (note: string) => void;
+  onUp: (note: string) => void;
 }
 
-export default function PianoKeyboard({ octaves = [4, 5], scale = [], onPlay }: PianoKeyboardProps) {
+export default function PianoKeyboard({ octaves = [4, 5], scale = [], onDown, onUp }: PianoKeyboardProps) {
   const whites = octaves.flatMap((o) => WHITE.map((pc) => ({ note: `${pc}${o}`, pc, octave: o })));
   const n = whites.length;
   const whiteW = 100 / n;
   const blackW = whiteW * 0.62;
   const inScale = (pc: string) => scale.length === 0 || scale.includes(pc);
 
+  const press = (note: string) => (e: ReactPointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); // release fires here even if the finger slides off
+    onDown(note);
+  };
+  const release = (note: string) => () => onUp(note);
+
   return (
-    <div style={{ position: "relative", height: 128, display: "flex", userSelect: "none", touchAction: "none" }}>
+    <div style={{ position: "relative", height: 132, display: "flex", userSelect: "none", touchAction: "none" }}>
       {whites.map((w) => (
         <button
           key={w.note}
           type="button"
-          onPointerDown={(e) => { e.preventDefault(); onPlay(w.note); }}
+          onPointerDown={press(w.note)}
+          onPointerUp={release(w.note)}
+          onPointerCancel={release(w.note)}
           style={{
             flex: 1, minWidth: 0, height: "100%",
             border: "1px solid var(--border)", borderRadius: "0 0 7px 7px",
@@ -41,7 +54,9 @@ export default function PianoKeyboard({ octaves = [4, 5], scale = [], onPlay }: 
           <button
             key={bnote}
             type="button"
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onPlay(bnote); }}
+            onPointerDown={press(bnote)}
+            onPointerUp={release(bnote)}
+            onPointerCancel={release(bnote)}
             style={{
               position: "absolute", top: 0, left: `${leftPct}%`, width: `${blackW}%`, height: "62%",
               border: "1px solid #000", borderRadius: "0 0 5px 5px", zIndex: 1, cursor: "pointer",

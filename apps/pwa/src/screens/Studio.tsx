@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Pause, Play, Sparkles, Save } from "lucide-react";
+import { X, Pause, Play, Sparkles, Save, Circle, Square, Trash2 } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
 import Disc from "../components/Disc";
 import PianoKeyboard from "../components/PianoKeyboard";
 import { buildSoundscape, describeMood } from "../sounds/previewPlan";
-import { auditionNote } from "../audio/audition";
+import { auditionAttack, auditionRelease } from "../audio/audition";
 import { getScale } from "../music/harmony";
 import {
   DEFAULT_KEY, DEFAULT_PROGRESSION, DEFAULT_LAYERS, TONICS,
-  type Sound, type SoundMood, type SoundLayers,
+  type Sound, type SoundMood, type SoundLayers, type MelodyNote, type MelodyTake,
 } from "../sounds/types";
 import type { ComposerSettings } from "../features/composer/types";
 import { card, sectionLabel, mutedNote, chip } from "../ui/styles";
@@ -54,22 +54,51 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
     key: sound.key ?? DEFAULT_KEY,
     progression: sound.progression?.length ? sound.progression : DEFAULT_PROGRESSION,
     layers: sound.layers ?? DEFAULT_LAYERS,
-    melody: sound.melody ?? [],
+    melody: Array.isArray(sound.melody) ? (sound.melody as MelodyTake[]).filter((t) => t && Array.isArray(t.notes)) : [],
   }));
   const [previewing, setPreviewing] = useState(false);
   const [dirty, setDirty] = useState(false);
   const previewingRef = useRef(false);
   previewingRef.current = previewing;
 
+  // Melody recorder — captures timing (gaps between presses) and hold duration.
+  const [recording, setRecording] = useState(false);
+  const recStart = useRef(0);
+  const takeNotes = useRef<MelodyNote[]>([]);
+  const activeNotes = useRef<Map<string, number>>(new Map());
+  const nowSec = () => performance.now() / 1000;
+
   const patch = (p: Partial<Sound>) => { setDraft((d) => ({ ...d, ...p })); setDirty(true); };
 
-  function tapNote(note: string) {
-    void auditionNote(note); // instant feedback
-    setDraft((d) => ({ ...d, melody: [...(d.melody ?? []), note] }));
-    setDirty(true);
+  function keyDown(note: string) {
+    void auditionAttack(note);
+    if (recording) activeNotes.current.set(note, nowSec() - recStart.current);
   }
-  function removeNote(index: number) {
-    patch({ melody: (draft.melody ?? []).filter((_, j) => j !== index) });
+  function keyUp(note: string) {
+    auditionRelease(note);
+    if (recording && activeNotes.current.has(note)) {
+      const start = activeNotes.current.get(note)!;
+      const duration = Math.max(0.12, nowSec() - recStart.current - start);
+      takeNotes.current.push({ note, start, duration });
+      activeNotes.current.delete(note);
+    }
+  }
+  function toggleRecord() {
+    if (recording) {
+      setRecording(false);
+      const notes = [...takeNotes.current].sort((a, b) => a.start - b.start);
+      if (notes.length) patch({ melody: [...(draft.melody ?? []), { id: crypto.randomUUID(), notes }] });
+      takeNotes.current = [];
+      activeNotes.current.clear();
+    } else {
+      recStart.current = nowSec();
+      takeNotes.current = [];
+      activeNotes.current.clear();
+      setRecording(true);
+    }
+  }
+  function removeTake(id: string) {
+    patch({ melody: (draft.melody ?? []).filter((t) => t.id !== id) });
   }
 
   // Live refine while previewing.
@@ -173,32 +202,33 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
 
         {/* Melody */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <span style={sectionLabel}>Melody — play it in</span>
+          <span style={sectionLabel}>Melody — record &amp; play in</span>
           <div style={{ ...card, display: "flex", flexDirection: "column", gap: 14 }}>
-            {/* Editable note groups (bars of 4) */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, minHeight: 34, alignItems: "center" }}>
-              {(draft.melody ?? []).length === 0 ? (
-                <span style={mutedNote}>Play the keys below — your notes appear here in bars, tap one to remove it.</span>
-              ) : (
-                <>
-                  {Array.from({ length: Math.ceil((draft.melody ?? []).length / 4) }, (_, g) => (
-                    <div key={g} style={{ display: "flex", gap: 4, padding: "4px 6px", borderRadius: 8, background: "var(--surface-muted)", border: "1px solid var(--border)" }}>
-                      {(draft.melody ?? []).slice(g * 4, g * 4 + 4).map((note, ni) => {
-                        const idx = g * 4 + ni;
-                        return (
-                          <button key={idx} type="button" onClick={() => removeNote(idx)} title="Remove"
-                            style={{ border: "none", background: "var(--surface)", color: "var(--text-h)", borderRadius: 6, padding: "5px 8px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                            {note}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
-                  <button type="button" onClick={() => patch({ melody: [] })} style={{ ...chip, padding: "6px 10px", color: "var(--text-muted)" }}>clear</button>
-                </>
-              )}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <button type="button" onClick={toggleRecord}
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 16px", borderRadius: "var(--radius-pill)", border: "1px solid", cursor: "pointer", fontWeight: 600,
+                  ...(recording ? { borderColor: "#c2506f", background: "#c2506f", color: "#fff" } : { borderColor: "var(--border)", background: "var(--surface)", color: "var(--text)" }) }}>
+                {recording ? <Square size={14} /> : <Circle size={14} fill="#c2506f" color="#c2506f" />}
+                {recording ? "Stop recording" : "Record"}
+              </button>
+              <span style={mutedNote}>{recording ? "Play the keys — timing and hold are captured." : "Record a phrase; each take stacks and plays in the soundscape."}</span>
             </div>
-            <PianoKeyboard scale={scale} onPlay={tapNote} />
+
+            {(draft.melody ?? []).length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {(draft.melody ?? []).map((take, i) => (
+                  <div key={take.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 12px", borderRadius: 10, background: "var(--surface-muted)", border: "1px solid var(--border)" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>Take {i + 1}</span>
+                    <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: "auto" }}>{take.notes.length} note{take.notes.length !== 1 ? "s" : ""}</span>
+                    <button type="button" onClick={() => removeTake(take.id)} aria-label="Delete take" style={{ border: "none", background: "transparent", color: "var(--text-faint)", cursor: "pointer", padding: 2 }}>
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <PianoKeyboard scale={scale} onDown={keyDown} onUp={keyUp} />
           </div>
         </div>
 
