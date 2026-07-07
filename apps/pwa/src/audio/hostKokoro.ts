@@ -1,13 +1,15 @@
 import * as Tone from "tone";
 import { runExclusive } from "../runtime/modelRuntime";
+import { idbModelCache, clearModelCache } from "./kokoroCache";
 
-// Kokoro-82M neural TTS (kokoro-js → transformers.js). OPT-IN and DESKTOP-ONLY:
-// its onnxruntime/WASM stack throws "undefined is not a function" and blows past
-// memory on iOS Safari, so we don't load it there — the station uses the system
-// speechSynthesis voice on iOS instead. Rendered PCM plays through the
-// (already-unlocked) WebAudio context via a BufferSource straight to the hardware
-// destination (bypasses the duck so the voice sits on top). Serialized through
-// the shared runtime mutex; falls back to Web Speech whenever it isn't ready.
+// Kokoro-82M neural TTS (kokoro-js → transformers.js). OPT-IN. On iOS we force a
+// SINGLE-THREADED WASM path: threaded onnxruntime needs SharedArrayBuffer (only
+// with cross-origin isolation), and calling it where it's absent throws
+// "undefined is not a function"; WebGPU there is fragile too. We configure this
+// via kokoro-js's OWN re-exported `env` (same transformers instance), which also
+// lets our IndexedDB cache actually apply. Rendered PCM plays through the
+// (already-unlocked) WebAudio context (BufferSource → hardware destination,
+// bypassing the duck). Falls back to Web Speech whenever it isn't ready.
 
 const MODEL = "onnx-community/Kokoro-82M-v1.0-ONNX";
 const VOICE = "af_heart";
@@ -37,29 +39,47 @@ export function kokoroInstalled(): boolean {
   try { return localStorage.getItem(INSTALLED_KEY) === "1"; } catch { return false; }
 }
 
-// iOS (incl. iPadOS reporting as Mac): Kokoro's ML stack crashes/OOMs, so it's
-// unsupported there.
+// iOS (incl. iPadOS reporting as Mac): force the WASM path (WebGPU ORT is fragile
+// there). We now attempt Kokoro everywhere.
 function isIOS(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
   const nav = navigator as unknown as { platform?: string; maxTouchPoints?: number };
   return /iP(hone|ad|od)/.test(ua) || (nav.platform === "MacIntel" && (nav.maxTouchPoints ?? 0) > 1);
 }
-export function kokoroSupported(): boolean { return !isIOS(); }
+export function kokoroSupported(): boolean { return true; }
 
 function detectDevice(): "webgpu" | "wasm" {
+  if (isIOS()) return "wasm";
   const hasGpu = typeof navigator !== "undefined" && !!(navigator as unknown as { gpu?: unknown }).gpu;
   return hasGpu ? "webgpu" : "wasm";
 }
 
 export async function loadKokoro(onProgress?: (p: number, text: string) => void): Promise<boolean> {
-  if (!kokoroSupported()) { status = "error"; return false; } // iOS: never touch the ML stack
   if (kokoroReady()) return true;
   if (loadPromise) return loadPromise;
   status = "loading";
   loadPromise = (async () => {
     try {
-      const mod = await import("kokoro-js");
+      // Import KokoroTTS AND kokoro's OWN re-exported transformers `env`, so our
+      // config actually applies to the instance it uses.
+      const { KokoroTTS, env } = (await import("kokoro-js")) as unknown as {
+        KokoroTTS: { from_pretrained: (m: string, o: unknown) => Promise<KokoroModel> };
+        env: { useBrowserCache?: boolean; useCustomCache?: boolean; customCache?: unknown; backends?: { onnx?: { wasm?: { numThreads?: number; proxy?: boolean; simd?: boolean } } } };
+      };
+      try {
+        // Persist weights in IndexedDB (Safari's Cache API put fails).
+        env.useBrowserCache = false;
+        env.useCustomCache = true;
+        env.customCache = idbModelCache;
+        // Single-threaded WASM on the main thread. Research-backed: threaded ORT
+        // needs SharedArrayBuffer (absent w/o cross-origin isolation) → "undefined
+        // is not a function"; and the WebGPU/JSEP backend blows up memory and
+        // crashes on Safari 26. numThreads=1 + WASM (see detectDevice) avoids both.
+        const wasm = env.backends?.onnx?.wasm;
+        if (wasm) { wasm.numThreads = 1; wasm.proxy = false; wasm.simd = true; }
+      } catch { /* best effort */ }
+
       const device = detectDevice();
       const opts = {
         dtype: device === "webgpu" ? "fp32" : "q8",
@@ -68,8 +88,10 @@ export async function loadKokoro(onProgress?: (p: number, text: string) => void)
           if (info?.status === "progress" && typeof info.progress === "number") onProgress?.(Math.min(1, info.progress / 100), `${info.file ?? "model"} · ${Math.round(info.progress)}%`);
           else if (info?.status) onProgress?.(0, String(info.status));
         },
-      } as unknown as Parameters<typeof mod.KokoroTTS.from_pretrained>[1];
-      model = (await mod.KokoroTTS.from_pretrained(MODEL, opts)) as unknown as KokoroModel;
+      };
+      // Serialize the (heavy) load through the shared mutex so it can't peak
+      // memory at the same instant as an LLM load/inference.
+      model = await runExclusive("tts", () => KokoroTTS.from_pretrained(MODEL, opts));
       status = "ready";
       try { localStorage.setItem(INSTALLED_KEY, "1"); } catch { /* ignore */ }
       return true;
@@ -109,6 +131,7 @@ export async function clearKokoro(): Promise<void> {
   model = null;
   status = "idle";
   try { localStorage.removeItem(INSTALLED_KEY); } catch { /* ignore */ }
+  await clearModelCache();
   try {
     if ("caches" in window) {
       const keys = await caches.keys();
