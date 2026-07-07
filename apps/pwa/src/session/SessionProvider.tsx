@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { db } from "../db/db";
 import { buildStimulusSnapshot } from "../stimuli/buildStimulusSnapshot";
 import { useAppStore } from "../store/useAppStore";
@@ -124,6 +124,14 @@ function useSessionRuntime() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Eject the loaded disc when the last track is deleted (sessions 0 → empty),
+  // so a stale plan doesn't keep playing/showing after the library is cleared.
+  const prevSessionCount = useRef(sessions.length);
+  useEffect(() => {
+    if (prevSessionCount.current > 0 && sessions.length === 0) audio.eject();
+    prevSessionCount.current = sessions.length;
+  }, [sessions.length, audio]);
 
   // Surface the most relevant status in the transport bar.
   const displayStatus = model.progressText ?? model.status ?? audio.status ?? appStatus;

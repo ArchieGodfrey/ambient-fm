@@ -7,7 +7,7 @@ import { startComposer, stopComposer } from "../composer/runtime";
 import { postToast } from "../utils/toast";
 import { db } from "../db/db";
 import { analyzeSession } from "../memory/analyzeSession";
-import { generateTrackName } from "../ai/trackName";
+import { generateTrackName, generateTrackNameLLM } from "../ai/trackName";
 import { applySoundToPlan } from "../sounds/soundDirection";
 import type { Sound } from "../sounds/types";
 import { restoreRuntime } from "../runtime/restoreRuntime";
@@ -56,11 +56,11 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     }
   }
 
-  async function saveSession(events: StimulusEvent[], plan: CompositionPlan) {
+  async function saveSession(events: StimulusEvent[], plan: CompositionPlan, title?: string) {
     try {
       const summary = analyzeSession(crypto.randomUUID(), events, plan);
       summary.plan = plan;
-      summary.title = generateTrackName(plan);
+      summary.title = title ?? generateTrackName(plan);
       await db.sessions.add(summary);
       await pruneOldSessions();
       setCurrentSessionSaved(true);
@@ -138,11 +138,14 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       // the recorded melody, explicit layers, tempo — so the burn is truly "your sound".
       if (sound) applySoundToPlan(composition, sound);
       setSharedPlan(composition);
-      await saveSession(inputEvents, composition);
       await resumeAudioContext(); // model load may have suspended the context
       startCompositionRuntime(composition);
       startComposer(intent);
       setStatus(`Composition generated: ${composition.key}`);
+      // Name it with the model (fallbacks to deterministic), then persist —
+      // done after audio starts so naming latency doesn't delay playback.
+      const title = await generateTrackNameLLM(composition, { vibe: sound?.vibe ?? direction?.vibe, moodWords: direction?.moodWords });
+      await saveSession(inputEvents, composition, title);
     } catch (error) {
       // No fallback — surface the failure instead of presenting a stand-in disc.
       console.error("Failed to generate composition", error);
@@ -160,6 +163,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     try {
       await startAudio();
       setIsPlaying(true);
+      setStoreIsPlaying(true); // keep the transport bar's Play/Stop in sync
       setStatus("Session loaded and playing");
     } catch (error) {
       console.error(error);
@@ -178,6 +182,19 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     setCurrentSessionSaved(true);
     setStatus("Loaded most recent session plan");
   }, [setSharedPlan]);
+
+  // Eject the loaded disc: stop everything and clear the tray. Used when the
+  // last remaining track is deleted so nothing stale keeps playing.
+  const eject = useCallback(() => {
+    stopAudio();
+    stopRuntimeLoop();
+    stopComposer();
+    setIsPlaying(false);
+    setStoreIsPlaying(false);
+    setSharedPlan(null);
+    setCurrentSessionSaved(true);
+    setStatus("Tray empty");
+  }, [setSharedPlan, setStoreIsPlaying]);
 
   const restoreSession = useCallback(async () => {
     try {
@@ -207,5 +224,6 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     loadSessionPlan,
     loadStaticPlan,
     restoreSession,
+    eject,
   };
 }

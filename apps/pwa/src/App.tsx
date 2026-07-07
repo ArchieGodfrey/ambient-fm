@@ -36,6 +36,7 @@ export default function App() {
       <CurrentSessionBar onExpand={() => setExpanded(true)} />
 
       <nav className="afm-nav">
+        <div className="afm-nav-inner">
         {tabs.map(({ key, label, Icon }) => {
           const on = key === active;
           return (
@@ -52,6 +53,7 @@ export default function App() {
             </button>
           );
         })}
+        </div>
       </nav>
     </SessionProvider>
   );

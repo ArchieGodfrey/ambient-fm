@@ -1,4 +1,5 @@
 import { field } from "../music/random/randomField";
+import { infer, isModelLoaded } from "../runtime/modelRuntime";
 import type { CompositionPlan } from "./types";
 
 // Evocative two-word track names, generated deterministically from the plan's
@@ -35,4 +36,38 @@ export function generateTrackName(plan: Pick<CompositionPlan, "seed" | "globalMo
   const adj = adjs[Math.floor(rng() * adjs.length) % adjs.length];
   const noun = NOUNS[Math.floor(rng() * NOUNS.length) % NOUNS.length];
   return `${adj} ${noun}`;
+}
+
+// Pull a clean 2–4 word title out of a raw model completion, or null if it
+// looks like a refusal / prose / junk (so the caller falls back).
+function sanitizeName(raw: string): string | null {
+  const first = raw.split("\n").map((s) => s.trim()).find(Boolean) ?? "";
+  const name = first
+    .replace(/^(title|name)\s*[:\-]\s*/i, "")
+    .replace(/^["'`*]+|["'`*.]+$/g, "")
+    .trim();
+  const words = name.split(/\s+/).filter(Boolean);
+  if (!name || words.length > 4 || name.length > 32 || !/[a-z]/i.test(name)) return null;
+  return name;
+}
+
+// Name the track with the model — a short evocative title from its feel —
+// falling back to the deterministic name if the model is absent or misbehaves.
+export async function generateTrackNameLLM(
+  plan: Pick<CompositionPlan, "seed" | "globalMood" | "key">,
+  opts?: { vibe?: string; moodWords?: string },
+): Promise<string> {
+  const fallback = generateTrackName(plan);
+  if (!isModelLoaded()) return fallback;
+  const feel = [
+    `mood: ${opts?.moodWords ?? plan.globalMood ?? "ambient"}`,
+    plan.key ? `key: ${plan.key}` : "",
+    opts?.vibe ? `vibe: ${opts.vibe}` : "",
+  ].filter(Boolean).join("; ");
+  const prompt = `Invent a short, evocative title (2 to 4 words) for an instrumental ambient music track.\nTrack feel — ${feel}.\nReply with ONLY the title. No quotes, no explanation, no trailing punctuation.`;
+  try {
+    return sanitizeName(await infer(prompt)) ?? fallback;
+  } catch {
+    return fallback;
+  }
 }

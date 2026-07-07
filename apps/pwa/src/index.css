@@ -131,10 +131,13 @@ button {
 }
 .afm-nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-  height: 64px; max-width: 480px; margin: 0 auto;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  height: 64px;
   background: color-mix(in srgb, var(--surface-strong) 82%, transparent);
   backdrop-filter: blur(14px); border-top: 1px solid var(--border);
+}
+.afm-nav-inner {
+  height: 100%; max-width: 480px; margin: 0 auto;
+  display: grid; grid-template-columns: repeat(4, 1fr);
 }
 .afm-nav-btn {
   border: none; background: transparent; cursor: pointer; padding: 0;
@@ -149,10 +152,14 @@ button {
   #root { max-width: none; }
   .afm-main { max-width: 780px; margin: 0 auto 0 260px; padding: 0 20px; }
   .afm-nav {
-    top: 0; bottom: 0; right: auto; width: 240px; height: 100svh; max-width: none; margin: 0;
-    grid-template-columns: none; display: flex; flex-direction: column; align-items: stretch;
-    gap: 6px; padding: 44px 16px; border-top: none; border-right: 1px solid var(--border);
+    top: 0; bottom: 0; right: auto; width: 240px; height: 100svh; margin: 0;
+    border-top: none; border-right: 1px solid var(--border);
     background: var(--surface-muted);
+  }
+  .afm-nav-inner {
+    height: auto; max-width: none; margin: 0;
+    display: flex; flex-direction: column; align-items: stretch;
+    gap: 6px; padding: 44px 16px;
   }
   .afm-nav-btn {
     flex-direction: row; justify-content: flex-start; gap: 14px;

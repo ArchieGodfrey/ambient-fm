@@ -21,6 +21,8 @@ export default function useSessionHistory() {
     try {
       await deleteSessionSummary(id);
       await loadSessions();
+      // Notify other useSessionHistory instances (Today tracklist, eject-on-empty).
+      window.dispatchEvent(new Event("session-saved"));
       postToast("Session deleted.", "success");
     } catch (error) {
       console.error("Failed to delete session", error);

@@ -3,6 +3,7 @@ import { Play, Trash2 } from "lucide-react";
 import useSessionHistory from "../hooks/useSessionHistory";
 import { useSession } from "../session/SessionProvider";
 import Disc from "../components/Disc";
+import CapturesSection from "../components/CapturesSection";
 import { screen, screenEyebrow, screenTitle, card, mutedNote } from "../ui/styles";
 import type { SessionSummary } from "../memory/types";
 
@@ -112,6 +113,8 @@ export default function Journey() {
           ) : null}
         </>
       )}
+
+      <CapturesSection />
     </div>
   );
 }

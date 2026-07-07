@@ -38,7 +38,12 @@ export default function useCapture() {
   const addEvent = useAppStore((s) => s.addEvent);
 
   const load = useCallback(async () => {
-    setRecordings(await db.recordings.orderBy("ts").reverse().toArray());
+    try {
+      setRecordings(await db.recordings.orderBy("ts").reverse().toArray());
+    } catch (e) {
+      // Guard against an unopened/stale DB so this never throws uncaught.
+      console.warn("Failed to load recordings", e);
+    }
   }, []);
 
   useEffect(() => {
