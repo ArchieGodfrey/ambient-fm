@@ -6,7 +6,7 @@ import useFeedback from "../hooks/useFeedback";
 import { recordFeedback } from "../feedback/feedback";
 import { useAppStore } from "../store/useAppStore";
 import { unlockAudio } from "../audio/toneEngine";
-import { unlockVoice, unlockSpeech } from "../audio/host";
+import { unlockVoice } from "../audio/host";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
 // The station front door. Tune in → the composer runs an ongoing set, the DJ
@@ -29,10 +29,10 @@ export default function Radio() {
   const isError = /fail|error|not available|unavailable/i.test(displayStatus ?? "");
 
   const tuneIn = async () => {
-    // Unlock audio + voice SYNCHRONOUSLY in the click (iOS) before the async work.
+    // Unlock the WebAudio context SYNCHRONOUSLY in the click (iOS) before the
+    // async work, so the voice can play later.
     unlockAudio();
     unlockVoice();
-    unlockSpeech();
     setPreparing(true);
     try { await startRadio(); } finally { setPreparing(false); }
   };
@@ -151,8 +151,8 @@ export default function Radio() {
           </div>
         )}
 
-        {!radio.ttsAvailable ? (
-          <p style={{ ...mutedNote, fontSize: 11.5, textAlign: "center" }}>Voice host unavailable here — captions still show between tracks.</p>
+        {!radio.voiceAudible ? (
+          <p style={{ ...mutedNote, fontSize: 11.5, textAlign: "center" }}>Download the DJ voice in Settings to hear the host — captions show between tracks either way.</p>
         ) : null}
         {displayStatus && isError ? (
           <p style={{ textAlign: "center", fontSize: 13, color: "#c2506f", maxWidth: 320 }}>{displayStatus}</p>

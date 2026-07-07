@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import useSounds from "./useSounds";
 import usePreference from "./usePreference";
 import type useAudioComposer from "./useAudioComposer";
-import { prepareLine, cancelHost, hostAvailable, preloadKokoro } from "../audio/host";
+import { prepareLine, cancelHost, voiceAudible, preloadVoice } from "../audio/host";
 import { duckTo, unduck } from "../audio/toneEngine";
 import { hostWelcome, hostGreeting, hostFiller, hostIntro } from "../ai/hostScript";
 import { soundToDirection } from "../sounds/soundDirection";
@@ -17,10 +17,10 @@ export type NowPlaying = { title: string; mood: string; key: string } | null;
 // The station: an autonomous generate → announce → play loop. The DJ picks what
 // to compose from — a fresh capture if the mic's been used recently, otherwise a
 // random one of your saved Sounds (bespoke/manual generation lives in the Studio
-// now). The host talks WHILE the next track composes: for Kokoro we pre-render
-// the line to a clip (GPU) before generation starts, then play it during (via
-// HTMLAudio, no GPU); speechSynthesis just speaks live. Either way the voice
-// covers the audio-context suspension — a host-bridged transition.
+// now). The host talks WHILE the next track composes: the voice line is
+// pre-rendered (Piper, WASM/CPU) before generation starts, then played during it
+// — a host-bridged transition. If the voice isn't downloaded, the line shows as
+// an on-screen caption for a readable beat instead (no system voice).
 const HOST_GREETING_EVERY = 2;
 const MIN_TRACK_MS = 120_000; // tracks run at least two minutes (loop if shorter)
 const FRESH_CAPTURE_MS = 15 * 60 * 1000;
@@ -83,7 +83,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     const direction = sound ? soundToDirection(sound) : undefined;
     const greetingDue = first || countRef.current % HOST_GREETING_EVERY === 0;
 
-    // Duck the outgoing track to a bed; prepare the host line (Kokoro renders
+    // Duck the outgoing track to a bed; prepare the host line (the voice renders
     // here, before generation grabs the GPU).
     duckTo(-16);
     setState("announcing");
@@ -127,9 +127,9 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     if (fadeTimerRef.current) { clearTimeout(fadeTimerRef.current); fadeTimerRef.current = null; }
     runningRef.current = true;
     countRef.current = 0;
-    preloadKokoro(); // warm the neural voice while the first track composes
+    preloadVoice(); // warm the neural voice while the first track composes
     void cycle(true);
   }, [cycle]);
 
-  return { state, hostText, nowPlaying, tuneIn, tuneOut, isOn: state !== "idle", ttsAvailable: hostAvailable() };
+  return { state, hostText, nowPlaying, tuneIn, tuneOut, isOn: state !== "idle", voiceAudible: voiceAudible() };
 }

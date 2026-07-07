@@ -114,13 +114,13 @@ export async function clearRuntime() {
 
 export async function infer(prompt: string) {
   // Serialize inference on the shared mutex too, so LLM infer never overlaps a
-  // model load or a Kokoro TTS render — one queue for all heavy GPU/compute work.
+  // model load or a voice (TTS) render — one queue for all heavy GPU/compute work.
   return scheduler.acquire("ml_infer", () => mlLayer.infer(prompt));
 }
 
 // Run a GPU/compute task under the shared runtime mutex, so it never overlaps a
-// model load (or another exclusive task like Kokoro TTS rendering). Used to keep
-// second-model work (Kokoro) orchestrated with the LLM runtime.
+// model load (or another exclusive task like voice/TTS rendering). Used to keep
+// second-model work orchestrated with the LLM runtime.
 export function runExclusive<T>(label: RuntimeState, fn: () => Promise<T>): Promise<T> {
   return scheduler.acquire(label, fn);
 }

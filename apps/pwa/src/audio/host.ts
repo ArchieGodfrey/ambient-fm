@@ -1,76 +1,29 @@
-import { kokoroRender, kokoroPlay, stopKokoro, preloadKokoro, unlockVoice } from "./hostKokoro";
+import { voiceRender, voicePlay, stopVoice, preloadVoice, unlockVoice, voiceEnabled } from "./hostPiper";
 
-// The DJ host voice. Prefers Kokoro neural TTS (nicer voice); falls back to the
-// platform Web Speech API. Both are independent of the Tone audio context (which
-// suspends during inference), so the voice covers the track-generation gap.
+// The DJ host voice: Piper neural TTS, on-device. We deliberately do NOT fall
+// back to the platform Web Speech voice (too disruptive / inconsistent) — when
+// the neural voice isn't available, the line simply shows as an on-screen
+// caption (subtitles) for a readable beat, with no audio.
 
-export { preloadKokoro, unlockVoice };
+export { preloadVoice, unlockVoice };
 
-export function hostAvailable(): boolean {
-  return typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
+// Whether the DJ can be heard right now (else it's captions-only).
+export function voiceAudible(): boolean {
+  return voiceEnabled();
 }
 
-function pickVoice(): SpeechSynthesisVoice | undefined {
-  try {
-    const vs = window.speechSynthesis.getVoices();
-    return (
-      vs.find((v) => v.lang?.startsWith("en") && v.localService) ??
-      vs.find((v) => v.lang?.startsWith("en")) ??
-      vs[0]
-    );
-  } catch {
-    return undefined;
-  }
-}
+const paceMs = (text: string) => Math.min(7000, Math.max(1600, 1200 + text.length * 45));
 
-// Live speechSynthesis fallback. Resolves when the line finishes (with a
-// timeout backstop for engines that drop onend).
-export function speak(text: string, opts?: { rate?: number; pitch?: number }): Promise<void> {
-  if (!hostAvailable() || !text.trim()) return Promise.resolve();
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = () => { if (done) return; done = true; resolve(); };
-    try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      const v = pickVoice();
-      if (v) u.voice = v;
-      u.rate = opts?.rate ?? 0.98;
-      u.pitch = opts?.pitch ?? 1;
-      u.onend = finish;
-      u.onerror = finish;
-      window.speechSynthesis.speak(u);
-      window.setTimeout(finish, Math.min(22000, 1400 + text.length * 75));
-    } catch {
-      finish();
-    }
-  });
-}
-
-// Prepare a line for playback and return a player that plays it and resolves
-// when done. Kokoro is RENDERED here (uses the GPU) so the returned player just
-// plays a pre-rendered clip via HTMLAudio — safe to run concurrently with track
-// generation. If Kokoro is unavailable, the player speaks live via Web Speech.
+// Prepare a line: render Piper now; return a player that plays the audio, or —
+// when the neural voice isn't available — paces for a readable caption duration
+// (the caller shows the caption regardless).
 export async function prepareLine(text: string): Promise<() => Promise<void>> {
   if (!text.trim()) return () => Promise.resolve();
-  const clip = await kokoroRender(text);
-  if (clip) return () => kokoroPlay(clip);
-  return () => speak(text);
-}
-
-// Prime speechSynthesis inside a user gesture — iOS blocks the first spoken
-// utterance unless it follows a real user action, and the DJ speaks later
-// (mid-cycle), so without this there's no voice at all on iPhone.
-export function unlockSpeech(): void {
-  if (!hostAvailable()) return;
-  try {
-    const u = new SpeechSynthesisUtterance(" ");
-    u.volume = 0;
-    window.speechSynthesis.speak(u);
-  } catch { /* ignore */ }
+  const buffer = await voiceRender(text);
+  if (buffer) return () => voicePlay(buffer);
+  return () => new Promise<void>((resolve) => window.setTimeout(resolve, paceMs(text)));
 }
 
 export function cancelHost(): void {
-  try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
-  stopKokoro();
+  stopVoice();
 }

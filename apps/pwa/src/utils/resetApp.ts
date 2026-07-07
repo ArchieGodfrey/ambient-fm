@@ -1,7 +1,7 @@
 // Force the app onto fresh code/assets — for when an installed PWA (esp. on
 // iOS) keeps serving a stale bundle after an update. Unregisters service
 // workers and clears code/asset caches, then reloads. KEEPS the model caches
-// (multi-GB) and all IndexedDB data (sounds, sessions, feedback, Kokoro weights).
+// (multi-GB) and all IndexedDB/OPFS data (sounds, sessions, feedback, voice model).
 export async function resetApp(): Promise<void> {
   try {
     if ("serviceWorker" in navigator) {
