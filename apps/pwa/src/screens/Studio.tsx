@@ -29,9 +29,10 @@ const LAYER_KEYS: Array<{ key: keyof SoundLayers; label: string }> = [
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII"];
 const TABS = [
   { id: "melody", label: "Melody" },
-  { id: "chords", label: "Key & chords" },
+  { id: "chords", label: "Chords" },
   { id: "layers", label: "Layers" },
   { id: "feel", label: "Feel" },
+  { id: "vibe", label: "Vibe" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -267,7 +268,11 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
                 {MOOD_DIMS.map(({ key, label }) => <Slider key={key} label={label} value={draft.mood[key]} onChange={(v) => patch({ mood: { ...draft.mood, [key]: v } })} />)}
                 <div style={{ height: 1, background: "var(--border)" }} />
                 {CHARACTER.map(({ key, label }) => <Slider key={key} label={label} value={draft.composerSettings[key]} onChange={(v) => patch({ composerSettings: { ...draft.composerSettings, [key]: v } })} />)}
-                <div style={{ height: 1, background: "var(--border)" }} />
+              </div>
+            ) : null}
+
+            {tab === "vibe" ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>Vibe</span>
@@ -276,7 +281,7 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
                       <button type="button" onClick={() => void writeVibe()} disabled={writingVibe} style={{ ...chip, padding: "5px 10px", fontSize: 12, borderColor: "var(--accent-border)", color: "var(--accent)" }}>{writingVibe ? "Writing…" : "✨ AI"}</button>
                     </span>
                   </div>
-                  <textarea value={draft.vibe ?? ""} onChange={(e) => patch({ vibe: e.target.value })} rows={2} placeholder="A calm, dim drift…"
+                  <textarea value={draft.vibe ?? ""} onChange={(e) => patch({ vibe: e.target.value })} rows={3} placeholder="A calm, dim drift…"
                     style={{ width: "100%", resize: "vertical", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-h)", fontSize: 13, fontFamily: "inherit" }} />
                 </div>
                 <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>

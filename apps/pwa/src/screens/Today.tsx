@@ -1,6 +1,7 @@
-import { Flame, Pause, Play } from "lucide-react";
+import { Flame, Pause, Play, Mic, Square } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import useSessionHistory from "../hooks/useSessionHistory";
+import useCapture from "../hooks/useCapture";
 import Disc from "../components/Disc";
 import { screen, screenEyebrow, screenTitle, primaryButton, mutedNote } from "../ui/styles";
 
@@ -15,7 +16,9 @@ function isToday(ts: number) {
 export default function Today() {
   const { audio, model, isGenerating, handleGenerate, displayStatus } = useSession();
   const { sessions } = useSessionHistory();
+  const { recording, recordings, start, stop } = useCapture();
   const plan = audio.plan;
+  const capturesToday = recordings.filter((r) => isToday(r.ts)).length;
   const tracksToday = sessions.filter((s) => isToday(s.timestamp)).length;
   const isError = /fail|error|too low|not available|unavailable/i.test(displayStatus ?? "");
 
@@ -78,9 +81,24 @@ export default function Today() {
         ) : null}
       </div>
 
-      <p style={{ ...mutedNote, textAlign: "center", marginTop: "auto" }}>
-        Each day is a disc. Burn a track whenever the mood moves you — soon you'll capture a moment of your day and press it into the music.
-      </p>
+      {/* Passive capture — records the room in the background to colour your next burn */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginTop: "auto" }}>
+        <button
+          type="button"
+          onClick={() => (recording ? stop() : void start())}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: "var(--radius-pill)", cursor: "pointer", fontSize: 13, fontWeight: 500,
+            border: "1px solid " + (recording ? "#c2506f" : "var(--border)"),
+            background: recording ? "#c2506f" : "var(--surface)", color: recording ? "#fff" : "var(--text-muted)",
+          }}
+        >
+          {recording ? <Square size={14} /> : <Mic size={14} />}
+          {recording ? "Listening… tap to stop" : "Capture the room"}
+        </button>
+        <p style={{ ...mutedNote, textAlign: "center", fontSize: 12 }}>
+          {capturesToday > 0 ? `${capturesToday} moment${capturesToday > 1 ? "s" : ""} captured today — they colour your next burn.` : "Capture a moment and it colours your next composition."}
+        </p>
+      </div>
     </div>
   );
 }

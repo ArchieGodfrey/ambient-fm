@@ -8,6 +8,12 @@ import { installDebugCapture } from './utils/debugCapture'
 
 installDebugCapture()
 
+// The dev service worker is disabled, but a previously-registered one can linger
+// and serve stale/mixed bundles (e.g. an old db schema). Unregister any in dev.
+if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {})
+}
+
 const updateSW = registerSW({
   onNeedRefresh() {
     if (confirm('New version available. Reload?')) {

@@ -132,7 +132,7 @@ button {
 .afm-nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
   height: 64px; max-width: 480px; margin: 0 auto;
-  display: grid; grid-template-columns: repeat(5, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   background: color-mix(in srgb, var(--surface-strong) 82%, transparent);
   backdrop-filter: blur(14px); border-top: 1px solid var(--border);
 }

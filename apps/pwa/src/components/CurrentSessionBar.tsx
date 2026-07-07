@@ -2,7 +2,7 @@ import { Play, Pause } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import Disc from "./Disc";
 
-export default function CurrentSessionBar() {
+export default function CurrentSessionBar({ onExpand }: { onExpand?: () => void }) {
   const plan = useAppStore((state) => state.currentPlan);
   const isPlaying = useAppStore((state) => state.isPlaying);
   const playToggle = useAppStore((state) => state.playToggle);
@@ -23,9 +23,10 @@ export default function CurrentSessionBar() {
         borderBottom: "1px solid var(--border)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+      <button type="button" onClick={() => onExpand?.()} aria-label="Expand now playing"
+        style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1, border: "none", background: "transparent", padding: 0, cursor: onExpand ? "pointer" : "default", textAlign: "left" }}>
         <Disc size={40} spinning={isPlaying} mood={plan?.globalMood} inserting={false} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0, textAlign: "left" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-h)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {plan ? `${plan.key} · ${plan.globalMood}` : "Tray empty"}
           </div>
@@ -33,7 +34,7 @@ export default function CurrentSessionBar() {
             {plan ? (isPlaying ? "Now spinning" : "Ready to spin") : "Burn a track to load a disc"}
           </div>
         </div>
-      </div>
+      </button>
 
       <button
         type="button"
