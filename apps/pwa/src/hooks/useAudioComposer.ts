@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { startAudio, stopAudio, resumeAudioContext } from "../audio/toneEngine";
-import { generateComposition, fallbackComposition } from "../ai/composer";
+import { generateComposition, isModelLoaded } from "../ai/composer";
 import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop, subscribeRuntimeState } from "../audio/compositionRuntime";
 import { startComposer, stopComposer } from "../composer/runtime";
 import { postToast } from "../utils/toast";
@@ -12,7 +12,7 @@ import type { CompositionPlan } from "../ai/types";
 import type { StimulusEvent } from "../types";
 import type { CompositionRuntimeSnapshot } from "../audio/compositionRuntime";
 
-export default function useAudioComposer(events: StimulusEvent[], modelLoaded: boolean) {
+export default function useAudioComposer(events: StimulusEvent[]) {
   const setStoreIsPlaying = useAppStore((state) => state.setIsPlaying);
   const setPlayToggle = useAppStore((state) => state.setPlayToggle);
   const composerSettings = useAppStore((state) => state.composerSettings);
@@ -117,9 +117,8 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
   }, []);
 
   async function runAIComposer(overrideEvents?: StimulusEvent[]) {
-    if (!modelLoaded) {
-      postToast("Model not loaded. Load the model before generating.", "warning");
-      setStatus("Model not loaded. Load the model before generating.");
+    if (!isModelLoaded()) {
+      setStatus("Composer isn't ready yet — the model failed to load.");
       return;
     }
 
@@ -136,22 +135,10 @@ export default function useAudioComposer(events: StimulusEvent[], modelLoaded: b
       startComposer(intent);
       setStatus(`Composition generated: ${composition.key}`);
     } catch (error) {
+      // No fallback — surface the failure instead of presenting a stand-in disc.
       console.error("Failed to generate composition", error);
       const message = error instanceof Error ? error.message : String(error);
-      postToast(`AI composition failed: ${message}`, "error");
-      setStatus(`AI composition failed: ${message}`);
-      const fallback = fallbackComposition();
-      setSharedPlan(fallback);
-      await resumeAudioContext();
-      startCompositionRuntime(fallback);
-      startComposer({
-        key: { tonic: "C", mode: "minor" },
-        bpm: fallback.bpm,
-        progression: [0, 3, 4, 5],
-        motifDensity: fallback.texture.density,
-        complexity: 0.4,
-        energy: 0.5,
-      });
+      setStatus(`Composing failed: ${message}`);
     } finally {
       setAIStatus("Ready");
     }

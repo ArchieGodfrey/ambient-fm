@@ -24,7 +24,7 @@ function useSessionRuntime() {
   const availableModels = getAvailableModels();
 
   const model = useModelManager(workerInitPayload);
-  const audio = useAudioComposer(events, model.modelLoaded);
+  const audio = useAudioComposer(events);
   const { sessions } = useSessionHistory();
 
   async function refreshStimuli() {
@@ -80,7 +80,8 @@ function useSessionRuntime() {
       }
       await audio.runAIComposer();
     } finally {
-      await model.unloadModelAction();
+      // Keep the model loaded between burns — reloading each time was slow and
+      // race-prone. The user can unload manually in Settings if needed.
       setIsGenerating(false);
     }
   }

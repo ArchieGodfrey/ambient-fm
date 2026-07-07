@@ -40,8 +40,6 @@ export default function Today() {
           burning={isGenerating}
           progress={model.modelProgress}
           mood={plan?.globalMood}
-          label={plan?.key ?? "—"}
-          sublabel={plan ? plan.globalMood : "empty"}
           onClick={plan ? () => void audio.handlePlayToggle() : undefined}
         />
         <p style={{ ...mutedNote, marginTop: 8 }}>{trackLine}</p>
