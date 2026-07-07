@@ -37,8 +37,9 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Dark theme vars, shared by system-dark (unless forced light) and explicit dark. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --text: #d8d4e2;
     --text-h: #f5f3fb;
     --text-muted: #928da0;
@@ -57,6 +58,28 @@
     --shadow-soft: rgba(0, 0, 0, 0.35) 0 8px 22px -10px;
   }
 }
+:root[data-theme="dark"] {
+  --text: #d8d4e2;
+  --text-h: #f5f3fb;
+  --text-muted: #928da0;
+  --text-faint: #625d70;
+  --bg: #0e0d12;
+  --surface: #17151d;
+  --surface-strong: #1b1922;
+  --surface-muted: #131218;
+  --border: #2a2833;
+  --code-bg: #17151d;
+  --accent: #9b93ea;
+  --accent-soft: rgba(155, 147, 234, 0.16);
+  --accent-bg: rgba(155, 147, 234, 0.16);
+  --accent-border: rgba(155, 147, 234, 0.3);
+  --shadow: rgba(0, 0, 0, 0.5) 0 16px 40px -16px;
+  --shadow-soft: rgba(0, 0, 0, 0.35) 0 8px 22px -10px;
+}
+
+/* Icons in buttons/links: render as block so they vertically center in
+   flex rows instead of sitting on the text baseline. */
+button svg, a svg { display: block; }
 
 * {
   box-sizing: border-box;
@@ -126,6 +149,8 @@ button {
   50% { box-shadow: 0 0 0 14px transparent; }
 }
 .afm-onair { animation: afm-onair 2.2s ease-in-out infinite; }
+@keyframes afm-fade { from { opacity: 0; } to { opacity: 1; } }
+.afm-fade { animation: afm-fade 0.4s ease both; }
 @keyframes afm-spin { to { transform: rotate(360deg); } }
 .afm-spin { animation: afm-spin 0.9s linear infinite; display: inline-flex; }
 @keyframes afm-indet { 0% { left: -40%; } 100% { left: 100%; } }
@@ -152,6 +177,9 @@ button {
 .afm-nav-inner {
   height: 100%; max-width: 480px; margin: 0 auto;
   display: grid; grid-template-columns: repeat(4, 1fr);
+  /* Keep the outer icons off the curved screen edges / safe areas. */
+  padding-left: max(10px, env(safe-area-inset-left));
+  padding-right: max(10px, env(safe-area-inset-right));
 }
 .afm-nav-btn {
   border: none; background: transparent; cursor: pointer; padding: 0;

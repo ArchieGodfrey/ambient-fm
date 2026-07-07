@@ -24,7 +24,7 @@ export default function YourSound() {
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <span style={screenEyebrow}>Your sound</span>
           <h1 style={screenTitle}>Your sounds</h1>
-          <p style={mutedNote}>Sounds are inspiration — shape one in the studio, let the AI elevate it, then burn it to a track. The radio draws on them too.</p>
+          <p style={mutedNote}>Your palettes — shape one in the studio, let the AI flesh it out, and burn it into a track. The radio draws from them too.</p>
         </div>
 
         <YourSoundCard />

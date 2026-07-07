@@ -73,7 +73,7 @@ export default function YourSoundCard() {
       </div>
 
       <span style={{ ...mutedNote, fontSize: 11.5 }}>
-        Formed from {p.sampleSize} track{p.sampleSize === 1 ? "" : "s"} + recent moments · {Math.round(p.confidence * 100)}% confident. It evolves — you can't edit it directly.
+        Formed from {p.sampleSize} track{p.sampleSize === 1 ? "" : "s"} + recent moments · {Math.round(p.confidence * 100)}% confident.
       </span>
     </div>
   );

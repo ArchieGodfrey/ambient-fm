@@ -1,6 +1,8 @@
 import { RefreshCw } from "lucide-react";
 import ModelActions from "../components/ModelActions";
 import VoiceActions from "../components/VoiceActions";
+import ThemeToggle from "../components/ThemeToggle";
+import SystemHealth from "../components/SystemHealth";
 import RuntimeDiagnostics from "../components/RuntimeDiagnostics";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
@@ -19,6 +21,11 @@ export default function Settings() {
         <span style={screenEyebrow}>Settings</span>
         <h1 style={screenTitle}>The composer</h1>
         <p style={mutedNote}>The AI runs entirely on your device. Manage the model and inspect the engine here.</p>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <span style={sectionLabel}>Appearance</span>
+        <ThemeToggle />
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -76,6 +83,7 @@ export default function Settings() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <span style={sectionLabel}>Diagnostics</span>
+        <SystemHealth />
         <RuntimeDiagnostics
           gpuStatus={model.gpuStatus}
           gpuLimits={model.gpuLimits}

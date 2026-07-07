@@ -5,8 +5,10 @@ import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
 import { installDebugCapture } from './utils/debugCapture'
+import { applyTheme, getTheme } from './utils/theme'
 
 installDebugCapture()
+applyTheme(getTheme()) // apply the saved theme before first paint
 
 // A production build's autoUpdate service worker can linger on this origin and
 // keep CONTROLLING dev loads — serving a stale precached bundle (e.g. an old db

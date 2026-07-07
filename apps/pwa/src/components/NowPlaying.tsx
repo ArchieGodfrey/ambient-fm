@@ -116,18 +116,16 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
         </div>
       ) : null}
 
+      {/* Lock = a dimming scrim OVER the unchanged content. The disc stays exactly
+          where it is (same element), just stops spinning; the screen fades to black
+          and dims. No second disc, so nothing jumps. */}
       {locked ? (
-        <div onClick={guardTap} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, touchAction: "none" }}>
-          <Disc size={210} spinning={false} mood={plan?.globalMood} inserting={false} style={{ opacity: 0.45 }} />
-          <div style={{ textAlign: "center", opacity: 0.6 }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#fff" }}>{heading}</div>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", textTransform: "capitalize" }}>{plan?.globalMood ?? ""}</div>
-          </div>
+        <div onClick={guardTap} className="afm-fade" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 16, paddingBottom: 64, touchAction: "none" }}>
           <button type="button" onClick={(e) => e.stopPropagation()} onPointerDown={holdStart} onPointerUp={holdEnd} onPointerLeave={holdEnd} onPointerCancel={holdEnd} aria-label="Hold to unlock"
             style={{ width: 56, height: 56, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
             <Lock size={20} />
           </button>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>Double-tap anywhere, or hold the lock, to unlock</span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Double-tap anywhere, or hold the lock, to unlock</span>
         </div>
       ) : null}
     </div>
