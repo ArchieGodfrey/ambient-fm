@@ -54,8 +54,8 @@ export async function startAudio() {
     try {
       const vol = Tone.getDestination().volume;
       vol.cancelScheduledValues(Tone.now());
-      vol.value = -28;
-      vol.rampTo(0, 0.6);
+      vol.value = -50;
+      vol.rampTo(0, 0.9);
     } catch { /* no context yet */ }
     if (Tone.Transport.state !== "started") {
       Tone.Transport.start();
