@@ -165,7 +165,7 @@ export default function Studio({ sound, onClose, onSave }: StudioProps) {
       instruction: draft.fillInstruction?.trim() || undefined,
       vibe: draft.vibe?.trim() || undefined,
     };
-    await handleGenerate(direction);
+    await handleGenerate(direction, draft);
   }
 
   const scale = getScale(draft.key!.tonic, draft.key!.mode);

@@ -7,6 +7,9 @@ import { startComposer, stopComposer } from "../composer/runtime";
 import { postToast } from "../utils/toast";
 import { db } from "../db/db";
 import { analyzeSession } from "../memory/analyzeSession";
+import { generateTrackName } from "../ai/trackName";
+import { applySoundToPlan } from "../sounds/soundDirection";
+import type { Sound } from "../sounds/types";
 import { restoreRuntime } from "../runtime/restoreRuntime";
 import { useAppStore } from "../store/useAppStore";
 import type { CompositionPlan } from "../ai/types";
@@ -57,6 +60,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     try {
       const summary = analyzeSession(crypto.randomUUID(), events, plan);
       summary.plan = plan;
+      summary.title = generateTrackName(plan);
       await db.sessions.add(summary);
       await pruneOldSessions();
       setCurrentSessionSaved(true);
@@ -117,7 +121,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     return unsubscribe;
   }, []);
 
-  async function runAIComposer(overrideEvents?: StimulusEvent[], direction?: CompositionDirection) {
+  async function runAIComposer(overrideEvents?: StimulusEvent[], direction?: CompositionDirection, sound?: Partial<Sound>) {
     if (!isModelLoaded()) {
       setStatus("Composer isn't ready yet — the model failed to load.");
       return;
@@ -128,7 +132,11 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     setStatus("Generating composition...");
 
     try {
-      const { plan: composition, intent } = await generateComposition(inputEvents, composerSettings, direction);
+      const settings = sound?.composerSettings ?? composerSettings;
+      const { plan: composition, intent } = await generateComposition(inputEvents, settings, direction);
+      // Graft in the parts of the loaded Sound the intent path can't emit —
+      // the recorded melody, explicit layers, tempo — so the burn is truly "your sound".
+      if (sound) applySoundToPlan(composition, sound);
       setSharedPlan(composition);
       await saveSession(inputEvents, composition);
       await resumeAudioContext(); // model load may have suspended the context
