@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import useSounds from "./useSounds";
+import usePreference from "./usePreference";
 import type useAudioComposer from "./useAudioComposer";
 import { prepareLine, cancelHost, hostAvailable, preloadKokoro } from "../audio/host";
 import { duckTo, unduck } from "../audio/toneEngine";
@@ -26,8 +27,11 @@ const FRESH_CAPTURE_MS = 15 * 60 * 1000;
 
 export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) {
   const { sounds } = useSounds();
+  const { preference, yourSound } = usePreference();
   const soundsRef = useRef(sounds);
   soundsRef.current = sounds;
+  const prefRef = useRef({ preference, yourSound });
+  prefRef.current = { preference, yourSound };
   const eventsRef = useRef(events);
   eventsRef.current = events;
 
@@ -40,10 +44,14 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
   const [hostText, setHostText] = useState<string | null>(null);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying>(null);
 
-  // Fresh capture → compose from the moment; else a random saved Sound.
-  const pickSource = useCallback((): { sound?: Partial<Sound>; name?: string } => {
+  // The DJ picks what to compose from: a fresh capture → the moment; else, once
+  // we know you a little, sometimes your emergent "Your Sound"; otherwise a
+  // random saved Sound.
+  const pickSource = useCallback((): { sound?: Partial<Sound>; name?: string; yours?: boolean } => {
     const hasFreshCapture = eventsRef.current.some((e) => e.source === "audio" && Date.now() - e.timestamp < FRESH_CAPTURE_MS);
     if (hasFreshCapture) return {}; // the audio stimulus in events drives it
+    const { preference: pref, yourSound: ys } = prefRef.current;
+    if (pref.confidence >= 0.3 && Math.random() < 0.5) return { sound: ys, yours: true }; // steer by preference
     const list = soundsRef.current;
     if (!list.length) return {};
     const pick = list[Math.floor(Math.random() * list.length)];
@@ -71,7 +79,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     if (!runningRef.current) return;
     // The track that was on air played to its natural end → a "complete" signal.
     if (playingRef.current) { void recordFeedback("complete", playingRef.current); playingRef.current = null; }
-    const { sound, name } = pickSource();
+    const { sound, name, yours } = pickSource();
     const direction = sound ? soundToDirection(sound) : undefined;
     const greetingDue = first || countRef.current % HOST_GREETING_EVERY === 0;
 
@@ -96,7 +104,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     // Introduce the new track over the bed, then bring it up to full.
     setNowPlaying({ title: result.title, mood: String(result.plan.globalMood ?? "ambient"), key: result.plan.key });
     setState("announcing");
-    const introLine = hostIntro(result.title, result.plan, name);
+    const introLine = hostIntro(result.title, result.plan, { soundName: name, yours });
     setHostText(introLine);
     const playIntro = await prepareLine(introLine);
     if (!runningRef.current) return;

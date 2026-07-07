@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Play, Trash2 } from "lucide-react";
+import { Play, Trash2, Sparkles } from "lucide-react";
 import useSessionHistory from "../hooks/useSessionHistory";
 import { useSession } from "../session/SessionProvider";
+import { postToast } from "../utils/toast";
 import Disc from "../components/Disc";
 import CapturesSection from "../components/CapturesSection";
 import { recordFeedback } from "../feedback/feedback";
@@ -25,8 +26,15 @@ function trackTime(ts: number) {
 
 export default function Journey() {
   const { sessions, deleteSession } = useSessionHistory();
-  const { audio } = useSession();
+  const { audio, handleGenerate, isGenerating } = useSession();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  // Compose a fresh track seeded from an existing one's key/mood/tempo (6d).
+  async function moreLikeThis(t: SessionSummary) {
+    const [tonic, mode] = (t.key ?? "C major").split(/\s+/);
+    const result = await handleGenerate({ key: { tonic: tonic || "C", mode: /minor/i.test(mode || "") ? "minor" : "major" }, moodWords: t.dominantMood, tempo: Math.round(t.avgBpm) });
+    if (result) postToast(`Composed “${result.title}” — more like ${t.title ?? "that"}.`, "success");
+  }
 
   const discs = useMemo<DayDisc[]>(() => {
     const map = new Map<string, DayDisc>();
@@ -105,6 +113,9 @@ export default function Journey() {
                       {t.key} · {Math.round(t.avgBpm)} bpm · {trackTime(t.timestamp)}
                     </div>
                   </div>
+                  <button type="button" disabled={isGenerating} onClick={() => void moreLikeThis(t)} aria-label="More like this" title="More like this" style={{ border: "none", background: "transparent", color: "var(--accent)", cursor: isGenerating ? "default" : "pointer", padding: 6, opacity: isGenerating ? 0.5 : 1 }}>
+                    <Sparkles size={15} />
+                  </button>
                   <button type="button" onClick={() => { void recordFeedback("delete", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm }); void deleteSession(t.id); }} aria-label="Delete track" style={{ border: "none", background: "transparent", color: "var(--text-faint)", cursor: "pointer", padding: 6 }}>
                     <Trash2 size={15} />
                   </button>

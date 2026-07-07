@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import useSounds from "../hooks/useSounds";
 import Disc from "../components/Disc";
-import TasteSummary from "../components/TasteSummary";
+import YourSoundCard from "../components/YourSoundCard";
 import Studio from "./Studio";
 import { describeMood } from "../sounds/previewPlan";
 import { DEFAULT_MOOD, DEFAULT_COMPOSER_SETTINGS, type Sound } from "../sounds/types";
@@ -27,7 +27,7 @@ export default function YourSound() {
           <p style={mutedNote}>Sounds are inspiration — shape one in the studio, let the AI elevate it, then burn it to a track. The radio draws on them too.</p>
         </div>
 
-        <TasteSummary />
+        <YourSoundCard />
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 18 }}>
           {sounds.map((s: Sound) => (

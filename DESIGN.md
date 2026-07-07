@@ -311,16 +311,18 @@ for you and that slowly evolves. You don't edit it; it's earned.
 - **Uses beyond Your Sound:** bias the radio's Sound/҂capture pick and the AI
   `direction`; re-rank the Library; "more like this" from any track.
 
-### Sub-phases
-- **6a — Feedback capture + store:** ❤/✕ controls, wire implicit signals
-  (complete/skip/replay/keep/delete), persist. No behaviour change yet — just
-  collect and show a simple "what you like" summary.
-- **6b — Preference model:** aggregate signals + long-term track analysis into a
-  preference vector; visualise it.
-- **6c — Emergent Your Sound:** synthesize the read-only Sound from preference +
-  recent stimulus; recompute periodically; branchable; show its drift.
-- **6d — Close the loop:** the radio and Elevate/Burn read the preference vector
-  to steer generation; "more like this" everywhere.
+### Sub-phases — SHIPPED
+- **6a ✓ Feedback capture + store:** ❤/✕ on the Radio + now-playing view; implicit
+  complete/replay/delete; Dexie v8 `feedback` table with a feature snapshot.
+- **6b ✓ Preference model:** `preference/model.ts` weights each track by its net
+  feedback and blends with long-term track analysis into a `PreferenceVector`
+  (energy/complexity/tempo/minorBias/layers + top moods/keys + confidence).
+- **6c ✓ Emergent Your Sound:** `preference/yourSound.ts` synthesizes a read-only
+  Sound from the preference vector coloured by recent stimulus; shown as a
+  distinct card with its drift; branch = editable copy (`useSounds.createFromSound`).
+- **6d ✓ Close the loop:** the radio picks the emergent Your Sound once confident
+  (the DJ says "drawn from your own sound"); "More like this" on any Library track
+  composes a fresh track seeded from it.
 
 ### Risks
 - Cold start (no history) — fall back to authored Sounds / mood defaults.

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { db } from "../db/db";
-import { DEFAULT_COMPOSER_SETTINGS, type Sound, type SoundMood } from "../sounds/types";
+import { DEFAULT_COMPOSER_SETTINGS, DEFAULT_MOOD, type Sound, type SoundMood } from "../sounds/types";
 import type { ComposerSettings } from "../features/composer/types";
 
 const ACTIVE_KEY = "ambientfm-active-sound";
@@ -79,6 +79,32 @@ export default function useSounds() {
     notify();
   }, []);
 
+  // Create a full editable Sound from any source (e.g. the emergent Your Sound).
+  const createFromSound = useCallback(async (source: Partial<Sound>, name: string, parentId?: string) => {
+    const ts = Date.now();
+    const sound: Sound = {
+      id: crypto.randomUUID(),
+      name,
+      mood: { ...(source.mood ?? DEFAULT_MOOD) },
+      composerSettings: { ...(source.composerSettings ?? DEFAULT_COMPOSER_SETTINGS) },
+      tempo: source.tempo,
+      key: source.key ? { ...source.key } : undefined,
+      progression: source.progression ? [...source.progression] : undefined,
+      layers: source.layers ? { ...source.layers } : undefined,
+      melody: source.melody,
+      melodyInstrument: source.melodyInstrument,
+      vibe: source.vibe,
+      fillInstruction: source.fillInstruction,
+      parentId,
+      createdAt: ts,
+      updatedAt: ts,
+    };
+    await db.sounds.add(sound);
+    setActiveSound(sound.id);
+    notify();
+    return sound;
+  }, [setActiveSound]);
+
   const branchSound = useCallback(async (id: string) => {
     const parent = await db.sounds.get(id);
     if (!parent) return null;
@@ -91,5 +117,5 @@ export default function useSounds() {
 
   const activeSound = sounds.find((s) => s.id === activeSoundId) ?? null;
 
-  return { sounds, activeSound, activeSoundId, setActiveSound, createSound, updateSound, deleteSound, branchSound };
+  return { sounds, activeSound, activeSoundId, setActiveSound, createSound, createFromSound, updateSound, deleteSound, branchSound };
 }
