@@ -6,6 +6,17 @@ let playing = false;
 let suspended = false;
 let transportWasPlayingBeforeSuspend = false;
 
+// Resume the AudioContext within a user gesture (e.g. the Burn button) so that
+// nodes created while preparing a composition don't trip the browser autoplay
+// policy ("AudioContext was not allowed to start"). Does not start playback.
+export async function resumeAudioContext() {
+  try {
+    await Tone.start();
+  } catch {
+    // No gesture yet / already running — audio will start on the next play.
+  }
+}
+
 export async function startAudio() {
   if (!started) {
     await Tone.start();

@@ -50,15 +50,51 @@ personal, evolving sound with minimal effort.
 - **Recording → ears:** add a processed layer to `audioGraph` (Tone.Player /
   granular / convolution) whose gain is driven by the composition.
 
+## Visual language — the CD / disc metaphor
+
+The whole experience is framed as **burning memories onto CDs and playing them back**:
+
+- **A day = a disc.** Composing multiple times in a day burns multiple **tracks**
+  onto that day's disc.
+- **Compose = "burn a track."** A `<Disc>` shows a **laser burn sweep** and a
+  **burn-progress ring** (driven by real generation progress) while writing.
+- **Playing = the disc spins.** Iridescent CD sheen, grooves, center label + hole.
+- **Mood tints the disc.** Each disc's iridescence/glow is hued by its mood
+  (`moodHue`: calm→blue, focus→indigo, tense→red, energised→pink, ambient→violet).
+- **Discs insert.** A disc drops into place when composed or swapped (keyed remount).
+- **The Library is a rack** of day-discs you flip through; select one to see its
+  tracklist and play a track.
+- Reusable component: `components/Disc.tsx` (props: size, spinning, burning,
+  progress, mood, label, sublabel, inserting).
+
 ## Redesigned UI shell
 
 Replace the 3 developer tabs (Now/Mood/Sessions) with a journey shell:
 
-- **Today** — calm canvas: one focal action ("Capture a moment") + what's playing.
-  Mood shown as an abstract orb / 2-D field, not labelled sliders.
-- **Journey** — the timeline of Sound Memories (revisit, replay, adapt).
-- **Your Sound** — the refine space: live preview + shape mood/palette, save/branch profiles.
-- **Settings** — model, GPU, diagnostics (hidden away).
+- **Today** — today's disc on a player: burn a track, spin it up to listen. The
+  disc is the focal point (mood-tinted, spins on play, burns on compose).
+- **Library** — a rack of day-discs (grouped by day); pick a disc → tracklist → play.
+- **Your Sound** — the refine space: shape mood/palette, save/branch profiles.
+- **Settings** — model, GPU, diagnostics + a **Developer** toggle ("Show progress
+  steps") — hidden from the journey.
+
+### Shell conventions
+- **Responsive:** bottom tab bar on phones; left sidebar rail on desktops (≥900px)
+  with a wider centred content column (CSS media queries on `.afm-nav/.afm-main/.afm-transport`).
+- **No toasts.** Errors surface inline (clear red text on Today, error banner in
+  Settings). `postToast` still feeds the status string but nothing overlays.
+- **Progress is visual.** The disc's burn ring conveys progress; the verbal
+  step-by-step is dev-only behind Settings → Developer.
+- Minimal design system in `index.css`: neutral base + one periwinkle accent,
+  soft radii, light/dark, animations (spin, burn-sweep, breathe, insert).
+
+## Runtime gotchas (learned)
+- **OffscreenCanvas transfers once per page** — transfer it to the worker at most
+  once (`MLLayer` flag); it's optional (inference requests its own GPU device).
+- **GPU preflight** requires only the WebGPU baseline (16384 B) of workgroup
+  storage — never derive it from VRAM/buffer size.
+- Dev server runs behind Caddy (TLS) → vite HMR websockets don't traverse cleanly;
+  HMR + dev SW are disabled in dev (refresh to see changes).
 
 ## Phased roadmap (each phase shippable)
 

@@ -7,6 +7,7 @@ import useAudioComposer from "../hooks/useAudioComposer";
 import useSessionHistory from "../hooks/useSessionHistory";
 import { getAvailableModels, getSelectedModelId, selectModel } from "../ai/composer";
 import { postToast } from "../utils/toast";
+import { resumeAudioContext } from "../audio/toneEngine";
 import OffscreenCanvasHost from "../components/OffscreenCanvasHost";
 
 type WorkerInitPayload = { canvas: OffscreenCanvas; width: number; height: number };
@@ -63,6 +64,9 @@ function useSessionRuntime() {
 
   async function handleGenerate() {
     setIsGenerating(true);
+    // Burning is a user gesture — resume the audio context now so the composition
+    // nodes prepared below don't hit the browser autoplay warning.
+    await resumeAudioContext();
     try {
       if (!model.modelDownloaded) {
         const downloaded = await model.downloadModelAction();

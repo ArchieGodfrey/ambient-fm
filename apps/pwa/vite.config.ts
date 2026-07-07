@@ -13,7 +13,9 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['favicon.svg', 'manifest.webmanifest'],
       devOptions: {
-        enabled: true,
+        // Dev service worker relies on the HMR socket (disabled behind the
+        // proxy) and crashes on it; keep the SW to production builds only.
+        enabled: false,
         type: 'module',
       },
       workbox: {
@@ -90,6 +92,12 @@ export default defineConfig({
     https: true,
     host: '0.0.0.0',
     port: 5173,
+    // The dev server runs behind a Caddy TLS proxy (HTTP/2), which HMR
+    // websockets can't traverse cleanly — the client fails to connect and the
+    // dev service worker crashes on the dead socket. Disable HMR in this
+    // proxied setup; a full refresh loads the latest modules. (Production
+    // builds are static and unaffected.)
+    hmr: false,
   },
   preview: {
     https: true,
