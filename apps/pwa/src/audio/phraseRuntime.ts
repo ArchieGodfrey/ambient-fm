@@ -83,3 +83,15 @@ export function stopPhrase() {
   stopActivePlayers();
   currentPhraseId = null;
 }
+
+// Clear the active phrase + its motif players and reset the cached phrase id, so
+// the next activatePhrase() actually rebuilds players (a matching cached id would
+// otherwise early-out). Defensive against players whose Tone context was disposed
+// (e.g. after an offline render). Used when switching Tone contexts.
+export function resetPhraseRuntime() {
+  activePlayers.forEach((player) => {
+    try { player.stop(); } catch { /* loop from a disposed context */ }
+  });
+  activePlayers = [];
+  currentPhraseId = null;
+}

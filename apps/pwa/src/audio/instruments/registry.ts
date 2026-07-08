@@ -14,4 +14,8 @@ export class InstrumentRegistry {
   getAll() {
     return Array.from(this.instruments.values());
   }
+
+  clear() {
+    this.instruments.clear();
+  }
 }

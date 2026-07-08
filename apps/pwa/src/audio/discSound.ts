@@ -1,4 +1,5 @@
 import * as Tone from "tone";
+import { isRendering } from "./renderGate";
 
 // A short, soft mechanical "k-thock" — a disc seating into / releasing from the
 // tray. Synthesized on the fly (no samples), routed to the hardware destination
@@ -7,6 +8,9 @@ import * as Tone from "tone";
 // there are no clicks/pops that read as glitches.
 
 function ctxNow(): [AudioContext, number] | null {
+  // During an offline render the global context is the offline one — skip the SFX
+  // rather than route this one-shot into the render.
+  if (isRendering()) return null;
   try {
     const c = Tone.getContext().rawContext as unknown as AudioContext;
     if (c.state !== "running") return null;

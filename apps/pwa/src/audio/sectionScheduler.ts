@@ -4,9 +4,12 @@ let startTime = 0;
 let plan: CompositionPlan | null = null;
 let currentPhraseId: string | null = null;
 
-export function startScheduler(p: CompositionPlan) {
+// `now` is the base timestamp (ms) the scheduler measures elapsed time against.
+// Live playback uses performance.now(); an offline render passes 0 so the clock
+// aligns with the offline transport's seconds (see renderTrack).
+export function startScheduler(p: CompositionPlan, now = performance.now()) {
   plan = p;
-  startTime = performance.now();
+  startTime = now;
   currentPhraseId = null;
 }
 

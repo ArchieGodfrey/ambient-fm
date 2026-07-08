@@ -1,5 +1,15 @@
-import * as Tone from "tone";
 import { runExclusive } from "../runtime/modelRuntime";
+import { getStation } from "../config/station";
+
+// The voice plays on its OWN AudioContext, not Tone's shared one. Offline track/
+// bed renders transiently swap Tone's global context to an OfflineContext; keeping
+// the voice on a separate context means it can decode + play during a render (to
+// cover the generation gap) without ever reading the offline context.
+let voiceCtx: AudioContext | null = null;
+function getVoiceCtx(): AudioContext {
+  if (!voiceCtx) voiceCtx = new AudioContext();
+  return voiceCtx;
+}
 
 // The DJ voice, via Piper (VITS) running fully on-device in WASM/CPU — no WebGPU,
 // so it doesn't contend with WebLLM, and it's light enough (~75MB, <100MB RAM) to
@@ -8,7 +18,8 @@ import { runExclusive } from "../runtime/modelRuntime";
 // played through the (gesture-unlocked) WebAudio context, straight to the
 // hardware destination so the voice sits above the ducked music.
 
-const VOICE_ID = "en_US-hfc_female-medium"; // warm, natural; ~medium quality/size
+// The active voice comes from the station config (Settings / wizard picker).
+const currentVoiceId = () => getStation().voiceId;
 const ENABLED_KEY = "ambientfm-voice-enabled";
 const INSTALLED_KEY = "ambientfm-voice-installed";
 const AUTOTRIED_KEY = "ambientfm-voice-autotried"; // first-tune-in auto-download attempted
@@ -39,21 +50,25 @@ function errStr(e: unknown): string {
 
 type Session = { predict: (text: string) => Promise<Blob> };
 let session: Session | null = null;
+let loadedVoiceId: string | null = null;
 
 // Use the MAIN-THREAD TtsSession — the worker-based predict() throws "error
 // importing a module script" in Vite dev (a dependency's module-worker can't
 // resolve its bare imports). Main-thread ORT imports ARE rewritten by Vite.
 // pipe library logs to console (captured by the debug panel) for diagnosis.
 async function ensureSession(onProgress?: (p: number, text: string) => void): Promise<Session> {
-  if (session) return session;
+  const voiceId = currentVoiceId();
+  if (session && loadedVoiceId === voiceId) return session;
+  session = null; // voice changed → rebuild for the new voice
   const mod = await import("@mintplex-labs/piper-tts-web");
   session = (await mod.TtsSession.create({
-    voiceId: VOICE_ID,
+    voiceId,
     logger: (text: string) => console.warn("[piper]", text),
     progress: (p: { url: string; total: number; loaded: number }) => {
       if (p?.total > 0) onProgress?.(Math.min(1, p.loaded / p.total), `${Math.round((p.loaded / p.total) * 100)}%`);
     },
   })) as unknown as Session;
+  loadedVoiceId = voiceId;
   return session;
 }
 
@@ -108,8 +123,7 @@ export async function voiceRender(text: string): Promise<AudioBuffer | null> {
     const blob = await runExclusive("tts", () => s.predict(text));
     status = "ready";
     try { localStorage.setItem(INSTALLED_KEY, "1"); } catch { /* ignore */ }
-    const ctx = Tone.getContext().rawContext as unknown as AudioContext;
-    return await ctx.decodeAudioData(await blob.arrayBuffer());
+    return await getVoiceCtx().decodeAudioData(await blob.arrayBuffer());
   } catch (e) {
     console.warn("Voice render failed:", errStr(e));
     return null;
@@ -122,11 +136,11 @@ export function voicePlay(buffer: AudioBuffer): Promise<void> {
   stopVoice();
   return new Promise((resolve) => {
     try {
-      const ctx = Tone.getContext().rawContext as unknown as AudioContext;
+      const ctx = getVoiceCtx();
       void ctx.resume?.();
       const src = ctx.createBufferSource();
       src.buffer = buffer;
-      src.connect(ctx.destination); // above the duck
+      src.connect(ctx.destination);
       src.onended = () => { current = null; resolve(); };
       current = src;
       src.start();
@@ -145,12 +159,34 @@ export function stopVoice(): void {
 export async function clearVoice(): Promise<void> {
   status = "idle";
   session = null;
+  loadedVoiceId = null;
+  const voiceId = currentVoiceId();
   try { localStorage.removeItem(INSTALLED_KEY); localStorage.setItem(AUTOTRIED_KEY, "1"); } catch { /* ignore */ }
   try {
     const { remove } = await import("@mintplex-labs/piper-tts-web");
-    await remove(VOICE_ID);
+    await remove(voiceId);
   } catch { /* ignore */ }
 }
 
-// Back-compat: gesture unlock is handled by unlockAudio() (Tone.start).
-export function unlockVoice(): void { /* no-op */ }
+// Drop the in-memory session/status so the next load picks up a newly-selected
+// voice (the config's voiceId). Used by the voice picker.
+export function resetVoiceSession(): void {
+  session = null;
+  loadedVoiceId = null;
+  loadPromise = null;
+  status = "idle";
+  try { localStorage.removeItem(INSTALLED_KEY); } catch { /* ignore */ }
+}
+
+// Create + resume the voice's own AudioContext inside a user gesture (tune-in tap)
+// so it's allowed to produce sound later.
+export function unlockVoice(): void {
+  try { void getVoiceCtx().resume?.(); } catch { /* ignore */ }
+}
+
+// Stop the voice and suspend its context (power-down). It resumes automatically on
+// the next voicePlay().
+export function suspendVoice(): void {
+  stopVoice();
+  try { if (voiceCtx && voiceCtx.state === "running") void voiceCtx.suspend?.(); } catch { /* ignore */ }
+}

@@ -15,5 +15,9 @@ export function createTexture() {
       filter.frequency.value = 300 + brightness * 2500;
       filter.Q.value = 1 + intensity * 2;
     },
+    dispose() {
+      noise.dispose();
+      filter.dispose();
+    },
   };
 }

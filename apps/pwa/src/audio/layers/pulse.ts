@@ -21,5 +21,11 @@ export function createPulse() {
     start() {
       loop.start(0);
     },
+
+    dispose() {
+      loop.stop();
+      loop.dispose();
+      synth.dispose();
+    },
   };
 }

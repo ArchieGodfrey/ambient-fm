@@ -1,15 +1,14 @@
 import { useMemo, useState } from "react";
-import { Radio as RadioIcon, Mic, Square, Heart, X, Sparkles, SkipBack, SkipForward } from "lucide-react";
+import { Radio as RadioIcon, Mic, Square, Sparkles, Send } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import useCapture from "../hooks/useCapture";
-import useFeedback from "../hooks/useFeedback";
 import useSounds from "../hooks/useSounds";
 import usePreference from "../hooks/usePreference";
-import { recordFeedback } from "../feedback/feedback";
 import { useAppStore } from "../store/useAppStore";
 import { unlockAudio } from "../audio/toneEngine";
 import { unlockVoice, maybeAutoLoadVoice } from "../audio/host";
-import { startBackgroundKeepAlive } from "../audio/backgroundAudio";
+import { unlockRenderedPlayer } from "../audio/renderedPlayer";
+import { unlockBedPlayer } from "../audio/bedPlayer";
 import { buildRadioBubbles, type LeanTarget } from "../themes/presets";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
@@ -23,16 +22,20 @@ const RADIUS = 120;
 export default function Radio() {
   const { radio, startRadio, displayStatus, model } = useSession();
   const { recording, start, stop } = useCapture();
-  const { opinionFor } = useFeedback();
   const { sounds } = useSounds();
   const { preference, yourSound } = usePreference();
-  const sessionId = useAppStore((s) => s.currentSessionId);
-  const plan = useAppStore((s) => s.currentPlan);
   const events = useAppStore((s) => s.events);
   const leanIn = useAppStore((s) => s.leanIn);
   const setLeanIn = useAppStore((s) => s.setLeanIn);
   const [preparing, setPreparing] = useState(false);
-  const opinion = opinionFor(sessionId ?? undefined);
+  const [request, setRequest] = useState("");
+
+  const sendRequest = () => {
+    const t = request.trim();
+    if (!t) return;
+    radio.writeIn(t);
+    setRequest("");
+  };
 
   const on = radio.isOn;
   const needsDownload = !model.modelDownloaded && !model.modelLoaded;
@@ -50,20 +53,17 @@ export default function Radio() {
   );
 
   const tuneIn = async () => {
+    // Within the tap: unlockAudio() (Tone.start) unlocks Web Audio for the DJ voice,
+    // and unlockRenderedPlayer() unlocks the media element that plays the rendered
+    // tracks — otherwise iOS blocks its play() ~15s later once a track has rendered.
     unlockAudio(); unlockVoice(); maybeAutoLoadVoice();
-    startBackgroundKeepAlive(); // start the keep-alive WITHIN the tap gesture (iOS requires it)
+    unlockRenderedPlayer();
+    unlockBedPlayer();
     setPreparing(true);
     try { await startRadio(); } finally { setPreparing(false); }
   };
   const toggleTune = () => { if (on) radio.tuneOut(); else if (!busy) void tuneIn(); };
   const pickBubble = (t: LeanTarget) => setLeanIn(leanIn?.id === t.id ? null : t);
-
-  const statusLine =
-    preparing ? "tuning in…"
-    : radio.state === "generating" ? "composing…"
-    : radio.state === "announcing" ? "on air"
-    : radio.state === "playing" ? "now playing"
-    : "off air";
 
   const ringR = 62;
   const ringC = 2 * Math.PI * ringR;
@@ -144,47 +144,17 @@ export default function Radio() {
         })}
       </div>
 
-      {/* Status + host line / now playing */}
-      <div style={{ textAlign: "center", minHeight: 52 }}>
-        <div style={{ fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700, color: on ? "var(--accent)" : "var(--text-faint)" }}>{statusLine}</div>
+      {/* The host's spoken line (the track title/status live in the now-playing bar). */}
+      <div style={{ textAlign: "center", minHeight: 44 }}>
         {radio.hostText ? (
-          <p style={{ fontSize: 14, color: "var(--text-h)", marginTop: 5, maxWidth: 320, marginInline: "auto", lineHeight: 1.45, fontStyle: "italic" }}>“{radio.hostText}”</p>
-        ) : radio.nowPlaying ? (
-          <p style={{ fontSize: 15, color: "var(--text-h)", marginTop: 5, fontWeight: 600 }}>
-            {radio.nowPlaying.title} <span style={{ color: "var(--text-muted)", fontWeight: 500, textTransform: "capitalize" }}>· {radio.nowPlaying.mood}</span>
-          </p>
+          <p style={{ fontSize: 14, color: "var(--text-h)", maxWidth: 320, marginInline: "auto", lineHeight: 1.45, fontStyle: "italic" }}>“{radio.hostText}”</p>
         ) : leanIn ? (
-          <p style={{ ...mutedNote, fontSize: 12.5, marginTop: 5 }}>
+          <p style={{ ...mutedNote, fontSize: 12.5 }}>
             Leaning into <b style={{ color: "var(--text-h)" }}>{leanIn.name}</b> ·{" "}
             <button type="button" onClick={() => setLeanIn(null)} style={{ border: "none", background: "none", color: "var(--accent)", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 12.5 }}>clear</button>
           </p>
         ) : null}
       </div>
-
-      {/* Transport + react to the current track */}
-      {on ? (
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", alignItems: "center" }}>
-          <button type="button" aria-label="Previous track" onClick={() => radio.previous()} disabled={!radio.canPrev}
-            style={{ ...reactBtn, opacity: radio.canPrev ? 1 : 0.4, cursor: radio.canPrev ? "pointer" : "default" }}>
-            <SkipBack size={17} />
-          </button>
-          {radio.state === "playing" && sessionId ? (
-            <>
-              <button type="button" aria-label="Like" onClick={() => recordFeedback("like", { sessionId, mood: plan?.globalMood, key: plan?.key, bpm: plan?.bpm })}
-                style={{ ...reactBtn, ...(opinion === "like" ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" } : {}) }}>
-                <Heart size={17} fill={opinion === "like" ? "#fff" : "none"} />
-              </button>
-              <button type="button" aria-label="Not for me" onClick={() => recordFeedback("dislike", { sessionId, mood: plan?.globalMood, key: plan?.key, bpm: plan?.bpm })}
-                style={{ ...reactBtn, ...(opinion === "dislike" ? { background: "#c2506f", color: "#fff", borderColor: "#c2506f" } : {}) }}>
-                <X size={17} />
-              </button>
-            </>
-          ) : null}
-          <button type="button" aria-label="Skip track" onClick={() => radio.skip()} style={reactBtn}>
-            <SkipForward size={17} />
-          </button>
-        </div>
-      ) : null}
 
       {needsDownload && !on && !busy ? (
         <p style={{ ...mutedNote, fontSize: 12, textAlign: "center", maxWidth: 320, marginInline: "auto" }}>
@@ -215,6 +185,24 @@ export default function Radio() {
           {recording ? <Square size={14} /> : <Mic size={14} />}
           {recording ? "Listening… tap to stop" : "Capture the room"}
         </button>
+
+        {/* Write in — send the host a request; they read it out and spin one for you */}
+        {on ? (
+          <form onSubmit={(e) => { e.preventDefault(); sendRequest(); }} style={{ display: "flex", gap: 8, width: "100%", maxWidth: 360, marginTop: 2 }}>
+            <input
+              value={request}
+              onChange={(e) => setRequest(e.target.value)}
+              placeholder="Write in a request for the host…"
+              maxLength={120}
+              // 16px: iOS Safari auto-zooms the page when focusing an input under 16px.
+              style={{ flex: 1, minWidth: 0, padding: "8px 14px", borderRadius: "var(--radius-pill)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-h)", fontSize: 16, fontFamily: "inherit" }}
+            />
+            <button type="submit" aria-label="Send request" disabled={!request.trim() || busy}
+              style={{ ...reactBtn, width: 40, height: 40, opacity: (!request.trim() || busy) ? 0.4 : 1, cursor: (!request.trim() || busy) ? "default" : "pointer" }}>
+              <Send size={15} />
+            </button>
+          </form>
+        ) : null}
       </div>
     </div>
   );

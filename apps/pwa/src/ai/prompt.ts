@@ -48,6 +48,10 @@ RULES:
 - The composition blueprint should preserve mood, identity, key, harmony, motif density, and evolution intent.
 - Use 3 to 5 chord degrees in the progression.
 - Include a short, evocative "title" (2 to 4 words) that fits the mood — no quotes or punctuation.
+- You MAY set "palette" to the instrument voice that best fits: glass, warm, strings, bells, reed, synth, piano, harp, or cello.
+- You MAY set "arc" to the energy shape: steady, build, ebb, swell, or wavy.
+- You MAY set "vocals" (0 to 1) for how present a wordless choir should be.
+- palette/arc/vocals are optional — omit them if unsure; sensible defaults are chosen.
 - Keep the output minimal and avoid unnecessary extra detail.
 
 STIMULI:
@@ -78,7 +82,10 @@ OUTPUT FORMAT:
   "motifDensity": 0.6,
   "complexity": 0.3,
   "energy": 0.4,
-  "title": "Drifting Ember"
+  "title": "Drifting Ember",
+  "palette": "harp",
+  "arc": "swell",
+  "vocals": 0.4
 }
 `;
 }

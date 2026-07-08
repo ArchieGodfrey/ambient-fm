@@ -3,7 +3,6 @@ import { Trash2, Plus } from "lucide-react";
 import useSessionHistory from "../hooks/useSessionHistory";
 import useSounds from "../hooks/useSounds";
 import { useSession } from "../session/SessionProvider";
-import { postToast } from "../utils/toast";
 import Disc from "../components/Disc";
 import CapturesSection from "../components/CapturesSection";
 import TrackFeedback from "../components/TrackFeedback";
@@ -43,7 +42,6 @@ export default function Journey() {
       progression: t.plan?.intent?.progression,
       layers: t.plan?.layers ?? t.layerProfile,
     }, t.title ?? "Saved track");
-    postToast(`Saved “${t.title ?? "track"}” as a sound.`, "success");
   }
 
   const discs = useMemo<DayDisc[]>(() => {

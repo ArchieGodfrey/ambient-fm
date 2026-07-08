@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { db } from "../db/db";
+import { setMediaSessionHandlers, setMediaSessionTrack, setMediaSessionPlaying, clearMediaSession } from "../audio/backgroundAudio";
 import { buildStimulusSnapshot } from "../stimuli/buildStimulusSnapshot";
 import { useAppStore } from "../store/useAppStore";
 import useModelManager from "../hooks/useModelManager";
@@ -7,7 +8,6 @@ import useAudioComposer from "../hooks/useAudioComposer";
 import useRadio from "../hooks/useRadio";
 import useSessionHistory from "../hooks/useSessionHistory";
 import { getAvailableModels, getSelectedModelId, selectModel, isModelLoaded } from "../ai/composer";
-import { postToast } from "../utils/toast";
 import { resumeAudioContext } from "../audio/toneEngine";
 import type { CompositionDirection } from "../ai/prompt";
 import type { Sound } from "../sounds/types";
@@ -16,11 +16,16 @@ import OffscreenCanvasHost from "../components/OffscreenCanvasHost";
 
 type WorkerInitPayload = { canvas: OffscreenCanvas; width: number; height: number };
 
+function isToday(ts: number) {
+  const d = new Date(ts), n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+}
+
 // Single owner of the WebLLM/WebGPU + audio runtime, shared with every screen.
 // Instantiating the composer/model hooks more than once would spawn duplicate
 // workers and fight over the shared play toggle, so this lives at the app root.
 function useSessionRuntime() {
-  const { events, setEvents, addEvent, currentPlan, setCurrentSessionStatus } = useAppStore();
+  const { events, setEvents, addEvent, currentPlan, setCurrentSessionStatus, currentTitle, currentSessionId, isPlaying, playToggle } = useAppStore();
   const [workerInitPayload, setWorkerInitPayload] = useState<WorkerInitPayload | undefined>(undefined);
   const [isGenerating, setIsGenerating] = useState(false);
   const [appStatus, setAppStatus] = useState("Ready");
@@ -40,8 +45,7 @@ function useSessionRuntime() {
         addEvent(event);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      postToast(`Refresh failed: ${message}`, "error");
+      console.error("Refresh failed", error);
     }
   }
 
@@ -61,8 +65,7 @@ function useSessionRuntime() {
         await refreshStimuli();
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      postToast(`Failed to load events: ${message}`, "error");
+      console.error("Failed to load events", error);
       setAppStatus("Load failed");
     }
   }
@@ -169,6 +172,30 @@ function useSessionRuntime() {
   useEffect(() => {
     if (displayStatus) setCurrentSessionStatus(displayStatus);
   }, [displayStatus, setCurrentSessionStatus]);
+
+  // Manual playback: step through today's tracks (lock-screen next/prev + could
+  // be reused elsewhere).
+  const manualStep = useCallback((dir: number) => {
+    const today = sessions.filter((s) => isToday(s.timestamp)).sort((a, b) => a.timestamp - b.timestamp);
+    const i = today.findIndex((t) => t.id === currentSessionId);
+    const t = i >= 0 ? today[i + dir] : undefined;
+    if (t?.plan) void audio.loadSessionPlan(t.plan, t.title, t.id);
+  }, [sessions, currentSessionId, audio]);
+
+  // One place that reflects the current playback (radio OR manual) into the
+  // lock-screen controls — so it's consistent however audio was started.
+  useEffect(() => {
+    const active = radio.isOn || isPlaying;
+    if (!active) { clearMediaSession(); return; }
+    setMediaSessionPlaying(true);
+    const title = radio.isOn ? radio.nowPlaying?.title : currentTitle;
+    if (title) setMediaSessionTrack(title);
+    if (radio.isOn) {
+      setMediaSessionHandlers({ onPlay: radio.tuneIn, onPause: radio.tuneOut, onNext: radio.skip, onPrev: radio.previous });
+    } else {
+      setMediaSessionHandlers({ onPlay: () => playToggle?.(), onPause: () => playToggle?.(), onNext: () => manualStep(1), onPrev: () => manualStep(-1) });
+    }
+  }, [radio.isOn, radio.nowPlaying?.title, radio.tuneIn, radio.tuneOut, radio.skip, radio.previous, isPlaying, currentTitle, playToggle, manualStep]);
 
   return {
     events,

@@ -1,5 +1,6 @@
 import * as Tone from "tone";
 import { initAudioGraph } from "./audioGraph";
+import { startBackgroundKeepAlive, stopBackgroundKeepAlive } from "./backgroundAudio";
 
 let started = false;
 let playing = false;
@@ -46,6 +47,10 @@ export async function startAudio() {
     initAudioGraph();
   }
 
+  // Common path for ALL playback (radio + manual): hold the iOS audio session
+  // open so playback survives a screen lock. Guarded, so repeat calls are no-ops.
+  startBackgroundKeepAlive();
+
   Tone.Destination.mute = false;
 
   if (!playing) {
@@ -70,6 +75,7 @@ export function stopAudio() {
   }
 
   Tone.Destination.mute = true;
+  stopBackgroundKeepAlive();
   playing = false;
   suspended = false;
   transportWasPlayingBeforeSuspend = false;
@@ -109,4 +115,27 @@ export async function resumeAudio() {
 
   suspended = false;
   transportWasPlayingBeforeSuspend = false;
+}
+
+// ── Low-power "park" for the radio ──
+// The radio plays through a media element and never uses the live Tone graph, so
+// its AudioContext sits idle-but-running (an audio thread) during playback. Park =
+// suspend the raw context in the steady state; unpark before any transition, disc
+// SFX, or offline render. These are deliberately independent of the `suspended`
+// flag + transport used by the model-load path (that path is keepAudio for radio),
+// so the two never fight. Media-element playback is unaffected by either.
+function rawCtx(): { state?: string; suspend?: () => Promise<void>; resume?: () => Promise<void> } | null {
+  try { return Tone.getContext().rawContext as unknown as { state?: string; suspend?: () => Promise<void>; resume?: () => Promise<void> }; } catch { return null; }
+}
+export async function parkAudioContext() {
+  const c = rawCtx();
+  if (c && c.state === "running" && typeof c.suspend === "function") {
+    try { await c.suspend(); } catch { /* ignore */ }
+  }
+}
+export async function unparkAudioContext() {
+  const c = rawCtx();
+  if (c && c.state === "suspended" && typeof c.resume === "function") {
+    try { await c.resume(); } catch { /* ignore */ }
+  }
 }

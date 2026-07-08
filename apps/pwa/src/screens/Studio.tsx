@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { X, Pause, Play, Flame, Sparkles, Save, Square, Trash2 } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
-import { postToast } from "../utils/toast";
 import Disc from "../components/Disc";
 import PianoKeyboard from "../components/PianoKeyboard";
 import MelodyRoll from "../components/MelodyRoll";
@@ -182,7 +181,6 @@ export default function Studio({ sound, onClose, onSave, onDelete }: StudioProps
     if (draft.tempo == null) filled.tempo = plan.bpm;
     if (!draft.layers || JSON.stringify(draft.layers) === JSON.stringify(DEFAULT_LAYERS)) filled.layers = { ...plan.layers };
     patch(filled);
-    postToast("Filled in your sound — tweak it, or burn it to a track.", "success");
   }
 
   // Burn this sound into an actual track on today's disc. Sounds themselves are
@@ -190,8 +188,7 @@ export default function Studio({ sound, onClose, onSave, onDelete }: StudioProps
   async function burnToTrack() {
     setComposerSettings(draft.composerSettings);
     await save();
-    const result = await handleGenerate(draftDirection(), draft);
-    if (result) postToast(`Burned “${result.title}” to today's disc.`, "success");
+    await handleGenerate(draftDirection(), draft);
   }
 
   const scale = getScale(draft.key!.tonic, draft.key!.mode);

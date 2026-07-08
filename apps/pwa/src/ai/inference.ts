@@ -3,7 +3,6 @@ import { applyMemoryBias } from "../memory/applyMemoryBias";
 import { dispatchRuntimeStatus, infer, isModelLoaded } from "../runtime/modelRuntime";
 import { buildPrompt, sanitizeJsonResponse, tryParseJsonWithRecovery, type CompositionDirection } from "./prompt";
 import { buildCompositionContext } from "./compositionContext";
-import { postToast } from "../utils/toast";
 import type { CompositionPlan } from "./types";
 import type { CompositionIntent } from "./intentSchema";
 import { buildCompositionPlanFromIntent } from "./intentToPlan";
@@ -80,7 +79,6 @@ export async function generateComposition(events: StimulusEvent[], composerSetti
     const message = error instanceof Error ? error.message : String(error);
     console.error("AI composer failed", error);
     dispatchRuntimeStatus({ stage: "infer-error", text: `AI composition failed: ${message}` });
-    postToast(`AI composer failed: ${message}`, "error");
     throw error instanceof Error ? error : new Error(message);
   }
 }

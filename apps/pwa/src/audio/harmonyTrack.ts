@@ -1,4 +1,6 @@
 import * as Tone from "tone";
+import { PALETTES, SAMPLE_INSTRUMENTS, VOWELS, PALETTE_VOWEL, type VoiceCfg } from "./palettes";
+import { samplerBuffers } from "./sampleBuffers";
 
 // Voices the harmonic bed — block chords + a bass root — as looping Tone.Parts
 // over the section timeline (seconds), plus an optional arpeggio over the
@@ -10,47 +12,82 @@ type BassEvent = { note: string; start: number; duration: number };
 let chordPart: Tone.Part | null = null;
 let bassPart: Tone.Part | null = null;
 let arpLoop: Tone.Loop | null = null;
-let padSynth: Tone.PolySynth | null = null;
+let padSynth: Tone.PolySynth | Tone.Sampler | null = null;
 let bassSynth: Tone.Synth | null = null;
-let arpSynth: Tone.Synth | null = null;
+let arpSynth: Tone.Synth | Tone.Sampler | null = null;
 let choirSynth: Tone.PolySynth | null = null;
 let choirVibrato: Tone.Vibrato | null = null;
-let choirFilter: Tone.Filter | null = null;
+let choirFormants: { bp: Tone.Filter; g: Tone.Gain }[] = [];
 let currentChord: string[] = [];
 let arpIndex = 0;
+let currentPaletteId = "";
 
 const upOctave = (note: string) => note.replace(/(\d)$/, (d) => String(Number(d) + 1));
 
-function ensure() {
-  if (!padSynth) {
-    padSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.5, decay: 0.8, sustain: 0.7, release: 2.5 } }).toDestination();
-    padSynth.volume.value = -20;
+const env = (c: VoiceCfg) => ({ attack: c.a, decay: c.d, sustain: c.s, release: c.r });
+function makePoly(c: VoiceCfg): Tone.PolySynth {
+  const s = new Tone.PolySynth(Tone.Synth, { oscillator: { type: c.oscType as never }, envelope: env(c) }).toDestination();
+  s.volume.value = c.vol;
+  return s;
+}
+function makeMono(c: VoiceCfg): Tone.Synth {
+  const s = new Tone.Synth({ oscillator: { type: c.oscType as never }, envelope: env(c) }).toDestination();
+  s.volume.value = c.vol;
+  return s;
+}
+function makeSampler(inst: string, vol: number): Tone.Sampler {
+  // Prefer pre-decoded buffers (required for offline renders — URL loading never
+  // resolves there); fall back to URL loading for the live path if not preloaded.
+  const buffers = samplerBuffers(inst);
+  const s = buffers
+    ? new Tone.Sampler({ urls: buffers }).toDestination()
+    : new Tone.Sampler({ urls: SAMPLE_INSTRUMENTS[inst], baseUrl: `${import.meta.env.BASE_URL}samples/${inst}/` }).toDestination();
+  s.volume.value = vol;
+  return s;
+}
+
+// (Re)build the pad/bass/arp voices for the given palette. On a palette change we
+// dispose the old voices and create the new timbres; the choir stays constant.
+function ensure(paletteId?: string) {
+  const id = paletteId && PALETTES[paletteId] ? paletteId : PALETTES[currentPaletteId] ? currentPaletteId : "glass";
+  if (id !== currentPaletteId) {
+    padSynth?.dispose(); bassSynth?.dispose(); arpSynth?.dispose();
+    padSynth = null; bassSynth = null; arpSynth = null;
+    // the choir's vowel is palette-dependent → rebuild it too
+    choirSynth?.dispose(); choirVibrato?.dispose();
+    choirFormants.forEach(({ bp, g }) => { bp.dispose(); g.dispose(); });
+    choirSynth = null; choirVibrato = null; choirFormants = [];
+    currentPaletteId = id;
   }
-  if (!bassSynth) {
-    bassSynth = new Tone.Synth({ oscillator: { type: "sine" }, envelope: { attack: 0.06, decay: 0.4, sustain: 0.8, release: 1 } }).toDestination();
-    bassSynth.volume.value = -15;
-  }
-  if (!arpSynth) {
-    arpSynth = new Tone.Synth({ oscillator: { type: "triangle" }, envelope: { attack: 0.005, decay: 0.2, sustain: 0, release: 0.3 } }).toDestination();
-    arpSynth.volume.value = -20;
-  }
+  const p = PALETTES[currentPaletteId];
+  if (!padSynth) padSynth = p.sample ? makeSampler(p.sample, p.pad.vol) : makePoly(p.pad);
+  if (!bassSynth) bassSynth = makeMono(p.bass);
+  if (!arpSynth) arpSynth = p.sample ? makeSampler(p.sample, p.arp.vol) : makeMono(p.arp);
   if (!choirSynth) {
-    // A breathy "aah" choir: a sawtooth swell through a vowel-ish bandpass with
-    // gentle vibrato — a synthesized vocal texture (the near-term step toward
-    // real vocals). Kept soft so it colours rather than dominates.
-    choirFilter = new Tone.Filter({ type: "bandpass", frequency: 900, Q: 1.4 }).toDestination();
-    choirVibrato = new Tone.Vibrato({ frequency: 5, depth: 0.12 }).connect(choirFilter);
-    choirSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 1.2, decay: 0.6, sustain: 0.8, release: 3 } }).connect(choirVibrato);
-    choirSynth.volume.value = -26;
+    // A sung-vowel choir via FORMANT SYNTHESIS: a sawtooth swell (with gentle
+    // vibrato) fed through parallel band-pass filters tuned to the vowel's F1/F2/F3
+    // resonances — reads as a real "aah/ooh/…" rather than a filtered buzz. The
+    // vowel is chosen by the palette. Kept soft so it colours rather than dominates.
+    const vowel = VOWELS[PALETTE_VOWEL[currentPaletteId] ?? "aah"] ?? VOWELS.aah;
+    choirVibrato = new Tone.Vibrato({ frequency: 5, depth: 0.1 });
+    choirFormants = vowel.f.map((freq, i) => {
+      const bp = new Tone.Filter({ type: "bandpass", frequency: freq, Q: 8 });
+      const g = new Tone.Gain(vowel.g[i] * 0.5).toDestination();
+      choirVibrato!.connect(bp);
+      bp.connect(g);
+      return { bp, g };
+    });
+    choirSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 1.2, decay: 0.6, sustain: 0.85, release: 3 } }).connect(choirVibrato);
+    choirSynth.volume.value = -16;
   }
 }
 
-export function setHarmony(chords?: ChordEvent[], bass?: BassEvent[], arpDensity = 0, vocalLevel = 0) {
+export function setHarmony(chords?: ChordEvent[], bass?: BassEvent[], arpDensity = 0, vocalLevel = 0, paletteId?: string) {
   stopHarmony();
   const hasChords = !!chords?.length;
   const hasBass = !!bass?.length;
   if (!hasChords && !hasBass) return;
-  ensure();
+  ensure(paletteId);
   const end = Math.max(1, ...[...(chords ?? []), ...(bass ?? [])].map((e) => e.start + e.duration));
 
   if (hasChords && padSynth) {
@@ -95,7 +132,41 @@ export function stopHarmony() {
   chordPart?.dispose();
   bassPart?.dispose();
   if (arpLoop) { arpLoop.stop(); arpLoop.dispose(); arpLoop = null; }
+  // Release any sounding voices — disposing the Parts only stops scheduling; a
+  // held chord (long duration + 2.5–3s release) would otherwise ring on as a
+  // "drone" if the master is ever un-muted.
+  // Release sounding voices (PolySynth/Sampler use releaseAll; a mono Synth uses
+  // triggerRelease) so a held chord doesn't ring on if the master is un-muted.
+  const rel = (v: Tone.PolySynth | Tone.Sampler | Tone.Synth | null) => {
+    try { if (v && "releaseAll" in v) v.releaseAll(); else (v as Tone.Synth | null)?.triggerRelease(); } catch { /* not started */ }
+  };
+  rel(padSynth);
+  rel(arpSynth);
+  rel(choirSynth);
+  try { bassSynth?.triggerRelease(); } catch { /* not started */ }
   chordPart = null;
   bassPart = null;
   currentChord = [];
+}
+
+// Dispose every cached voice (not just the Parts, as stopHarmony does) and null
+// the singletons so the next setHarmony() rebuilds them in whatever Tone context
+// is active — needed to render into an offline context and to rebuild live after.
+export function resetHarmony() {
+  stopHarmony();
+  const safe = (fn: () => void) => { try { fn(); } catch { /* node from a disposed context */ } };
+  safe(() => padSynth?.dispose());
+  safe(() => bassSynth?.dispose());
+  safe(() => arpSynth?.dispose());
+  safe(() => choirSynth?.dispose());
+  safe(() => choirVibrato?.dispose());
+  choirFormants.forEach(({ bp, g }) => { safe(() => bp.dispose()); safe(() => g.dispose()); });
+  padSynth = null;
+  bassSynth = null;
+  arpSynth = null;
+  choirSynth = null;
+  choirVibrato = null;
+  choirFormants = [];
+  currentPaletteId = "";
+  arpIndex = 0;
 }

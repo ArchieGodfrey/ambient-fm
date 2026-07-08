@@ -8,7 +8,6 @@ import {
   isModelDownloaded,
   isModelLoaded,
 } from "../ai/composer";
-import { postToast } from "../utils/toast";
 import { requestPersistentStorage } from "../utils/install";
 
 type WorkerInitPayload = {
@@ -215,7 +214,6 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
       success = false;
       console.error("Download model failed", error);
       const message = error instanceof Error ? error.message : String(error);
-      postToast(`Download failed: ${message}`, "error");
       setStatus(`Download failed: ${message}`);
     } finally {
       setModelProgress((prev) => (prev === 1 ? 1 : null));
@@ -241,7 +239,6 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
       success = false;
       console.error("Load model failed", error);
       const message = error instanceof Error ? error.message : String(error);
-      postToast(`Load failed: ${message}`, "error");
       setStatus(`Load failed: ${message}`);
     } finally {
       setModelProgress((prev) => (prev === 1 ? 1 : null));
@@ -263,7 +260,6 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
       success = false;
       console.error("Unload model failed", error);
       const message = error instanceof Error ? error.message : String(error);
-      postToast(`Unload failed: ${message}`, "error");
       setStatus(`Unload failed: ${message}`);
     }
 
@@ -284,7 +280,6 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
     } catch (error) {
       console.error("Delete model failed", error);
       const message = error instanceof Error ? error.message : String(error);
-      postToast(`Delete failed: ${message}`, "error");
       setStatus(`Delete failed: ${message}`);
     }
 
@@ -303,7 +298,6 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
     } catch (error) {
       console.error("Reset runtime failed", error);
       const message = error instanceof Error ? error.message : String(error);
-      postToast(`Reset failed: ${message}`, "error");
       setStatus(`Reset failed: ${message}`);
     }
 

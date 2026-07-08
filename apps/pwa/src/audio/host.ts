@@ -19,6 +19,8 @@ const paceMs = (text: string) => Math.min(7000, Math.max(1600, 1200 + text.lengt
 // (the caller shows the caption regardless).
 export async function prepareLine(text: string): Promise<() => Promise<void>> {
   if (!text.trim()) return () => Promise.resolve();
+  // The voice runs on its own AudioContext (hostPiper), independent of Tone's
+  // offline-render context swap — so it can be prepared and played during a render.
   const buffer = await voiceRender(text);
   if (buffer) return () => voicePlay(buffer);
   return () => new Promise<void>((resolve) => window.setTimeout(resolve, paceMs(text)));

@@ -4,7 +4,6 @@ import {
   type VoiceStatus,
 } from "../audio/hostPiper";
 import { takeFloor, releaseFloor } from "../audio/playbackFloor";
-import { postToast } from "../utils/toast";
 
 // Manages the Piper DJ voice for Settings: download (with progress), test, remove.
 export default function useVoiceManager() {
@@ -21,8 +20,8 @@ export default function useVoiceManager() {
     const ok = await loadVoice((p, t) => { setProgress(p); setProgressText(t); });
     setStatus(voiceStatus());
     setInstalled(voiceInstalled());
-    if (ok) { setVoiceEnabled(true); setEnabled(true); postToast("DJ voice ready.", "success"); }
-    else postToast("Couldn't load the DJ voice — captions will show instead.", "error");
+    if (ok) { setVoiceEnabled(true); setEnabled(true); }
+    else console.error("Couldn't load the DJ voice — captions will show instead.");
     return ok;
   }, []);
 
@@ -34,7 +33,6 @@ export default function useVoiceManager() {
     setStatus("idle");
     setProgress(0);
     setProgressText("");
-    postToast("DJ voice removed.", "success");
   }, []);
 
   const stopPreview = useCallback(() => {
@@ -55,7 +53,7 @@ export default function useVoiceManager() {
       setInstalled(voiceInstalled());
     }
     const buf = await voiceRender("This is your station host. Good to have you tuned in.");
-    if (!buf) { postToast("Voice isn't ready yet.", "error"); return; }
+    if (!buf) { console.error("Voice isn't ready yet."); return; }
     takeFloor(stopPreview); // stop the radio / other playback while previewing
     setPreviewing(true);
     await voicePlay(buf);   // resolves when it finishes (or is stopped)

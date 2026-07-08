@@ -1,22 +1,34 @@
+import * as Tone from "tone";
+
 // Background / locked-screen playback + lock-screen controls.
 //
-// iOS keeps a page's audio session — and therefore the Web Audio context playing
-// the music — alive while an <audio> element is actively playing REAL media. A
-// MediaStream element isn't reliably treated as such (it's closer to live
-// capture), so we loop a short, near-silent WAV FILE in a hidden element instead.
-// The element MUST start inside the tune-in tap gesture (iOS blocks play()
-// otherwise), so startBackgroundKeepAlive() is called synchronously from the
-// Tune-in click. The music itself stays on the normal Web Audio output.
+// iOS suspends the live Web Audio CONTEXT on lock (symptom: music stops when
+// locked, resuming only when the audible DJ voice calls ctx.resume()). A standalone
+// media element, however, keeps its media playback going in the background and
+// keeps firing `timeupdate` — even when locked. So we loop a hidden near-silent
+// element and, on every timeupdate tick, resume the audio context — reviving the
+// music continuously while locked. (We deliberately do NOT route the element into
+// the graph via createMediaElementSource — that couples the element's playback to
+// the context's suspension, defeating the purpose.) Must start in the tune-in tap.
 
 let el: HTMLAudioElement | null = null;
 let url: string | null = null;
 let started = false;
 
-// A 2s mono WAV of an inaudible 40Hz tone (like the old keep-alive oscillator) —
-// non-silent so iOS treats the element as genuinely playing, but far below
-// hearing. Built at runtime so there's no giant base64 blob in the bundle.
+function ctxRaw(): AudioContext | null {
+  try { return Tone.getContext().rawContext as unknown as AudioContext; } catch { return null; }
+}
+function resumeCtx() {
+  const c = ctxRaw();
+  if (c && c.state === "suspended") void c.resume?.().catch(() => { /* needs a gesture */ });
+}
+
+// A long mono WAV of an inaudible 40Hz tone — non-silent so iOS treats the element
+// as genuinely playing, but far below hearing. Made LONG (not 2s) because iOS
+// doesn't honour `loop` in the background — a short clip ends and the media (and
+// our timeupdate-driven context resume) stops. Built at runtime.
 function silentToneWavUrl(): string {
-  const rate = 8000, seconds = 2, n = rate * seconds, bytes = n * 2;
+  const rate = 8000, seconds = 60, n = rate * seconds, bytes = n * 2;
   const buf = new ArrayBuffer(44 + bytes);
   const dv = new DataView(buf);
   const str = (o: number, s: string) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
@@ -28,11 +40,18 @@ function silentToneWavUrl(): string {
   return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
 }
 
-// iOS may pause the element (interruptions, returning from lock). Re-assert it.
+// iOS may pause the element / suspend the context (interruptions, returning from
+// lock). Re-assert playback and revive the context.
 function keepPlaying() {
-  if (started && el && el.paused) void el.play().catch(() => { /* needs a gesture */ });
+  if (!started) return;
+  if (el && el.paused) void el.play().catch(() => { /* needs a gesture */ });
+  resumeCtx();
 }
 const onVisibility = () => { if (typeof document !== "undefined" && !document.hidden) keepPlaying(); };
+// iOS may not loop in the background — restart the clip so ticks keep firing.
+function onEnded() {
+  if (started && el) { try { el.currentTime = 0; } catch { /* */ } void el.play().catch(() => { /* */ }); resumeCtx(); }
+}
 
 // MUST be called inside a user gesture (the Tune-in tap) so iOS allows playback.
 export function startBackgroundKeepAlive() {
@@ -45,9 +64,15 @@ export function startBackgroundKeepAlive() {
     el.preload = "auto";
     el.src = url;
     el.style.display = "none";
+    document.body.appendChild(el);
+    // The engine: every media tick (fires ~4x/sec, even when locked) revives the
+    // suspended music context.
+    el.addEventListener("timeupdate", resumeCtx);
+    // iOS ignores `loop` in the background, so re-play when the clip ends to keep
+    // the media (and the ticks) going.
+    el.addEventListener("ended", onEnded);
     el.addEventListener("pause", keepPlaying);
     document.addEventListener("visibilitychange", onVisibility);
-    document.body.appendChild(el);
     void el.play().catch(() => { /* outside a gesture — will retry via keepPlaying */ });
     started = true;
   } catch {
@@ -61,6 +86,8 @@ export function stopBackgroundKeepAlive() {
   started = false; // set first so keepPlaying() won't re-play during teardown
   if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
   if (el) {
+    el.removeEventListener("timeupdate", resumeCtx);
+    el.removeEventListener("ended", onEnded);
     el.removeEventListener("pause", keepPlaying);
     el.pause();
     el.removeAttribute("src");

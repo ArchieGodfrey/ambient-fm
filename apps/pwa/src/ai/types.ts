@@ -62,6 +62,7 @@ export interface CompositionPlan {
   percussionDensity?: number; // 0..1, drives a gated kick/snare/hat pattern
   arpDensity?: number;        // 0..1, drives an arpeggio over the current chord
   vocalLevel?: number;        // 0..1, drives a gated "aah" choir pad over the chords
+  palette?: string;           // instrument-palette id (see audio/palettes.ts) — pad/bass/arp timbre
 }
 
 export type { CompositionIntent };

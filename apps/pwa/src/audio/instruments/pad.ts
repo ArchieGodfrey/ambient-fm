@@ -15,5 +15,9 @@ export function createPadInstrument(): Instrument {
     setIntensity(v) {
       synth.volume.value = -30 + v * 15;
     },
+
+    dispose() {
+      synth.dispose();
+    },
   };
 }

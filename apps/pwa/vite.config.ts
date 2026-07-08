@@ -41,6 +41,22 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         runtimeCaching: [
           {
+            // Real-instrument samples: cached on first fetch (the setup wizard
+            // warms this, so sampled palettes work offline) rather than precached.
+            urlPattern: /\/samples\/.*\.mp3$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'sample-cache',
+              expiration: {
+                maxEntries: 80,
+                maxAgeSeconds: 60 * 60 * 24 * 90,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
             urlPattern: /^https:\/\/huggingface\.co\/.*$/,
             handler: 'CacheFirst',
             options: {

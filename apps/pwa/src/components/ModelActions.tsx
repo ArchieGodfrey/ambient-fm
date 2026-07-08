@@ -1,4 +1,4 @@
-import { Download, Cpu, Trash2, RotateCcw, Loader } from "lucide-react";
+import { Download, Cpu, Trash2, Loader } from "lucide-react";
 import { card, mutedNote, primaryButton, ghostButton } from "../ui/styles";
 
 type ModelOption = { label: string; model_id: string };
@@ -15,7 +15,6 @@ type ModelActionsProps = {
   onLoad: () => Promise<boolean> | void;
   onUnload: () => Promise<boolean> | void;
   onDelete: () => Promise<void> | void;
-  onResetRuntime: () => Promise<void> | void;
 };
 
 // The on-device model, styled to match VoiceActions (one card, a status pill, a
@@ -24,7 +23,7 @@ type ModelActionsProps = {
 export default function ModelActions({
   availableModels, selectedModelId, onSelectModel,
   modelLoaded, modelDownloaded, modelProgress, progressText,
-  onDownload, onLoad, onUnload, onDelete, onResetRuntime,
+  onDownload, onLoad, onUnload, onDelete,
 }: ModelActionsProps) {
   const loading = modelProgress != null && modelProgress < 1;
   const statusLabel = loading ? "Loading…" : modelLoaded ? "Loaded" : modelDownloaded ? "Downloaded" : "Not downloaded";
@@ -72,7 +71,6 @@ export default function ModelActions({
         {modelDownloaded ? (
           <button type="button" onClick={() => onDelete()} style={{ ...ghostButton, color: "#c2506f", borderColor: "#c2506f55" }}><Trash2 size={15} /> Delete</button>
         ) : null}
-        <button type="button" onClick={() => onResetRuntime()} style={ghostButton}><RotateCcw size={15} /> Reset</button>
       </div>
     </div>
   );

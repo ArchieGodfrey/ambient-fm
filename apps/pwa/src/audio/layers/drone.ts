@@ -19,5 +19,9 @@ export function createDrone() {
         /* keep current pitch */
       }
     },
+    dispose() {
+      osc.dispose();
+      filter.dispose();
+    },
   };
 }

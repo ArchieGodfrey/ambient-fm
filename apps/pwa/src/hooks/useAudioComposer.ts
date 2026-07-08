@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { startAudio, stopAudio, resumeAudioContext } from "../audio/toneEngine";
 import { playInsert, playEject } from "../audio/discSound";
+import { playRenderedBlob, stopRenderedBlob } from "../audio/renderedPlayer";
 import { takeFloor } from "../audio/playbackFloor";
 import { generateComposition, isModelLoaded } from "../ai/composer";
 import type { CompositionDirection } from "../ai/prompt";
-import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop, subscribeRuntimeState } from "../audio/compositionRuntime";
+import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop } from "../audio/compositionRuntime";
 import { startComposer, stopComposer } from "../composer/runtime";
-import { postToast } from "../utils/toast";
 import { db } from "../db/db";
 import { analyzeSession } from "../memory/analyzeSession";
 import { generateTrackName } from "../ai/trackName";
@@ -17,7 +17,6 @@ import { useAppStore } from "../store/useAppStore";
 import type { CompositionPlan } from "../ai/types";
 import type { CompositionIntent } from "../ai/intentSchema";
 import type { StimulusEvent } from "../types";
-import type { CompositionRuntimeSnapshot } from "../audio/compositionRuntime";
 
 export default function useAudioComposer(events: StimulusEvent[]) {
   const setStoreIsPlaying = useAppStore((state) => state.setIsPlaying);
@@ -31,20 +30,6 @@ export default function useAudioComposer(events: StimulusEvent[]) {
   const [plan, setPlan] = useState<CompositionPlan | null>(null);
   const setCurrentPlan = useAppStore((state) => state.setCurrentPlan);
   const [currentSessionSaved, setCurrentSessionSaved] = useState(false);
-  const [runtimeState, setRuntimeState] = useState<CompositionRuntimeSnapshot>({
-    cursor: 0,
-    activeSection: null,
-    activePhrase: null,
-    intensity: 0,
-    drift: 0,
-    planDuration: 0,
-    sectionTimeRemaining: 0,
-    activeMotifs: 0,
-    runtimeUptime: 0,
-    frameDelay: 0,
-    audioRestartCount: 0,
-    snapshotCount: 0,
-  });
 
   const setSharedPlan = useCallback((planInput: CompositionPlan | null) => {
     setPlan(planInput);
@@ -112,8 +97,6 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       setStatus("Audio started");
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : String(error);
-      postToast(`Audio failed: ${message}`, "error");
       setStatus("Audio failed");
     }
   }, [endSession, events, isPlaying, plan, setStoreIsPlaying]);
@@ -124,11 +107,6 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       playToggleRef.current = handlePlayToggle;
     }
   }, [handlePlayToggle, setPlayToggle]);
-
-  useEffect(() => {
-    const unsubscribe = subscribeRuntimeState(setRuntimeState);
-    return unsubscribe;
-  }, []);
 
   type Composed = { plan: CompositionPlan; intent: CompositionIntent; title: string; sessionId: string | null };
 
@@ -203,15 +181,32 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       setStatus(`Now playing: ${composition.key}`);
     } catch (error) {
       console.error(error);
-      postToast(`Audio failed: ${error instanceof Error ? error.message : String(error)}`, "error");
       setStatus("Audio failed");
     }
+  }, [setSharedPlan, setCurrentTitle, setCurrentSessionId, setStoreIsPlaying]);
+
+  // Play a PRE-RENDERED track: the audio comes from a media element (renderedPlayer)
+  // instead of the live Web Audio graph, so it keeps playing when the phone is
+  // locked. No live composition runtime runs — the blob already is the finished
+  // audio. Used by the radio; shared plan/title/session are still set so the
+  // transport UI, disc visuals and feedback see the current track.
+  const playRenderedTrack = useCallback(async (composition: CompositionPlan, blob: Blob, title?: string | null, sessionId?: string | null) => {
+    setSharedPlan(composition);
+    setCurrentTitle(title ?? null);
+    setCurrentSessionId(sessionId ?? null);
+    setCurrentSessionSaved(true);
+    playInsert(); // disc-seat "chunk" (skipped while a render holds the context)
+    playRenderedBlob(blob);
+    setIsPlaying(true);
+    setStoreIsPlaying(true);
+    setStatus(`Now playing: ${composition.key}`);
   }, [setSharedPlan, setCurrentTitle, setCurrentSessionId, setStoreIsPlaying]);
 
   // Stop everything (used by the radio's tune-out and manual stop).
   const stopPlayback = useCallback(() => {
     playEject();
     stopAudio();
+    stopRenderedBlob();
     stopRuntimeLoop();
     stopComposer();
     setIsPlaying(false);
@@ -249,8 +244,6 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       setStatus("Session loaded and playing");
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : String(error);
-      postToast(`Audio failed: ${message}`, "error");
       setStatus("Audio failed");
       return;
     }
@@ -305,13 +298,13 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     aiStatus,
     status,
     plan,
-    runtimeState,
     handlePlayToggle,
     runAIComposer,
     composeTrack,
     composePlanOnly,
     persistComposed,
     playComposed,
+    playRenderedTrack,
     stopPlayback,
     loadSessionPlan,
     loadStaticPlan,

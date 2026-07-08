@@ -41,3 +41,17 @@ export function setPercussion(density?: number) {
 export function stopPercussion() {
   if (loop) { loop.stop(); loop.dispose(); loop = null; }
 }
+
+// Dispose the cached drum voices and null the singletons so the next
+// setPercussion() rebuilds them in whatever Tone context is active (offline
+// render / live rebuild).
+export function resetPercussion() {
+  stopPercussion();
+  const safe = (fn: () => void) => { try { fn(); } catch { /* node from a disposed context */ } };
+  safe(() => kick?.dispose());
+  safe(() => snare?.dispose());
+  safe(() => hat?.dispose());
+  kick = null;
+  snare = null;
+  hat = null;
+}

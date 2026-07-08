@@ -1,5 +1,6 @@
 import { resolveProgression, getScale } from "../music/harmony/index";
 import { generateMotif } from "../music/motifs/generator";
+import { pickPaletteId, PALETTES } from "../audio/palettes";
 import { createSeed } from "../utils/randomField";
 import { field } from "../music/random/randomField";
 import type { CompositionIntent } from "./intentSchema";
@@ -32,14 +33,21 @@ function deriveMood(energy: number, tension: number, brightness: number, calmnes
   return brightness > 0.6 ? "bright" : minor ? "ambient" : "focused";
 }
 
-// Intensity arc archetypes — the shape of the intro→…→outro energy curve. Chosen
-// by mood + seed so tracks don't all follow the same build-to-peak-and-release.
+// Intensity arc archetypes — the shape of the intro→…→outro energy curve. Named
+// so the model can request one (intent.arc); else chosen by mood + seed.
+const ARCS: Record<string, number[]> = {
+  steady: [0.5, 0.62, 0.58, 0.66, 0.54],
+  build: [0.5, 0.72, 0.9, 1.0, 0.78],
+  ebb: [0.6, 0.85, 0.55, 0.9, 0.62],
+  swell: [0.55, 0.7, 0.85, 0.7, 0.9],
+  wavy: [0.7, 0.6, 0.8, 0.6, 0.72],
+};
 function pickArc(energy: number, calmness: number, r: number): number[] {
-  if (calmness > 0.6 && energy < 0.5) return [0.5, 0.62, 0.58, 0.66, 0.54]; // gentle, steady
-  if (energy > 0.6) return [0.5, 0.72, 0.9, 1.0, 0.78];                     // build to a peak
-  if (r < 0.4) return [0.6, 0.85, 0.55, 0.9, 0.62];                        // ebb and flow
-  if (r < 0.7) return [0.55, 0.7, 0.85, 0.7, 0.9];                          // late swell
-  return [0.7, 0.6, 0.8, 0.6, 0.72];                                        // wavy / undulating
+  if (calmness > 0.6 && energy < 0.5) return ARCS.steady;
+  if (energy > 0.6) return ARCS.build;
+  if (r < 0.4) return ARCS.ebb;
+  if (r < 0.7) return ARCS.swell;
+  return ARCS.wavy;
 }
 // Sample an arc (any length) at a normalized position 0..1.
 function arcAt(arc: number[], t: number): number {
@@ -99,7 +107,8 @@ export function buildCompositionPlanFromIntent(
 
   // Arrangement: an archetype arc (mood + seed) sampled across a mood-varied
   // section count, so structure differs track to track.
-  const arc = pickArc(energy, calmness, rnd("arc"));
+  // Hybrid: honour the model's arc choice if valid, else the deterministic pick.
+  const arc = intent.arc && ARCS[intent.arc] ? ARCS[intent.arc] : pickArc(energy, calmness, rnd("arc"));
   const sectionCount = clamp(2 + Math.round(complexity * 2 + rnd("secs") * 2), 2, 6);
   const secDur = Math.max(6, Math.floor(duration / sectionCount));
   const arcLift = 0.45 + energy * 0.55;
@@ -136,9 +145,12 @@ export function buildCompositionPlanFromIntent(
     sections,
     chordEvents,
     bassEvents,
+    // Hybrid: honour the model's palette if it's a valid id, else the mood-driven pick.
+    palette: intent.palette && PALETTES[intent.palette] ? intent.palette : pickPaletteId(energy, tension, brightness, calmness, rnd("palette")),
     percussionDensity: clamp(energy * 0.95 - calmness * 0.25, 0, 1),
     arpDensity: clamp(motifDensity * 0.5 + brightness * 0.4, 0, 1),
-    vocalLevel: clamp((1 - energy) * 0.25 + calmness * 0.4 + complexity * 0.2, 0, 1),
+    // Hybrid: honour the model's requested vocal presence, else the mood-derived level.
+    vocalLevel: typeof intent.vocals === "number" ? clamp(intent.vocals, 0, 1) : clamp((1 - energy) * 0.25 + calmness * 0.4 + complexity * 0.2, 0, 1),
     texture: {
       density: clamp(motifDensity * 0.7 + energy * 0.3, 0, 1),
       brightness: clamp(0.28 + brightness * 0.62, 0, 1),
