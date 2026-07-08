@@ -1,5 +1,5 @@
-import { useState, type CSSProperties } from "react";
-import { Download, Check, Sparkles, ArrowRight, Loader } from "lucide-react";
+import { useState, useRef, type CSSProperties } from "react";
+import { Download, Check, Sparkles, ArrowRight, ArrowLeft, Loader } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import useVoiceManager from "../hooks/useVoiceManager";
 import { setSetupDone, requestPersistentStorage } from "../utils/install";
@@ -15,22 +15,35 @@ export default function SetupWizard({ onDone }: { onDone: () => void }) {
   const voice = useVoiceManager();
   const [step, setStep] = useState<Step>("welcome");
   const [failed, setFailed] = useState(false);
+  const runRef = useRef(0); // bumped on cancel so a stale in-flight download can't resurface
 
   const finish = () => { setSetupDone(true); onDone(); };
   const skip = () => { setSetupDone(true); onDone(); };
 
   const accept = async () => {
+    const rid = ++runRef.current;
     setStep("downloading");
     setFailed(false);
     await requestPersistentStorage(); // ask before we store GBs, so they aren't eviction-eligible
+    let okVoice = false, okModel = false;
     try {
-      const okModel = await model.downloadModelAction();
-      const okVoice = await voice.download();
-      setFailed(!(okModel && okVoice));
-    } catch {
-      setFailed(true);
-    }
+      // Voice first — it's a small, reliable CPU download. Then the model, which
+      // caches its weights (a one-time load pass, then unloaded — not kept in RAM).
+      okVoice = await voice.download();
+      if (runRef.current !== rid) return; // cancelled while downloading the voice
+      okModel = await model.downloadModelAction();
+    } catch { /* reflected in the ok flags below */ }
+    if (runRef.current !== rid) return;   // cancelled → don't overwrite the reset UI
+    setFailed(!(okVoice && okModel));
     setStep("done");
+  };
+
+  // Cancel an in-flight download and return to the start so the user is never
+  // trapped (e.g. a model load that stalls). Tears down the runtime to abort it.
+  const back = () => {
+    runRef.current++;
+    void model.resetRuntimeAction().catch(() => { /* best-effort abort */ });
+    setStep("welcome");
   };
 
   return (
@@ -69,9 +82,15 @@ export default function SetupWizard({ onDone }: { onDone: () => void }) {
             <h1 style={title}>Getting things ready…</h1>
             <p style={{ ...mutedNote, textAlign: "center" }}>Downloading to your device. This can take a few minutes on first run.</p>
             <div style={{ ...panel, marginTop: 12, display: "flex", flexDirection: "column", gap: 16 }}>
-              <ProgressRow label="Music model" progress={model.modelProgress} text={model.progressText} />
               <ProgressRow label="DJ voice" progress={voice.progress} text={voice.progressText} />
+              <ProgressRow label="Music model" progress={model.modelProgress} text={model.progressText} />
             </div>
+            <button type="button" onClick={back} style={{ ...ghostButton, marginTop: 14 }}>
+              <ArrowLeft size={15} /> Back
+            </button>
+            <span style={{ ...mutedNote, fontSize: 11.5, textAlign: "center", maxWidth: 340 }}>
+              Taking too long? Go back and try again, or skip — it'll download automatically the first time you tune in.
+            </span>
           </>
         )}
 
