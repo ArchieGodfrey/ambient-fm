@@ -1,4 +1,4 @@
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Sparkles } from "lucide-react";
 import ModelActions from "../components/ModelActions";
 import VoiceActions from "../components/VoiceActions";
 import ThemeToggle from "../components/ThemeToggle";
@@ -6,6 +6,7 @@ import SystemHealth from "../components/SystemHealth";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
 import { resetApp } from "../utils/resetApp";
+import { openSetupWizard } from "../utils/install";
 import { screen, screenEyebrow, screenTitle, sectionLabel, card, mutedNote, ghostButton } from "../ui/styles";
 
 export default function Settings() {
@@ -59,6 +60,17 @@ export default function Settings() {
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <span style={sectionLabel}>Voice host</span>
         <VoiceActions />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <span style={sectionLabel}>Setup</span>
+        <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+          <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-h)" }}>Run setup again</span>
+            <span style={mutedNote}>Re-download or repair the on-device model and voice, and re-check offline storage.</span>
+          </span>
+          <button type="button" onClick={() => openSetupWizard()} style={{ ...ghostButton, flexShrink: 0 }}><Sparkles size={15} /> Set up</button>
+        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
