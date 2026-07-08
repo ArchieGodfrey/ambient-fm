@@ -9,6 +9,7 @@ import { recordFeedback } from "../feedback/feedback";
 import { useAppStore } from "../store/useAppStore";
 import { unlockAudio } from "../audio/toneEngine";
 import { unlockVoice, maybeAutoLoadVoice } from "../audio/host";
+import { unlockRenderedPlayer } from "../audio/renderedPlayer";
 import { buildRadioBubbles, type LeanTarget } from "../themes/presets";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
@@ -49,10 +50,11 @@ export default function Radio() {
   );
 
   const tuneIn = async () => {
-    // unlockAudio() (Tone.start) unlocks the audio session within the tap; the radio
-    // plays pre-rendered tracks through a media element, which keeps playing when
-    // locked — so no silent keep-alive element is needed here.
+    // Within the tap: unlockAudio() (Tone.start) unlocks Web Audio for the DJ voice,
+    // and unlockRenderedPlayer() unlocks the media element that plays the rendered
+    // tracks — otherwise iOS blocks its play() ~15s later once a track has rendered.
     unlockAudio(); unlockVoice(); maybeAutoLoadVoice();
+    unlockRenderedPlayer();
     setPreparing(true);
     try { await startRadio(); } finally { setPreparing(false); }
   };

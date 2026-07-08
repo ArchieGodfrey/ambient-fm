@@ -8,7 +8,7 @@ import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
 import { resetApp } from "../utils/resetApp";
 import { renderTrack } from "../audio/renderTrack";
-import { playRenderedBlob, stopRenderedBlob } from "../audio/renderedPlayer";
+import { playRenderedBlob, stopRenderedBlob, unlockRenderedPlayer } from "../audio/renderedPlayer";
 import { screen, screenEyebrow, screenTitle, sectionLabel, card, mutedNote, ghostButton } from "../ui/styles";
 
 export default function Settings() {
@@ -24,6 +24,7 @@ export default function Settings() {
   const testRender = async () => {
     const plan = useAppStore.getState().currentPlan;
     if (!plan) { setRenderStatus("No track loaded to render — burn one first."); return; }
+    unlockRenderedPlayer(); // unlock the media element within this tap
     if (radio.isOn) radio.tuneOut(); else audio.stopPlayback();
     setRendering(true);
     setRenderStatus("Rendering…");

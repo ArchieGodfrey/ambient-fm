@@ -1,5 +1,6 @@
 import * as Tone from "tone";
 import { PALETTES, SAMPLE_INSTRUMENTS, VOWELS, PALETTE_VOWEL, type VoiceCfg } from "./palettes";
+import { samplerBuffers } from "./sampleBuffers";
 
 // Voices the harmonic bed — block chords + a bass root — as looping Tone.Parts
 // over the section timeline (seconds), plus an optional arpeggio over the
@@ -35,7 +36,12 @@ function makeMono(c: VoiceCfg): Tone.Synth {
   return s;
 }
 function makeSampler(inst: string, vol: number): Tone.Sampler {
-  const s = new Tone.Sampler({ urls: SAMPLE_INSTRUMENTS[inst], baseUrl: `${import.meta.env.BASE_URL}samples/${inst}/` }).toDestination();
+  // Prefer pre-decoded buffers (required for offline renders — URL loading never
+  // resolves there); fall back to URL loading for the live path if not preloaded.
+  const buffers = samplerBuffers(inst);
+  const s = buffers
+    ? new Tone.Sampler({ urls: buffers }).toDestination()
+    : new Tone.Sampler({ urls: SAMPLE_INSTRUMENTS[inst], baseUrl: `${import.meta.env.BASE_URL}samples/${inst}/` }).toDestination();
   s.volume.value = vol;
   return s;
 }

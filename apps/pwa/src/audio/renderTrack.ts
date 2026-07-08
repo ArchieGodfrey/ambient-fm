@@ -2,6 +2,8 @@ import * as Tone from "tone";
 import type { CompositionPlan, CompositionSection, Phrase } from "../ai/types";
 import { resetAudioModules, markLiveGraphDirty } from "./resetAudio";
 import { beginRender, endRender } from "./renderGate";
+import { PALETTES } from "./palettes";
+import { preloadInstrument } from "./sampleBuffers";
 import { initAudioGraph, applyComposition } from "./audioGraph";
 import { startScheduler, tick as schedulerTick } from "./sectionScheduler";
 import { activatePhrase, updatePhraseIntensity } from "./phraseRuntime";
@@ -85,6 +87,13 @@ export async function renderTrack(plan: CompositionPlan): Promise<Blob> {
       : 30;
   const duration = clamp(rawDuration, MIN_DURATION, MAX_DURATION);
 
+  // Pre-decode the palette's sampled instrument on the LIVE context first. Building
+  // a Tone.Sampler from URLs inside Tone.Offline loads asynchronously and never
+  // resolves Tone.loaded() there → the sampled voice renders silent. With the
+  // buffers cached, the offline Sampler is built ready, with no load.
+  const sampleInst = plan.palette ? PALETTES[plan.palette]?.sample : undefined;
+  if (sampleInst) await preloadInstrument(sampleInst);
+
   // Mark the render window: for its duration Tone's global context is offline, so
   // the voice/SFX must wait or skip rather than play into the render.
   beginRender();
@@ -108,10 +117,8 @@ export async function renderTrack(plan: CompositionPlan): Promise<Blob> {
     setHarmony(plan.chordEvents, plan.bassEvents, plan.arpDensity, plan.vocalLevel, plan.palette);
     setPercussion(plan.percussionDensity);
     transport.bpm.value = plan.bpm;
-
-    // Wait for any sampled-palette buffers to finish loading, otherwise samplers
-    // render silence. Resolves immediately when nothing is pending.
-    await Tone.loaded();
+    // No buffer-load wait: sampled palettes are pre-decoded (preloadInstrument
+    // above) so the Sampler is built ready, and everything else is synths.
 
     let currentPhrase: Phrase | null = null;
     // schedulerTick expects a ms clock measured from startScheduler's base (0);
