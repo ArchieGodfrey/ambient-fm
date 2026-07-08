@@ -23,11 +23,12 @@ function resumeCtx() {
   if (c && c.state === "suspended") void c.resume?.().catch(() => { /* needs a gesture */ });
 }
 
-// A 2s mono WAV of an inaudible 40Hz tone (like the old keep-alive oscillator) —
-// non-silent so iOS treats the element as genuinely playing, but far below
-// hearing. Built at runtime so there's no giant base64 blob in the bundle.
+// A long mono WAV of an inaudible 40Hz tone — non-silent so iOS treats the element
+// as genuinely playing, but far below hearing. Made LONG (not 2s) because iOS
+// doesn't honour `loop` in the background — a short clip ends and the media (and
+// our timeupdate-driven context resume) stops. Built at runtime.
 function silentToneWavUrl(): string {
-  const rate = 8000, seconds = 2, n = rate * seconds, bytes = n * 2;
+  const rate = 8000, seconds = 60, n = rate * seconds, bytes = n * 2;
   const buf = new ArrayBuffer(44 + bytes);
   const dv = new DataView(buf);
   const str = (o: number, s: string) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
@@ -47,6 +48,10 @@ function keepPlaying() {
   resumeCtx();
 }
 const onVisibility = () => { if (typeof document !== "undefined" && !document.hidden) keepPlaying(); };
+// iOS may not loop in the background — restart the clip so ticks keep firing.
+function onEnded() {
+  if (started && el) { try { el.currentTime = 0; } catch { /* */ } void el.play().catch(() => { /* */ }); resumeCtx(); }
+}
 
 // MUST be called inside a user gesture (the Tune-in tap) so iOS allows playback.
 export function startBackgroundKeepAlive() {
@@ -63,6 +68,9 @@ export function startBackgroundKeepAlive() {
     // The engine: every media tick (fires ~4x/sec, even when locked) revives the
     // suspended music context.
     el.addEventListener("timeupdate", resumeCtx);
+    // iOS ignores `loop` in the background, so re-play when the clip ends to keep
+    // the media (and the ticks) going.
+    el.addEventListener("ended", onEnded);
     el.addEventListener("pause", keepPlaying);
     document.addEventListener("visibilitychange", onVisibility);
     void el.play().catch(() => { /* outside a gesture — will retry via keepPlaying */ });
@@ -79,6 +87,7 @@ export function stopBackgroundKeepAlive() {
   if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
   if (el) {
     el.removeEventListener("timeupdate", resumeCtx);
+    el.removeEventListener("ended", onEnded);
     el.removeEventListener("pause", keepPlaying);
     el.pause();
     el.removeAttribute("src");
