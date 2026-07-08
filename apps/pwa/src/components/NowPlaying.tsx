@@ -34,6 +34,16 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
   const lastTap = useRef(0);
 
   const tracksToday = sessions.filter((s) => isToday(s.timestamp)).sort((a, b) => a.timestamp - b.timestamp);
+  // Manual playback: step through today's tracks with the transport buttons.
+  const currentIdx = tracksToday.findIndex((t) => (sessionId ? t.id === sessionId : plan?.seed != null && t.plan?.seed === plan.seed));
+  const playTrackAt = (i: number) => {
+    const t = tracksToday[i];
+    if (!t?.plan) return;
+    void audio.loadSessionPlan(t.plan, t.title, t.id);
+    void recordFeedback("replay", { sessionId: t.id, mood: t.dominantMood, key: t.key, bpm: t.avgBpm });
+  };
+  const manualCanPrev = currentIdx > 0;
+  const manualCanNext = currentIdx >= 0 && currentIdx < tracksToday.length - 1;
   const heading = title ?? plan?.key ?? "Tray empty";
   const sub = plan ? `${plan.globalMood} · ${plan.key} · ${plan.bpm} bpm` : "Tune in to start the station";
 
@@ -94,10 +104,20 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
               </button>
             </div>
           ) : (
-            <button type="button" onClick={() => playToggle?.()} disabled={!playToggle} aria-label={isPlaying ? "Stop" : "Play"}
-              style={{ width: 62, height: 62, borderRadius: "50%", border: "none", background: "var(--accent)", color: "#fff", cursor: playToggle ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow)" }}>
-              {isPlaying ? <Pause size={25} /> : <Play size={25} />}
-            </button>
+            <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
+              <button type="button" onClick={() => playTrackAt(currentIdx - 1)} disabled={!manualCanPrev} aria-label="Previous track"
+                style={{ ...transportBtn, opacity: manualCanPrev ? 1 : 0.4, cursor: manualCanPrev ? "pointer" : "default" }}>
+                <SkipBack size={22} />
+              </button>
+              <button type="button" onClick={() => playToggle?.()} disabled={!playToggle} aria-label={isPlaying ? "Stop" : "Play"}
+                style={{ width: 62, height: 62, borderRadius: "50%", border: "none", background: "var(--accent)", color: "#fff", cursor: playToggle ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow)" }}>
+                {isPlaying ? <Pause size={25} /> : <Play size={25} />}
+              </button>
+              <button type="button" onClick={() => playTrackAt(currentIdx + 1)} disabled={!manualCanNext} aria-label="Next track"
+                style={{ ...transportBtn, opacity: manualCanNext ? 1 : 0.4, cursor: manualCanNext ? "pointer" : "default" }}>
+                <SkipForward size={22} />
+              </button>
+            </div>
           )
         ) : null}
       </div>

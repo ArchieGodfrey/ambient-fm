@@ -16,6 +16,7 @@ import { setMasterSink } from "./toneEngine";
 // falls back to the default output.
 
 let el: HTMLAudioElement | null = null;
+let osc: OscillatorNode | null = null;
 let streamDest: MediaStreamAudioDestinationNode | null = null;
 let started = false;
 
@@ -33,6 +34,17 @@ export function startBackgroundKeepAlive() {
   try {
     const raw = Tone.getContext().rawContext as unknown as AudioContext;
     streamDest = raw.createMediaStreamDestination();
+
+    // A continuous, inaudible tone into the SAME stream so it's never fully
+    // silent. iOS only registers/keeps a media element that's actually producing
+    // audio (this is what makes the lock-screen "now playing" appear and keeps
+    // playback alive when locked); the real music is routed in alongside it.
+    const g = raw.createGain();
+    g.gain.value = 0.0001;
+    osc = raw.createOscillator();
+    osc.frequency.value = 40;
+    osc.connect(g).connect(streamDest);
+    osc.start();
 
     el = document.createElement("audio");
     el.setAttribute("playsinline", "");
@@ -56,6 +68,8 @@ export function stopBackgroundKeepAlive() {
   started = false; // set first so keepPlaying() won't re-play during teardown
   if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
   setMasterSink(null); // back to the hardware output for manual playback
+  try { osc?.stop(); } catch { /* already stopped */ }
+  osc = null;
   if (el) {
     el.removeEventListener("pause", keepPlaying);
     el.pause();
