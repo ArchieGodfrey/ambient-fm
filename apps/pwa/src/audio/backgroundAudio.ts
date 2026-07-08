@@ -73,12 +73,14 @@ export function setMediaSessionTrack(title: string, artist = "Ambient FM") {
   } catch { /* unsupported */ }
 }
 
-// Wire the lock-screen play/pause buttons to app actions.
-export function setMediaSessionHandlers(handlers: { onPlay: () => void; onPause: () => void }) {
+// Wire the lock-screen transport buttons to app actions.
+export function setMediaSessionHandlers(handlers: { onPlay: () => void; onPause: () => void; onNext?: () => void; onPrev?: () => void }) {
   if (!("mediaSession" in navigator)) return;
   try {
     navigator.mediaSession.setActionHandler("play", () => handlers.onPlay());
     navigator.mediaSession.setActionHandler("pause", () => handlers.onPause());
+    navigator.mediaSession.setActionHandler("nexttrack", handlers.onNext ? () => handlers.onNext!() : null);
+    navigator.mediaSession.setActionHandler("previoustrack", handlers.onPrev ? () => handlers.onPrev!() : null);
   } catch { /* unsupported */ }
 }
 
@@ -87,6 +89,8 @@ export function clearMediaSession() {
   try {
     navigator.mediaSession.setActionHandler("play", null);
     navigator.mediaSession.setActionHandler("pause", null);
+    navigator.mediaSession.setActionHandler("nexttrack", null);
+    navigator.mediaSession.setActionHandler("previoustrack", null);
     navigator.mediaSession.metadata = null;
     navigator.mediaSession.playbackState = "none";
   } catch { /* unsupported */ }

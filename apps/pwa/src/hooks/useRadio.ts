@@ -15,6 +15,7 @@ import { soundToDirection } from "../sounds/soundDirection";
 import { recordFeedback, type TrackRef } from "../feedback/feedback";
 import { blendLean } from "../themes/presets";
 import { isModelLoaded } from "../ai/composer";
+import { generateTrackName } from "../ai/trackName";
 import { useAppStore } from "../store/useAppStore";
 import type { Sound } from "../sounds/types";
 import type { CompositionPlan } from "../ai/types";
@@ -28,48 +29,55 @@ export type NowPlaying = { title: string; mood: string; key: string } | null;
 
 // A pre-generated, not-yet-saved track waiting in the buffer.
 type QueueItem = { plan: CompositionPlan; intent: CompositionIntent; title: string; name?: string; yours?: boolean };
+// A track that has played (saved, has a sessionId) — the back/forward history.
+type PlayedItem = QueueItem & { sessionId: string | null };
 
-// The station: an autonomous generate → announce → play loop. It keeps a small
-// BUFFER of pre-generated tracks so transitions are instant and gapless — the
-// model stays loaded during a session (inference doesn't suspend audio; a model
-// LOAD does, so we never reload mid-session). When you tune out we unload the
-// model after a short grace period to free memory. Host lines are deterministic
-// (no inference), and buffered tracks are saved only when they actually play.
-const MIN_TRACK_MS = 120_000; // tracks run at least two minutes (loop if shorter)
+// The station. A playlist model: `played` is the history of tracks heard (each
+// saved), `cursor` is where we are in it, and `queue` is a buffer of
+// pre-generated (unsaved) future tracks. Advancing past the history pulls from
+// the buffer (instant, gapless); skip/previous move the cursor. The model stays
+// loaded only while a batch generates (keepAudio reload — no mid-session gap) and
+// is freed between batches / on idle. Host lines are deterministic (no inference).
+const MIN_TRACK_MS = 120_000;
 const FRESH_CAPTURE_MS = 15 * 60 * 1000;
-const BUFFER_SIZE = 5;        // how many tracks a batch fills the buffer to
-const LOW_WATER = 1;         // reload + refill once the buffer drops to this
-const UNLOAD_GRACE_MS = 45_000; // unload the model this long after tuning out
+const BUFFER_SIZE = 5;        // a batch fills the buffer to this
+const LOW_WATER = 1;          // reload + refill once the buffer drops to this
+const UNLOAD_GRACE_MS = 45_000;
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export default function useRadio(audio: AudioComposer, events: StimulusEvent[], model: ModelManager) {
   const { sounds } = useSounds();
   const { preference, yourSound } = usePreference();
-  const soundsRef = useRef(sounds);
-  soundsRef.current = sounds;
-  const prefRef = useRef({ preference, yourSound });
-  prefRef.current = { preference, yourSound };
-  const eventsRef = useRef(events);
-  eventsRef.current = events;
+  const soundsRef = useRef(sounds); soundsRef.current = sounds;
+  const prefRef = useRef({ preference, yourSound }); prefRef.current = { preference, yourSound };
+  const eventsRef = useRef(events); eventsRef.current = events;
 
   const runningRef = useRef(false);
-  const runIdRef = useRef(0); // bumped on every tune in/out; a stale cycle bails
+  const runIdRef = useRef(0);
   const timerRef = useRef<number | null>(null);
   const unloadTimerRef = useRef<number | null>(null);
-  const countRef = useRef(0);
-  const playingRef = useRef<TrackRef | null>(null); // the track currently on air
-  const queueRef = useRef<QueueItem[]>([]);           // pre-generated buffer
-  const fillingRef = useRef(false);                   // a fill loop is in progress
-  const genRef = useRef(0);                           // bumped to discard a stale fill (lean-in change)
+  const playingRef = useRef<TrackRef | null>(null);
+  const playedRef = useRef<PlayedItem[]>([]);   // history (saved)
+  const cursorRef = useRef(-1);                  // index into played
+  const queueRef = useRef<QueueItem[]>([]);      // future buffer (unsaved)
+  const fillingRef = useRef(false);
+  const genRef = useRef(0);                      // bumped to discard a stale fill (lean-in change)
+  const usedTitlesRef = useRef<Set<string>>(new Set());
   const leanIn = useAppStore((s) => s.leanIn);
   const [state, setState] = useState<RadioState>("idle");
   const [hostText, setHostText] = useState<string | null>(null);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying>(null);
+  const [canPrev, setCanPrev] = useState(false);
 
-  // What the DJ composes from: a leaned-in target (explicit) → a fresh capture →
-  // sometimes your emergent "Your Sound" → a random saved Sound.
-  const pickSource = useCallback((): { sound?: Partial<Sound>; name?: string; yours?: boolean } => {
+  // Stable public handles (so takeFloor/MediaSession keep one identity).
+  const apiRef = useRef<Record<string, (...a: never[]) => unknown>>({});
+  const tuneIn = useCallback(() => apiRef.current.tuneIn?.(), []);
+  const tuneOut = useCallback(() => apiRef.current.tuneOut?.(), []);
+  const skip = useCallback(() => apiRef.current.skip?.(), []);
+  const previous = useCallback(() => apiRef.current.previous?.(), []);
+
+  const pickSource = (): { sound?: Partial<Sound>; name?: string; yours?: boolean } => {
     const { preference: pref, yourSound: ys } = prefRef.current;
     const lean = useAppStore.getState().leanIn;
     if (lean) return { sound: blendLean(lean.sound, ys, pref.confidence), name: lean.name };
@@ -80,20 +88,16 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     if (!list.length) return {};
     const pick = list[Math.floor(Math.random() * list.length)];
     return { sound: pick, name: pick.name };
-  }, []);
+  };
 
-  // Top the buffer up to `target` tracks. Runs while the model is already loaded
-  // (during a session) so it never gaps audio. One fill at a time.
-  const fill = useCallback(async (rid: number, target: number) => {
+  // Top the buffer up to `target`. Reloads the model gaplessly (keepAudio) if it
+  // was freed between batches, then frees it again once the batch is generated.
+  const fill = async (rid: number, target: number) => {
     if (fillingRef.current || queueRef.current.length >= target) return;
     fillingRef.current = true;
     const gen = genRef.current;
     const live = () => runIdRef.current === rid && runningRef.current && genRef.current === gen;
     try {
-      // Reload the model if it was unloaded between batches — WITHOUT suspending
-      // audio (keepAudio), so the currently-playing track keeps going while the
-      // model loads in its worker. The reload is hidden behind the last buffered
-      // track, so the batch is ready before it ends.
       if (!isModelLoaded()) {
         const ok = await model.loadModelAction({ keepAudio: true });
         if (ok === false || !live()) return;
@@ -103,122 +107,155 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
         const direction = src.sound ? soundToDirection(src.sound) : undefined;
         const composed = await audio.composeTrack(undefined, direction, src.sound, { save: false });
         if (!composed || !live()) break;
-        queueRef.current.push({ plan: composed.plan, intent: composed.intent, title: composed.title, name: src.name, yours: src.yours });
+        let title = composed.title;
+        if (usedTitlesRef.current.has(title.toLowerCase())) title = generateTrackName(composed.plan); // dedupe identical titles
+        usedTitlesRef.current.add(title.toLowerCase());
+        queueRef.current.push({ plan: composed.plan, intent: composed.intent, title, name: src.name, yours: src.yours });
       }
     } finally {
-      // Free the model from memory between batches; the next low-water fill
-      // reloads it gaplessly (keepAudio) while a track is still playing.
       if (isModelLoaded()) await model.unloadModelAction();
       fillingRef.current = false;
     }
-  }, [audio, pickSource, model]);
-  const fillRef = useRef(fill);
-  fillRef.current = fill;
+  };
 
-  const tuneOut = useCallback(() => {
+  // Play whatever the cursor points at. announce → the DJ intros it (natural
+  // transitions / first tune-in); manual skip/prev are snappy (no voice).
+  const playCurrent = async (rid: number, opts: { announce: boolean; first?: boolean }) => {
+    const live = () => runIdRef.current === rid && runningRef.current;
+    const item = playedRef.current[cursorRef.current];
+    if (!item || !live()) return;
+    setCanPrev(cursorRef.current > 0);
+    duckTo(-16);
+    setNowPlaying({ title: item.title, mood: String(item.plan.globalMood ?? "ambient"), key: item.plan.key });
+    setMediaSessionTrack(item.title);
+    if (opts.announce) {
+      setState("announcing");
+      const line = opts.first ? hostWelcome(eventsRef.current) : hostIntro(item.title, item.plan, { soundName: item.name, yours: item.yours });
+      setHostText(line);
+      const playLine = await prepareLine(line);
+      if (!live()) return;
+      await playLine();
+      if (!live()) return;
+    }
+    setHostText(null);
+    setState("playing");
+    await audio.playComposed(item.plan, item.intent, item.title, item.sessionId);
+    playingRef.current = { sessionId: item.sessionId ?? "", mood: String(item.plan.globalMood ?? ""), key: item.plan.key, bpm: item.plan.bpm };
+    unduck();
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const ms = Math.max(MIN_TRACK_MS, Math.round((item.plan.duration ?? 120) * 1000));
+    timerRef.current = window.setTimeout(() => void apiRef.current.toNext?.(rid as never, { auto: true } as never), ms);
+  };
+
+  const toNext = async (rid: number, opts: { auto?: boolean; first?: boolean }) => {
+    const live = () => runIdRef.current === rid && runningRef.current;
+    if (!live()) return;
+    if (opts.auto && playingRef.current) void recordFeedback("complete", playingRef.current); // natural end only
+    playingRef.current = null;
+
+    if (queueRef.current.length <= LOW_WATER && !fillingRef.current) void fill(rid, BUFFER_SIZE);
+
+    if (cursorRef.current < playedRef.current.length - 1) {
+      cursorRef.current += 1; // forward through history — already heard, so quick
+      await playCurrent(rid, { announce: false });
+      return;
+    }
+
+    // Need a fresh track from the buffer.
+    if (queueRef.current.length === 0) {
+      duckTo(-16);
+      setState("generating");
+      const line = opts.first ? hostWelcome(eventsRef.current) : hostFiller(eventsRef.current);
+      setHostText(line);
+      const voiceP = (await prepareLine(line))();
+      while (queueRef.current.length === 0 && live()) await wait(200);
+      await voiceP;
+      if (!live()) return;
+    }
+    const q = queueRef.current.shift();
+    if (!q) { apiRef.current.tuneOut?.(); return; }
+    const sessionId = await audio.persistComposed(eventsRef.current, q.plan, q.title);
+    if (!live()) return;
+    playedRef.current.push({ ...q, sessionId });
+    cursorRef.current = playedRef.current.length - 1;
+    await playCurrent(rid, { announce: !!opts.auto || !!opts.first, first: opts.first });
+  };
+
+  const toPrev = async (rid: number) => {
+    const live = () => runIdRef.current === rid && runningRef.current;
+    if (!live() || cursorRef.current <= 0) return;
+    playingRef.current = null; // going back isn't a "complete"
+    cursorRef.current -= 1;
+    await playCurrent(rid, { announce: false });
+  };
+
+  function doTuneOut() {
     runningRef.current = false;
     runIdRef.current += 1;
     genRef.current += 1;
     queueRef.current = [];
+    playedRef.current = [];
+    cursorRef.current = -1;
+    usedTitlesRef.current.clear();
     playingRef.current = null;
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
     cancelHost();
-    setHostText(null);
-    setNowPlaying(null);
-    setState("idle");
+    setHostText(null); setNowPlaying(null); setState("idle"); setCanPrev(false);
     releaseFloor(tuneOut);
     audio.stopPlayback();
     unduck(0.3);
     stopBackgroundKeepAlive();
     setMediaSessionPlaying(false);
     clearMediaSession();
-    // Free the model from memory shortly after tuning out (cancelled if you tune
-    // back in first) — memory savings without ever gapping playback mid-session.
     if (unloadTimerRef.current) clearTimeout(unloadTimerRef.current);
     unloadTimerRef.current = window.setTimeout(() => {
       unloadTimerRef.current = null;
       if (!runningRef.current) void model.unloadModelAction();
     }, UNLOAD_GRACE_MS);
-  }, [audio, model]);
+  }
 
-  const cycle = useCallback(async (first: boolean, rid: number) => {
-    const live = () => runIdRef.current === rid && runningRef.current;
-    if (!live()) return;
-    // The track that was on air played to its natural end → a "complete" signal.
-    if (playingRef.current) { void recordFeedback("complete", playingRef.current); playingRef.current = null; }
-
-    // At the low-water mark, reload (gaplessly) and refill the batch in the
-    // background while the last buffered track plays.
-    if (queueRef.current.length <= LOW_WATER && !fillingRef.current) void fill(rid, BUFFER_SIZE);
-
-    // Nothing ready yet (cold start, or generation briefly fell behind) — narrate
-    // while we wait for the first buffered track.
-    if (queueRef.current.length === 0) {
-      duckTo(-16);
-      setState("generating");
-      const line = first ? hostWelcome(eventsRef.current) : hostFiller(eventsRef.current);
-      setHostText(line);
-      const voicePromise = (await prepareLine(line))();
-      while (queueRef.current.length === 0 && live()) await wait(200);
-      await voicePromise;
-      if (!live()) return;
-    }
-
-    const next = queueRef.current.shift();
-    if (!next) { tuneOut(); return; }
-
-    // Save the track now that it's actually playing, so the library reflects what
-    // was heard (buffered/regenerated tracks are never saved unless they play).
-    const sessionId = await audio.persistComposed(eventsRef.current, next.plan, next.title);
-    if (!live()) return;
-
-    setNowPlaying({ title: next.title, mood: String(next.plan.globalMood ?? "ambient"), key: next.plan.key });
-    setMediaSessionTrack(next.title);
-    setState("announcing");
-    const introLine = hostIntro(next.title, next.plan, { soundName: next.name, yours: next.yours });
-    setHostText(introLine);
-    const playIntro = await prepareLine(introLine);
-    if (!live()) return;
-    await playIntro();
-    if (!live()) return;
-
-    setHostText(null);
-    setState("playing");
-    await audio.playComposed(next.plan, next.intent, next.title, sessionId);
-    playingRef.current = { sessionId: sessionId ?? "", mood: String(next.plan.globalMood ?? ""), key: next.plan.key, bpm: next.plan.bpm };
-    unduck();
-    countRef.current += 1;
-
-    const ms = Math.max(MIN_TRACK_MS, Math.round((next.plan.duration ?? 120) * 1000));
-    timerRef.current = window.setTimeout(() => void cycle(false, rid), ms);
-  }, [audio, fill, tuneOut]);
-
-  const tuneIn = useCallback(() => {
+  function doTuneIn() {
     if (runningRef.current) return;
-    if (unloadTimerRef.current) { clearTimeout(unloadTimerRef.current); unloadTimerRef.current = null; } // keep the model warm
+    if (unloadTimerRef.current) { clearTimeout(unloadTimerRef.current); unloadTimerRef.current = null; }
     runningRef.current = true;
     runIdRef.current += 1;
     genRef.current += 1;
-    queueRef.current = [];
+    queueRef.current = []; playedRef.current = []; cursorRef.current = -1;
+    usedTitlesRef.current.clear();
     const rid = runIdRef.current;
-    countRef.current = 0;
     maybeAutoLoadVoice();
     takeFloor(tuneOut);
     startBackgroundKeepAlive();
-    setMediaSessionHandlers({ onPlay: tuneIn, onPause: tuneOut });
+    setMediaSessionHandlers({ onPlay: tuneIn, onPause: tuneOut, onNext: skip, onPrev: previous });
     setMediaSessionPlaying(true);
-    void cycle(true, rid);
-  }, [cycle, tuneOut]);
+    void toNext(rid, { first: true });
+  }
 
-  // A new lean-in target: drop the buffered (old-lean) tracks and bump the fill
-  // generation so any in-flight fill is discarded. The current track keeps playing
-  // (model stays loaded → no gap); the next track regenerates with the new lean.
+  function doSkip() {
+    if (!runningRef.current) return;
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    void toNext(runIdRef.current, { auto: false });
+  }
+  function doPrevious() {
+    if (!runningRef.current) return;
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    void toPrev(runIdRef.current);
+  }
+
+  apiRef.current = {
+    tuneIn: doTuneIn as never, tuneOut: doTuneOut as never, skip: doSkip as never,
+    previous: doPrevious as never, toNext: toNext as never, fill: fill as never,
+  };
+
+  // A new lean-in target: drop the buffered (old-lean) future tracks and bump the
+  // fill generation so any in-flight fill is discarded. History stays; the next
+  // new track regenerates with the new lean (gaplessly — model reloads keepAudio).
   useEffect(() => {
     if (!runningRef.current) return;
     genRef.current += 1;
     queueRef.current = [];
-    if (!fillingRef.current) void fillRef.current(runIdRef.current, BUFFER_SIZE);
+    if (!fillingRef.current) void apiRef.current.fill?.(runIdRef.current as never, BUFFER_SIZE as never);
   }, [leanIn]);
 
-  return { state, hostText, nowPlaying, tuneIn, tuneOut, isOn: state !== "idle", voiceAudible: voiceAudible() };
+  return { state, hostText, nowPlaying, tuneIn, tuneOut, skip, previous, canPrev, isOn: state !== "idle", voiceAudible: voiceAudible() };
 }

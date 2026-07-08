@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Radio as RadioIcon, Mic, Square, Heart, X, Sparkles } from "lucide-react";
+import { Radio as RadioIcon, Mic, Square, Heart, X, Sparkles, SkipBack, SkipForward } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import useCapture from "../hooks/useCapture";
 import useFeedback from "../hooks/useFeedback";
@@ -156,16 +156,27 @@ export default function Radio() {
         ) : null}
       </div>
 
-      {/* React to the current track */}
-      {radio.state === "playing" && sessionId ? (
-        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <button type="button" aria-label="Like" onClick={() => recordFeedback("like", { sessionId, mood: plan?.globalMood, key: plan?.key, bpm: plan?.bpm })}
-            style={{ ...reactBtn, ...(opinion === "like" ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" } : {}) }}>
-            <Heart size={17} fill={opinion === "like" ? "#fff" : "none"} />
+      {/* Transport + react to the current track */}
+      {on ? (
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", alignItems: "center" }}>
+          <button type="button" aria-label="Previous track" onClick={() => radio.previous()} disabled={!radio.canPrev}
+            style={{ ...reactBtn, opacity: radio.canPrev ? 1 : 0.4, cursor: radio.canPrev ? "pointer" : "default" }}>
+            <SkipBack size={17} />
           </button>
-          <button type="button" aria-label="Not for me" onClick={() => recordFeedback("dislike", { sessionId, mood: plan?.globalMood, key: plan?.key, bpm: plan?.bpm })}
-            style={{ ...reactBtn, ...(opinion === "dislike" ? { background: "#c2506f", color: "#fff", borderColor: "#c2506f" } : {}) }}>
-            <X size={17} />
+          {radio.state === "playing" && sessionId ? (
+            <>
+              <button type="button" aria-label="Like" onClick={() => recordFeedback("like", { sessionId, mood: plan?.globalMood, key: plan?.key, bpm: plan?.bpm })}
+                style={{ ...reactBtn, ...(opinion === "like" ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" } : {}) }}>
+                <Heart size={17} fill={opinion === "like" ? "#fff" : "none"} />
+              </button>
+              <button type="button" aria-label="Not for me" onClick={() => recordFeedback("dislike", { sessionId, mood: plan?.globalMood, key: plan?.key, bpm: plan?.bpm })}
+                style={{ ...reactBtn, ...(opinion === "dislike" ? { background: "#c2506f", color: "#fff", borderColor: "#c2506f" } : {}) }}>
+                <X size={17} />
+              </button>
+            </>
+          ) : null}
+          <button type="button" aria-label="Skip track" onClick={() => radio.skip()} style={reactBtn}>
+            <SkipForward size={17} />
           </button>
         </div>
       ) : null}
