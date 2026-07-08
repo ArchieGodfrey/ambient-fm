@@ -7,6 +7,7 @@ import { postToast } from "../utils/toast";
 import type { CompositionPlan } from "./types";
 import type { CompositionIntent } from "./intentSchema";
 import { buildCompositionPlanFromIntent } from "./intentToPlan";
+import { generateTrackName } from "./trackName";
 import { createSeed } from "../utils/randomField";
 import type { ComposerSettings } from "../features/composer/types";
 import type { StimulusEvent } from "../types";
@@ -14,7 +15,22 @@ import type { StimulusEvent } from "../types";
 export type GeneratedComposition = {
   plan: CompositionPlan;
   intent: CompositionIntent;
+  title: string;
 };
+
+// Accept the model's title only if it's a clean 2–4 word phrase; else null so the
+// caller falls back to the deterministic name.
+function cleanTitle(raw?: string): string | null {
+  if (typeof raw !== "string") return null;
+  const name = raw.replace(/^["'`*\s]+|["'`*.\s]+$/g, "").trim();
+  const words = name.split(/\s+/).filter(Boolean);
+  if (!name || words.length > 4 || name.length > 32) return null;
+  // Letters/spaces/apostrophe/hyphen only — rejects placeholders like "<title>".
+  if (!/^[a-z][a-z '-]*$/i.test(name)) return null;
+  // Don't let the small model copy the prompt's example title verbatim.
+  if (name.toLowerCase() === "drifting ember") return null;
+  return name;
+}
 
 export async function generateComposition(events: StimulusEvent[], composerSettings: ComposerSettings, direction?: CompositionDirection): Promise<GeneratedComposition> {
   if (!isModelLoaded()) {
@@ -57,8 +73,9 @@ export async function generateComposition(events: StimulusEvent[], composerSetti
     const biasedPlan = applyMemoryBias(plan, sessions);
     biasedPlan.seed = plan.seed;
     biasedPlan.intent = intent;
+    const title = cleanTitle(intent.title) ?? generateTrackName(biasedPlan);
     dispatchRuntimeStatus({ stage: "infer-ready", text: "Composition ready" });
-    return { plan: biasedPlan, intent };
+    return { plan: biasedPlan, intent, title };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("AI composer failed", error);

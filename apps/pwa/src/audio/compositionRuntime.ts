@@ -44,10 +44,20 @@ let snapshot: CompositionRuntimeSnapshot = {
   snapshotCount: 0,
 };
 let lastFrameTime = performance.now();
+let lastTickTime = 0;
 let audioRestartCount = 0;
 let snapshotCount = 0;
 let checkpointIntervalId: number | null = null;
 const subscribers = new Set<(snapshot: CompositionRuntimeSnapshot) => void>();
+
+// Battery: the tick recomputes drift/scheduler/audio params and re-renders every
+// subscriber. Running that at display refresh (~60fps) is wasteful — the musical
+// evolution is slow, so throttle the heavy work to ~20fps. rAF still fires (and
+// still auto-pauses when the tab hides), but most frames early-out cheaply.
+const TICK_INTERVAL_MS = 50;
+// Checkpoints are a crash-recovery convenience, not real-time — a coarser cadence
+// saves IndexedDB churn / wakeups.
+const CHECKPOINT_INTERVAL_MS = 15000;
 
 function getPlanDuration() {
   if (!plan) return 0;
@@ -127,7 +137,7 @@ function updateSnapshot(cursor: number, activeSection: CompositionSection | null
   const sectionTimeRemaining = getSectionTimeRemaining(cursor, activeSection);
   const runtimeUptime = plan ? (performance.now() - startTime) / 1000 : 0;
   const now = performance.now();
-  const frameDelay = Math.max(0, now - lastFrameTime - 16);
+  const frameDelay = Math.max(0, now - lastFrameTime - TICK_INTERVAL_MS);
   lastFrameTime = now;
 
   snapshot = {
@@ -191,7 +201,7 @@ function scheduleCheckpointing() {
 
     const count = await saveSnapshot(snapshotData);
     snapshotCount = count;
-  }, 5000);
+  }, CHECKPOINT_INTERVAL_MS);
 }
 
 function stopCheckpointing() {
@@ -202,15 +212,18 @@ function stopCheckpointing() {
 }
 
 function tick() {
-  if (!plan) {
-    rafId = requestAnimationFrame(tick);
-    return;
-  }
+  rafId = requestAnimationFrame(tick); // always reschedule first
+  if (!plan) return;
 
   if (performance.now() - startTime > MAX_RUNTIME_MS) {
     stopRuntimeLoop();
     return;
   }
+
+  // Throttle the heavy work to TICK_INTERVAL_MS; cheap frames just early-out.
+  const tickNow = performance.now();
+  if (tickNow - lastTickTime < TICK_INTERVAL_MS) return;
+  lastTickTime = tickNow;
 
   const elapsed = (performance.now() - startTime) / 1000;
   if (elapsed > plan.duration * 3) {
@@ -250,8 +263,24 @@ function tick() {
   Tone.Transport.bpm.value = derived.bpm;
   applySectionToAudio(activeSection, derived.layers, { ...plan, texture: derived.texture }, drift);
   updateSnapshot(cursor, activeSection, drift);
+}
 
-  rafId = requestAnimationFrame(tick);
+// Battery + background: when the app is hidden (screen locked / tab switched) the
+// visual runtime loop does nothing useful, so tear it down entirely — the audio
+// keeps playing on Tone's audio clock. On return, resume the loop and re-wake the
+// audio context (iOS may have suspended it).
+function handleVisibility() {
+  if (typeof document === "undefined") return;
+  if (document.hidden) {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  } else if (plan && rafId === null) {
+    lastTickTime = 0; // run the next frame immediately to catch up
+    void ensureAudioRunning();
+    rafId = requestAnimationFrame(tick);
+  }
 }
 
 export function startCompositionRuntime(planInput: CompositionPlan, startOffset = 0) {
@@ -294,10 +323,16 @@ export function startCompositionRuntime(planInput: CompositionPlan, startOffset 
 
 export function startRuntimeLoop() {
   if (rafId !== null) return;
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", handleVisibility);
+  }
   rafId = requestAnimationFrame(tick);
 }
 
 export function stopRuntimeLoop() {
+  if (typeof document !== "undefined") {
+    document.removeEventListener("visibilitychange", handleVisibility);
+  }
   if (rafId !== null) {
     cancelAnimationFrame(rafId);
     rafId = null;

@@ -25,7 +25,7 @@ function dayKey(ts: number) {
 
 export default function Journey() {
   const { sessions, deleteSession } = useSessionHistory();
-  const { audio } = useSession();
+  const { audio, radio } = useSession();
   const { createFromSound } = useSounds();
   const { opinionFor } = useFeedback();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -72,14 +72,14 @@ export default function Journey() {
       ) : (
         <>
           {/* The rack — flip through day discs */}
-          <div style={{ display: "flex", gap: 18, overflowX: "auto", padding: "6px 2px 14px", scrollbarWidth: "none" }}>
+          <div style={{ display: "flex", gap: 18, overflowX: "auto", padding: "14px 12px 16px", scrollbarWidth: "none" }}>
             {discs.map((d) => {
               const on = selected?.key === d.key;
               return (
                 <div key={d.key} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flexShrink: 0 }}>
                   <Disc
                     size={128}
-                    spinning={on && audio.isPlaying}
+                    spinning={on && audio.isPlaying && !radio.isOn}
                     mood={d.tracks[0]?.dominantMood}
                     label={d.date.toLocaleDateString(undefined, { day: "numeric" })}
                     sublabel={d.date.toLocaleDateString(undefined, { month: "short" })}

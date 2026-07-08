@@ -1,0 +1,108 @@
+// Background / locked-screen playback + lock-screen controls.
+//
+// iOS keeps a page's audio session — and therefore the Web Audio context playing
+// the music — alive while an <audio> element is actively playing REAL media. A
+// MediaStream element isn't reliably treated as such (it's closer to live
+// capture), so we loop a short, near-silent WAV FILE in a hidden element instead.
+// The element MUST start inside the tune-in tap gesture (iOS blocks play()
+// otherwise), so startBackgroundKeepAlive() is called synchronously from the
+// Tune-in click. The music itself stays on the normal Web Audio output.
+
+let el: HTMLAudioElement | null = null;
+let url: string | null = null;
+let started = false;
+
+// A 2s mono WAV of an inaudible 40Hz tone (like the old keep-alive oscillator) —
+// non-silent so iOS treats the element as genuinely playing, but far below
+// hearing. Built at runtime so there's no giant base64 blob in the bundle.
+function silentToneWavUrl(): string {
+  const rate = 8000, seconds = 2, n = rate * seconds, bytes = n * 2;
+  const buf = new ArrayBuffer(44 + bytes);
+  const dv = new DataView(buf);
+  const str = (o: number, s: string) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, "RIFF"); dv.setUint32(4, 36 + bytes, true); str(8, "WAVE");
+  str(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  str(36, "data"); dv.setUint32(40, bytes, true);
+  for (let i = 0; i < n; i++) dv.setInt16(44 + i * 2, Math.round(4 * Math.sin((2 * Math.PI * 40 * i) / rate)), true);
+  return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+}
+
+// iOS may pause the element (interruptions, returning from lock). Re-assert it.
+function keepPlaying() {
+  if (started && el && el.paused) void el.play().catch(() => { /* needs a gesture */ });
+}
+const onVisibility = () => { if (typeof document !== "undefined" && !document.hidden) keepPlaying(); };
+
+// MUST be called inside a user gesture (the Tune-in tap) so iOS allows playback.
+export function startBackgroundKeepAlive() {
+  if (started) return;
+  try {
+    url = silentToneWavUrl();
+    el = document.createElement("audio");
+    el.setAttribute("playsinline", "");
+    el.loop = true;
+    el.preload = "auto";
+    el.src = url;
+    el.style.display = "none";
+    el.addEventListener("pause", keepPlaying);
+    document.addEventListener("visibilitychange", onVisibility);
+    document.body.appendChild(el);
+    void el.play().catch(() => { /* outside a gesture — will retry via keepPlaying */ });
+    started = true;
+  } catch {
+    el = null;
+    if (url) { URL.revokeObjectURL(url); url = null; }
+  }
+}
+
+export function stopBackgroundKeepAlive() {
+  if (!started) return;
+  started = false; // set first so keepPlaying() won't re-play during teardown
+  if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
+  if (el) {
+    el.removeEventListener("pause", keepPlaying);
+    el.pause();
+    el.removeAttribute("src");
+    el.load();
+    el.remove();
+    el = null;
+  }
+  if (url) { URL.revokeObjectURL(url); url = null; }
+}
+
+// ── MediaSession: lock-screen transport ──
+
+export function setMediaSessionPlaying(playing: boolean) {
+  if (!("mediaSession" in navigator)) return;
+  try { navigator.mediaSession.playbackState = playing ? "playing" : "paused"; } catch { /* unsupported */ }
+}
+
+export function setMediaSessionTrack(title: string, artist = "Ambient FM") {
+  if (!("mediaSession" in navigator) || typeof MediaMetadata === "undefined") return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({ title, artist, album: "Ambient FM" });
+  } catch { /* unsupported */ }
+}
+
+export function setMediaSessionHandlers(handlers: { onPlay: () => void; onPause: () => void; onNext?: () => void; onPrev?: () => void }) {
+  if (!("mediaSession" in navigator)) return;
+  try {
+    navigator.mediaSession.setActionHandler("play", () => handlers.onPlay());
+    navigator.mediaSession.setActionHandler("pause", () => handlers.onPause());
+    navigator.mediaSession.setActionHandler("nexttrack", handlers.onNext ? () => handlers.onNext!() : null);
+    navigator.mediaSession.setActionHandler("previoustrack", handlers.onPrev ? () => handlers.onPrev!() : null);
+  } catch { /* unsupported */ }
+}
+
+export function clearMediaSession() {
+  if (!("mediaSession" in navigator)) return;
+  try {
+    navigator.mediaSession.setActionHandler("play", null);
+    navigator.mediaSession.setActionHandler("pause", null);
+    navigator.mediaSession.setActionHandler("nexttrack", null);
+    navigator.mediaSession.setActionHandler("previoustrack", null);
+    navigator.mediaSession.metadata = null;
+    navigator.mediaSession.playbackState = "none";
+  } catch { /* unsupported */ }
+}

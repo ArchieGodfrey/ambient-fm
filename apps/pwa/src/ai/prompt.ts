@@ -47,6 +47,7 @@ RULES:
 - The model should return a high-level composition intent that becomes a long-lived blueprint for the runtime.
 - The composition blueprint should preserve mood, identity, key, harmony, motif density, and evolution intent.
 - Use 3 to 5 chord degrees in the progression.
+- Include a short, evocative "title" (2 to 4 words) that fits the mood — no quotes or punctuation.
 - Keep the output minimal and avoid unnecessary extra detail.
 
 STIMULI:
@@ -76,7 +77,8 @@ OUTPUT FORMAT:
   "progression": [0, 5, 3, 6],
   "motifDensity": 0.6,
   "complexity": 0.3,
-  "energy": 0.4
+  "energy": 0.4,
+  "title": "Drifting Ember"
 }
 `;
 }

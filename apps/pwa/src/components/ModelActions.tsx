@@ -1,9 +1,7 @@
-import { useState } from "react";
+import { Download, Cpu, Trash2, RotateCcw, Loader } from "lucide-react";
+import { card, mutedNote, primaryButton, ghostButton } from "../ui/styles";
 
-type ModelOption = {
-  label: string;
-  model_id: string;
-};
+type ModelOption = { label: string; model_id: string };
 
 type ModelActionsProps = {
   availableModels: ModelOption[];
@@ -20,113 +18,62 @@ type ModelActionsProps = {
   onResetRuntime: () => Promise<void> | void;
 };
 
+// The on-device model, styled to match VoiceActions (one card, a status pill, a
+// primary action + secondary ghost actions) so the two management sections read
+// as one system.
 export default function ModelActions({
-  availableModels,
-  selectedModelId,
-  onSelectModel,
-  modelLoaded,
-  modelDownloaded,
-  modelProgress,
-  progressText,
-  onDownload,
-  onLoad,
-  onUnload,
-  onDelete,
-  onResetRuntime,
+  availableModels, selectedModelId, onSelectModel,
+  modelLoaded, modelDownloaded, modelProgress, progressText,
+  onDownload, onLoad, onUnload, onDelete, onResetRuntime,
 }: ModelActionsProps) {
-  const [expanded, setExpanded] = useState(false);
-  const primaryLabel = !modelDownloaded ? "Download model" : modelLoaded ? "Unload model" : "Load model";
+  const loading = modelProgress != null && modelProgress < 1;
+  const statusLabel = loading ? "Loading…" : modelLoaded ? "Loaded" : modelDownloaded ? "Downloaded" : "Not downloaded";
+  const statusColor = modelLoaded || modelDownloaded ? "var(--accent)" : "var(--text-faint)";
+  const primaryLabel = !modelDownloaded ? "Download model" : modelLoaded ? "Unload" : "Load model";
 
-  const handlePrimaryAction = () => {
-    if (!modelDownloaded) {
-      onDownload();
-      return;
-    }
-    if (modelLoaded) {
-      onUnload();
-      return;
-    }
+  const handlePrimary = () => {
+    if (!modelDownloaded) { onDownload(); return; }
+    if (modelLoaded) { onUnload(); return; }
     onLoad();
   };
 
-  const showBadge = progressText != null && progressText !== "Model loaded" && progressText !== "Model already cached";
-  const badgeLabel = progressText ?? (modelLoaded ? "Loaded" : modelDownloaded ? "Downloaded" : "Not downloaded");
-
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto 16px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface-strong)", overflow: "hidden" }}>
-      <button
-        type="button"
-        onClick={() => setExpanded((value) => !value)}
-        style={{
-          width: "100%",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "14px 18px",
-          border: "none",
-          background: "var(--surface)",
-          cursor: "pointer",
-          fontSize: 14,
-          fontWeight: 700,
-          color: "var(--text)",
-        }}
-      >
-        <span>
-          Model: {availableModels.find((model) => model.model_id === selectedModelId)?.label ?? selectedModelId}
+    <div style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-h)" }}>AI model</span>
+          <span style={mutedNote}>The on-device composer. Downloads once, then runs offline.</span>
         </span>
-        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {showBadge ? (
-            <span style={{ padding: "4px 10px", borderRadius: 999, background: "var(--accent-bg)", color: "var(--accent)", fontSize: 12, fontWeight: 700 }}>
-              {badgeLabel}
-            </span>
-          ) : (
-            <span style={{ padding: "4px 10px", borderRadius: 999, background: "var(--surface)", color: "var(--text-muted)", fontSize: 12 }}>
-              {badgeLabel}
-            </span>
-          )}
-          <span>{expanded ? "▲" : "▼"}</span>
-        </span>
-      </button>
-      {expanded ? (
-        <>
-          <div style={{ display: "grid", gap: 12, padding: "16px 18px" }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 14 }}>
-              Select model
-              <select
-                value={selectedModelId}
-                onChange={(event) => onSelectModel(event.target.value)}
-                style={{ fontSize: 14, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-strong)", color: "var(--text)" }}
-              >
-                {availableModels.map((model) => (
-                  <option key={model.model_id} value={model.model_id}>
-                    {model.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div style={{ fontSize: 13, color: "var(--text-muted)", padding: "12px 14px", borderRadius: 12, background: "var(--surface-strong)", border: "1px solid var(--border)" }}>
-              {progressText || (modelLoaded ? "Model loaded" : modelDownloaded ? "Ready to load" : "Model is not downloaded")}
-            </div>
-            {modelProgress != null ? (
-              <div style={{ width: "100%", height: 8, borderRadius: 999, background: "var(--border)", overflow: "hidden" }}>
-                <div style={{ width: `${Math.round(modelProgress * 100)}%`, height: "100%", background: "var(--text-h)" }} />
-              </div>
-            ) : null}
-            <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
-              <button type="button" onClick={handlePrimaryAction} style={{ fontSize: 14, padding: "10px 16px" }}>
-                {primaryLabel}
-              </button>
-              <button type="button" onClick={onDelete} style={{ fontSize: 14, padding: "10px 16px" }}>
-                Delete cache
-              </button>
-              <button type="button" onClick={onResetRuntime} style={{ fontSize: 14, padding: "10px 16px" }}>
-                Reset runtime
-              </button>
-            </div>
-          </div>
+        <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: statusColor }}>{statusLabel}</span>
+      </div>
 
-        </>
-      ) : null}
+      <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <span style={{ ...mutedNote, fontSize: 11.5 }}>Model</span>
+        <select value={selectedModelId} onChange={(e) => onSelectModel(e.target.value)}
+          style={{ fontSize: 14, padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--surface-strong)", color: "var(--text)" }}>
+          {availableModels.map((m) => <option key={m.model_id} value={m.model_id}>{m.label}</option>)}
+        </select>
+      </label>
+
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ height: 6, borderRadius: 3, background: "var(--surface-muted)", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.round((modelProgress ?? 0) * 100)}%`, background: "var(--accent)", transition: "width 0.2s ease" }} />
+          </div>
+          <span style={{ ...mutedNote, fontSize: 11.5 }}>{progressText || "working…"}</span>
+        </div>
+      ) : progressText ? <span style={{ ...mutedNote, fontSize: 11.5 }}>{progressText}</span> : null}
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button type="button" onClick={handlePrimary} disabled={loading} style={{ ...primaryButton, opacity: loading ? 0.6 : 1 }}>
+          {loading ? <span className="afm-spin"><Loader size={15} /></span> : !modelDownloaded ? <Download size={15} /> : <Cpu size={15} />}
+          {loading ? "Working…" : primaryLabel}
+        </button>
+        {modelDownloaded ? (
+          <button type="button" onClick={() => onDelete()} style={{ ...ghostButton, color: "#c2506f", borderColor: "#c2506f55" }}><Trash2 size={15} /> Delete</button>
+        ) : null}
+        <button type="button" onClick={() => onResetRuntime()} style={ghostButton}><RotateCcw size={15} /> Reset</button>
+      </div>
     </div>
   );
 }

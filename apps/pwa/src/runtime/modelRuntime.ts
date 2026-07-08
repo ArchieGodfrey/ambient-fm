@@ -39,12 +39,13 @@ async function createRuntime(
   progressCallback?: (report: InitProgressReport) => void,
   initPayload?: WorkerInitPayload,
   suppressHeartbeatWarnings = false,
+  opts?: { keepAudio?: boolean },
 ) {
   mlLayer.setStatusCallback(progressCallback);
   mlLayer.setSuppressHeartbeatWarnings(suppressHeartbeatWarnings);
   await destroyRuntime();
   try {
-    await runtimeKernel.init(getSelectedModelId(), appConfig, initPayload);
+    await runtimeKernel.init(getSelectedModelId(), appConfig, initPayload, opts);
   } catch (error) {
     await destroyRuntime();
     throw error;
@@ -74,12 +75,12 @@ export async function downloadModel(progressCallback?: (report: InitProgressRepo
   }
 }
 
-export async function loadModel(progressCallback?: (report: InitProgressReport) => void, initPayload?: WorkerInitPayload) {
+export async function loadModel(progressCallback?: (report: InitProgressReport) => void, initPayload?: WorkerInitPayload, opts?: { keepAudio?: boolean }) {
   dispatchRuntimeStatus({ stage: "load-start", text: "Loading model" });
   await assertColdStart();
   await checkMemorySafety();
   try {
-    await createRuntime(progressCallback, initPayload, true);
+    await createRuntime(progressCallback, initPayload, true, opts);
     loadedModel = true;
     dispatchRuntimeStatus({ stage: "load-complete", text: "Model loaded" });
   } catch (error) {

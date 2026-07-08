@@ -9,6 +9,7 @@ import {
   isModelLoaded,
 } from "../ai/composer";
 import { postToast } from "../utils/toast";
+import { requestPersistentStorage } from "../utils/install";
 
 type WorkerInitPayload = {
   canvas: OffscreenCanvas;
@@ -191,6 +192,7 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
   }
 
   async function downloadModelAction() {
+    void requestPersistentStorage(); // protect the multi-GB cache from eviction
     const alreadyDownloaded = await isModelDownloaded();
     const actionText = alreadyDownloaded ? "Model already cached. Ready to load from cache." : "Starting model download...";
     setStatus(actionText);
@@ -224,14 +226,14 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
     return success;
   }
 
-  async function loadModelAction() {
+  async function loadModelAction(opts?: { keepAudio?: boolean }) {
     setStatus("Starting model load...");
     setModelProgress(0);
     setProgressText("Loading model...");
 
     let success = true;
     try {
-      await loadModel(handleProgress, workerInitPayload);
+      await loadModel(handleProgress, workerInitPayload, opts);
       setModelLoaded(true);
       setModelProgress(1);
       setStatus("Model loaded");
