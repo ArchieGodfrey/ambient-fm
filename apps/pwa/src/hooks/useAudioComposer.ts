@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { startAudio, stopAudio, resumeAudioContext } from "../audio/toneEngine";
 import { playInsert, playEject } from "../audio/discSound";
+import { playRenderedBlob, stopRenderedBlob } from "../audio/renderedPlayer";
 import { takeFloor } from "../audio/playbackFloor";
 import { generateComposition, isModelLoaded } from "../ai/composer";
 import type { CompositionDirection } from "../ai/prompt";
@@ -204,10 +205,28 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     }
   }, [setSharedPlan, setCurrentTitle, setCurrentSessionId, setStoreIsPlaying]);
 
+  // Play a PRE-RENDERED track: the audio comes from a media element (renderedPlayer)
+  // instead of the live Web Audio graph, so it keeps playing when the phone is
+  // locked. No live composition runtime runs — the blob already is the finished
+  // audio. Used by the radio; shared plan/title/session are still set so the
+  // transport UI, disc visuals and feedback see the current track.
+  const playRenderedTrack = useCallback(async (composition: CompositionPlan, blob: Blob, title?: string | null, sessionId?: string | null) => {
+    setSharedPlan(composition);
+    setCurrentTitle(title ?? null);
+    setCurrentSessionId(sessionId ?? null);
+    setCurrentSessionSaved(true);
+    playInsert(); // disc-seat "chunk" (skipped while a render holds the context)
+    playRenderedBlob(blob);
+    setIsPlaying(true);
+    setStoreIsPlaying(true);
+    setStatus(`Now playing: ${composition.key}`);
+  }, [setSharedPlan, setCurrentTitle, setCurrentSessionId, setStoreIsPlaying]);
+
   // Stop everything (used by the radio's tune-out and manual stop).
   const stopPlayback = useCallback(() => {
     playEject();
     stopAudio();
+    stopRenderedBlob();
     stopRuntimeLoop();
     stopComposer();
     setIsPlaying(false);
@@ -306,6 +325,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     composePlanOnly,
     persistComposed,
     playComposed,
+    playRenderedTrack,
     stopPlayback,
     loadSessionPlan,
     loadStaticPlan,

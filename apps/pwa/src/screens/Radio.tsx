@@ -9,7 +9,6 @@ import { recordFeedback } from "../feedback/feedback";
 import { useAppStore } from "../store/useAppStore";
 import { unlockAudio } from "../audio/toneEngine";
 import { unlockVoice, maybeAutoLoadVoice } from "../audio/host";
-import { startBackgroundKeepAlive } from "../audio/backgroundAudio";
 import { buildRadioBubbles, type LeanTarget } from "../themes/presets";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
@@ -50,8 +49,10 @@ export default function Radio() {
   );
 
   const tuneIn = async () => {
+    // unlockAudio() (Tone.start) unlocks the audio session within the tap; the radio
+    // plays pre-rendered tracks through a media element, which keeps playing when
+    // locked — so no silent keep-alive element is needed here.
     unlockAudio(); unlockVoice(); maybeAutoLoadVoice();
-    startBackgroundKeepAlive(); // start the keep-alive WITHIN the tap gesture (iOS requires it)
     setPreparing(true);
     try { await startRadio(); } finally { setPreparing(false); }
   };

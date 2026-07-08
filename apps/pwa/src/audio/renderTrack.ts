@@ -1,6 +1,7 @@
 import * as Tone from "tone";
 import type { CompositionPlan, CompositionSection, Phrase } from "../ai/types";
 import { resetAudioModules, markLiveGraphDirty } from "./resetAudio";
+import { beginRender, endRender } from "./renderGate";
 import { initAudioGraph, applyComposition } from "./audioGraph";
 import { startScheduler, tick as schedulerTick } from "./sectionScheduler";
 import { activatePhrase, updatePhraseIntensity } from "./phraseRuntime";
@@ -84,7 +85,12 @@ export async function renderTrack(plan: CompositionPlan): Promise<Blob> {
       : 30;
   const duration = clamp(rawDuration, MIN_DURATION, MAX_DURATION);
 
-  const rendered = await Tone.Offline(async () => {
+  // Mark the render window: for its duration Tone's global context is offline, so
+  // the voice/SFX must wait or skip rather than play into the render.
+  beginRender();
+  let rendered: Awaited<ReturnType<typeof Tone.Offline>>;
+  try {
+    rendered = await Tone.Offline(async () => {
     // During the Offline callback the global Tone context IS the offline context,
     // so getTransport()/toDestination()/new Tone.Part etc. all bind to it.
     const transport = Tone.getTransport();
@@ -142,7 +148,10 @@ export async function renderTrack(plan: CompositionPlan): Promise<Blob> {
     }, RENDER_TICK_SECONDS);
 
     transport.start(0);
-  }, duration, 2);
+    }, duration, 2);
+  } finally {
+    endRender();
+  }
 
   const audioBuffer = rendered.get();
   if (!audioBuffer) {

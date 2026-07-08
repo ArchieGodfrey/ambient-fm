@@ -26,3 +26,10 @@ export function stopRenderedBlob() {
 export function isRenderedPlaying(): boolean {
   return !!el && !el.paused;
 }
+
+// Lower the rendered track under the DJ voice (and restore it after). The voice
+// plays on the live context, so this is the only way to duck the music now that
+// it comes from a media element rather than the Tone master.
+export function duckRendered(ducked: boolean) {
+  if (el) el.volume = ducked ? 0.25 : 1;
+}

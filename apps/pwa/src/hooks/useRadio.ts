@@ -6,7 +6,8 @@ import type useModelManager from "./useModelManager";
 import { prepareLine, cancelHost, voiceAudible, maybeAutoLoadVoice } from "../audio/host";
 import { duckTo, unduck } from "../audio/toneEngine";
 import { takeFloor, releaseFloor } from "../audio/playbackFloor";
-import { startBackgroundKeepAlive } from "../audio/backgroundAudio";
+import { renderTrack } from "../audio/renderTrack";
+import { duckRendered } from "../audio/renderedPlayer";
 import { hostWelcome, hostFiller, hostIntro } from "../ai/hostScript";
 import { soundToDirection } from "../sounds/soundDirection";
 import { recordFeedback, type TrackRef } from "../feedback/feedback";
@@ -24,8 +25,10 @@ type ModelManager = ReturnType<typeof useModelManager>;
 export type RadioState = "idle" | "announcing" | "generating" | "playing";
 export type NowPlaying = { title: string; mood: string; key: string } | null;
 
-// A pre-generated, not-yet-saved track waiting in the buffer.
-type QueueItem = { plan: CompositionPlan; intent: CompositionIntent; title: string; name?: string; yours?: boolean };
+// A pre-generated, not-yet-saved track waiting in the buffer. `blob` is the track
+// rendered to audio during buffering — played through a media element so it keeps
+// going when the phone is locked (the live Web Audio context is suspended on lock).
+type QueueItem = { plan: CompositionPlan; intent: CompositionIntent; title: string; name?: string; yours?: boolean; blob: Blob };
 // A track that has played (saved, has a sessionId) — the back/forward history.
 type PlayedItem = QueueItem & { sessionId: string | null };
 
@@ -107,7 +110,17 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
         let title = composed.title;
         if (usedTitlesRef.current.has(title.toLowerCase())) title = generateTrackName(composed.plan); // dedupe identical titles
         usedTitlesRef.current.add(title.toLowerCase());
-        queueRef.current.push({ plan: composed.plan, intent: composed.intent, title, name: src.name, yours: src.yours });
+        // Pre-render the track to audio while it's buffering, so playback can run
+        // through a media element (backgroundable). Skip a track that fails to render.
+        let blob: Blob;
+        try {
+          blob = await renderTrack(composed.plan);
+        } catch (e) {
+          console.error("Track render failed, skipping", e);
+          continue;
+        }
+        if (!live()) break;
+        queueRef.current.push({ plan: composed.plan, intent: composed.intent, title, name: src.name, yours: src.yours, blob });
       }
     } finally {
       if (isModelLoaded()) await model.unloadModelAction();
@@ -126,6 +139,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     setNowPlaying({ title: item.title, mood: String(item.plan.globalMood ?? "ambient"), key: item.plan.key });
     if (opts.announce) {
       setState("announcing");
+      duckRendered(true); // fade the outgoing track under the DJ line
       const line = opts.first ? hostWelcome(eventsRef.current) : hostIntro(item.title, item.plan, { soundName: item.name, yours: item.yours });
       setHostText(line);
       const playLine = await prepareLine(line);
@@ -135,9 +149,11 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     }
     setHostText(null);
     setState("playing");
-    await audio.playComposed(item.plan, item.intent, item.title, item.sessionId);
-    // If a tune-out raced in while playComposed was starting audio, it just
-    // un-stopped us — stop again so playback doesn't linger for a few seconds.
+    // Play the pre-rendered blob through a media element (survives lock). This
+    // replaces the previous track's element, so the new track starts at full volume.
+    await audio.playRenderedTrack(item.plan, item.blob, item.title, item.sessionId);
+    // If a tune-out raced in while playback was starting, it just un-stopped us —
+    // stop again so playback doesn't linger for a few seconds.
     if (!live()) { audio.stopPlayback(); return; }
     playingRef.current = { sessionId: item.sessionId ?? "", mood: String(item.plan.globalMood ?? ""), key: item.plan.key, bpm: item.plan.bpm };
     unduck();
@@ -225,7 +241,8 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     const rid = runIdRef.current;
     maybeAutoLoadVoice();
     takeFloor(tuneOut);
-    startBackgroundKeepAlive();
+    // No silent keep-alive element: the pre-rendered track's own media element is
+    // what keeps playback (and the lock-screen controls) alive when locked.
     void toNext(rid, { first: true });
   }
 
