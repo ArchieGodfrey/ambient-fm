@@ -4,10 +4,10 @@ import usePreference from "./usePreference";
 import type useAudioComposer from "./useAudioComposer";
 import type useModelManager from "./useModelManager";
 import { prepareLine, cancelHost, voiceAudible, maybeAutoLoadVoice } from "../audio/host";
-import { duckTo, unduck } from "../audio/toneEngine";
+import { duckTo, unduck, parkAudioContext, unparkAudioContext } from "../audio/toneEngine";
 import { takeFloor, releaseFloor } from "../audio/playbackFloor";
 import { renderTrack } from "../audio/renderTrack";
-import { duckRendered } from "../audio/renderedPlayer";
+import { duckRendered, isRenderedPlaying } from "../audio/renderedPlayer";
 import { getBed } from "../audio/djBed";
 import { playBed, fadeOutBed, stopBed } from "../audio/bedPlayer";
 import { hostIntroSegment, hostExtraLine, hostFiller, hostIntro, hostBackAnnounce, hostRequestAck } from "../ai/hostScript";
@@ -161,7 +161,9 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
       const line = i < seed.length ? seed[i] : hostExtraLine(eventsRef.current, i);
       if (!(await speakLine(line, live))) return;
       i += 1;
-      if (!ready() && live()) await wait(500); // a beat between lines
+      // Speak sparingly when a track is already playing under the DJ (it carries the
+      // silence); talk more often when only the ambient bed is filling it (tune-in).
+      if (!ready() && live()) await wait(isRenderedPlaying() ? 9000 : 2500);
     }
   };
 
@@ -196,6 +198,9 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     if (timerRef.current) clearTimeout(timerRef.current);
     const ms = Math.max(MIN_TRACK_MS, Math.round((track.plan.duration ?? 120) * 1000));
     timerRef.current = window.setTimeout(() => void apiRef.current.toNext?.(rid as never, { auto: true } as never), ms);
+    // Steady state: the track plays via the media element, so park the idle Tone
+    // context to save power (unparked again at the next transition / render).
+    void parkAudioContext();
   };
 
   // Play whatever the cursor points at. announce → the DJ intros it (natural
@@ -223,6 +228,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     const seq = ++playSeqRef.current;
     const live = () => runIdRef.current === rid && runningRef.current && playSeqRef.current === seq;
     if (!live()) return;
+    void unparkAudioContext(); // wake the base context for SFX / renders this transition
     if (opts.auto && playingRef.current) void recordFeedback("complete", playingRef.current); // natural end only
     playingRef.current = null;
 
@@ -266,6 +272,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     const seq = ++playSeqRef.current;
     const live = () => runIdRef.current === rid && runningRef.current && playSeqRef.current === seq;
     if (!live() || cursorRef.current <= 0) return;
+    void unparkAudioContext();
     playingRef.current = null; // going back isn't a "complete"
     cursorRef.current -= 1;
     await playCurrent(rid, { announce: false });
@@ -278,6 +285,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     const seq = ++playSeqRef.current;
     const live = () => runIdRef.current === rid && runningRef.current && playSeqRef.current === seq;
     if (!live()) return;
+    void unparkAudioContext();
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
     playingRef.current = null;
     duckTo(-16);

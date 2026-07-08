@@ -10,7 +10,7 @@ export default function StationSettings() {
   const field: React.CSSProperties = {
     width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10,
     border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-h)",
-    fontSize: 14, fontFamily: "inherit",
+    fontSize: 16, fontFamily: "inherit", // 16px avoids iOS focus auto-zoom
   };
   const labelText: React.CSSProperties = { fontSize: 13, fontWeight: 500, color: "var(--text-h)" };
 

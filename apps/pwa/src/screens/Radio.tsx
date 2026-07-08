@@ -1,11 +1,9 @@
 import { useMemo, useState } from "react";
-import { Radio as RadioIcon, Mic, Square, Heart, X, Sparkles, SkipBack, SkipForward, Send } from "lucide-react";
+import { Radio as RadioIcon, Mic, Square, Sparkles, Send } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import useCapture from "../hooks/useCapture";
-import useFeedback from "../hooks/useFeedback";
 import useSounds from "../hooks/useSounds";
 import usePreference from "../hooks/usePreference";
-import { recordFeedback } from "../feedback/feedback";
 import { useAppStore } from "../store/useAppStore";
 import { unlockAudio } from "../audio/toneEngine";
 import { unlockVoice, maybeAutoLoadVoice } from "../audio/host";
@@ -24,17 +22,13 @@ const RADIUS = 120;
 export default function Radio() {
   const { radio, startRadio, displayStatus, model } = useSession();
   const { recording, start, stop } = useCapture();
-  const { opinionFor } = useFeedback();
   const { sounds } = useSounds();
   const { preference, yourSound } = usePreference();
-  const sessionId = useAppStore((s) => s.currentSessionId);
-  const plan = useAppStore((s) => s.currentPlan);
   const events = useAppStore((s) => s.events);
   const leanIn = useAppStore((s) => s.leanIn);
   const setLeanIn = useAppStore((s) => s.setLeanIn);
   const [preparing, setPreparing] = useState(false);
   const [request, setRequest] = useState("");
-  const opinion = opinionFor(sessionId ?? undefined);
 
   const sendRequest = () => {
     const t = request.trim();
@@ -162,31 +156,6 @@ export default function Radio() {
         ) : null}
       </div>
 
-      {/* Transport + react to the current track */}
-      {on ? (
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", alignItems: "center" }}>
-          <button type="button" aria-label="Previous track" onClick={() => radio.previous()} disabled={!radio.canPrev}
-            style={{ ...reactBtn, opacity: radio.canPrev ? 1 : 0.4, cursor: radio.canPrev ? "pointer" : "default" }}>
-            <SkipBack size={17} />
-          </button>
-          {radio.state === "playing" && sessionId ? (
-            <>
-              <button type="button" aria-label="Like" onClick={() => recordFeedback("like", { sessionId, mood: plan?.globalMood, key: plan?.key, bpm: plan?.bpm })}
-                style={{ ...reactBtn, ...(opinion === "like" ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" } : {}) }}>
-                <Heart size={17} fill={opinion === "like" ? "#fff" : "none"} />
-              </button>
-              <button type="button" aria-label="Not for me" onClick={() => recordFeedback("dislike", { sessionId, mood: plan?.globalMood, key: plan?.key, bpm: plan?.bpm })}
-                style={{ ...reactBtn, ...(opinion === "dislike" ? { background: "#c2506f", color: "#fff", borderColor: "#c2506f" } : {}) }}>
-                <X size={17} />
-              </button>
-            </>
-          ) : null}
-          <button type="button" aria-label="Skip track" onClick={() => radio.skip()} style={reactBtn}>
-            <SkipForward size={17} />
-          </button>
-        </div>
-      ) : null}
-
       {needsDownload && !on && !busy ? (
         <p style={{ ...mutedNote, fontSize: 12, textAlign: "center", maxWidth: 320, marginInline: "auto" }}>
           First tune-in downloads the composer + voice (one time). The music eases in when it's ready.
@@ -225,7 +194,8 @@ export default function Radio() {
               onChange={(e) => setRequest(e.target.value)}
               placeholder="Write in a request for the host…"
               maxLength={120}
-              style={{ flex: 1, minWidth: 0, padding: "9px 14px", borderRadius: "var(--radius-pill)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-h)", fontSize: 13, fontFamily: "inherit" }}
+              // 16px: iOS Safari auto-zooms the page when focusing an input under 16px.
+              style={{ flex: 1, minWidth: 0, padding: "8px 14px", borderRadius: "var(--radius-pill)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-h)", fontSize: 16, fontFamily: "inherit" }}
             />
             <button type="submit" aria-label="Send request" disabled={!request.trim() || busy}
               style={{ ...reactBtn, width: 40, height: 40, opacity: (!request.trim() || busy) ? 0.4 : 1, cursor: (!request.trim() || busy) ? "default" : "pointer" }}>

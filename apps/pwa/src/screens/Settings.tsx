@@ -1,4 +1,5 @@
-import { RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { RefreshCw, RotateCcw, Power } from "lucide-react";
 import ModelActions from "../components/ModelActions";
 import VoiceActions from "../components/VoiceActions";
 import ThemeToggle from "../components/ThemeToggle";
@@ -7,12 +8,29 @@ import StationSettings from "../components/StationSettings";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
 import { resetApp } from "../utils/resetApp";
+import { parkAudioContext } from "../audio/toneEngine";
+import { suspendVoice } from "../audio/hostPiper";
+import { stopBed } from "../audio/bedPlayer";
 import { screen, screenEyebrow, screenTitle, sectionLabel, card, mutedNote, ghostButton } from "../ui/styles";
 
 export default function Settings() {
-  const { model, availableModels, selectedModelId, selectModelAction } = useSession();
+  const { model, audio, radio, availableModels, selectedModelId, selectModelAction } = useSession();
   const debug = useAppStore((s) => s.debug);
   const setDebug = useAppStore((s) => s.setDebug);
+  const [powerStatus, setPowerStatus] = useState<string | null>(null);
+
+  // Return the phone to a normal state: stop the radio + all playback, free the
+  // model (GPU), and suspend the audio contexts so nothing keeps running.
+  const switchEverythingOff = async () => {
+    setPowerStatus("Switching everything off…");
+    try { if (radio.isOn) radio.tuneOut(); } catch { /* ignore */ }
+    try { audio.stopPlayback(); } catch { /* ignore */ }
+    try { stopBed(); } catch { /* ignore */ }
+    try { suspendVoice(); } catch { /* ignore */ }
+    try { await model.unloadModelAction(); } catch { /* ignore */ }
+    try { await parkAudioContext(); } catch { /* ignore */ }
+    setPowerStatus("Everything's off. Safe to leave — it'll spin back up when you tune in.");
+  };
 
   return (
     <div style={screen} className="afm-rise">
@@ -60,7 +78,6 @@ export default function Settings() {
           onLoad={model.loadModelAction}
           onUnload={model.unloadModelAction}
           onDelete={model.deleteModelAction}
-          onResetRuntime={model.resetRuntimeAction}
         />
       </div>
 
@@ -75,10 +92,25 @@ export default function Settings() {
         </label>
         <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
           <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-h)" }}>Switch everything off</span>
+            <span style={mutedNote}>Stop the radio and all audio, free the model from memory, and idle the audio engine — returns the phone to a normal state.</span>
+            {powerStatus ? <span style={{ ...mutedNote, color: "var(--accent)" }}>{powerStatus}</span> : null}
+          </span>
+          <button type="button" onClick={() => void switchEverythingOff()} style={{ ...ghostButton, flexShrink: 0 }}><Power size={15} /> Off</button>
+        </div>
+        <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+          <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-h)" }}>Reset runtime</span>
+            <span style={mutedNote}>Tear down and rebuild the AI runtime if generation gets stuck. Keeps the downloaded model.</span>
+          </span>
+          <button type="button" onClick={() => void model.resetRuntimeAction()} style={{ ...ghostButton, flexShrink: 0 }}><RotateCcw size={15} /> Reset</button>
+        </div>
+        <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+          <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-h)" }}>Reset & reload</span>
             <span style={mutedNote}>Reload with the latest version if the app seems out of date. Keeps your sounds and downloaded models.</span>
           </span>
-          <button type="button" onClick={() => void resetApp()} style={{ ...ghostButton, flexShrink: 0 }}><RefreshCw size={15} /> Reset</button>
+          <button type="button" onClick={() => void resetApp()} style={{ ...ghostButton, flexShrink: 0 }}><RefreshCw size={15} /> Reload</button>
         </div>
       </div>
 

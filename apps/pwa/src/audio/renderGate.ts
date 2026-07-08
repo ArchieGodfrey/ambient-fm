@@ -7,6 +7,8 @@
 // (The DJ voice used to wait on this too, but it now runs on its own AudioContext
 // and no longer touches Tone's global context — so it can talk during a render.)
 
+import { unparkAudioContext } from "./toneEngine";
+
 let active = false;
 let chain: Promise<unknown> = Promise.resolve();
 
@@ -18,6 +20,9 @@ export function isRendering(): boolean {
 export function runRender<T>(fn: () => Promise<T>): Promise<T> {
   const result = chain.then(async () => {
     active = true;
+    // The radio may have parked (suspended) the base context for power; ensure it's
+    // live before rendering, since Tone.Offline is set up against the global context.
+    await unparkAudioContext();
     try {
       return await fn();
     } finally {

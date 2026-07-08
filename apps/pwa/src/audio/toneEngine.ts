@@ -116,3 +116,26 @@ export async function resumeAudio() {
   suspended = false;
   transportWasPlayingBeforeSuspend = false;
 }
+
+// ── Low-power "park" for the radio ──
+// The radio plays through a media element and never uses the live Tone graph, so
+// its AudioContext sits idle-but-running (an audio thread) during playback. Park =
+// suspend the raw context in the steady state; unpark before any transition, disc
+// SFX, or offline render. These are deliberately independent of the `suspended`
+// flag + transport used by the model-load path (that path is keepAudio for radio),
+// so the two never fight. Media-element playback is unaffected by either.
+function rawCtx(): { state?: string; suspend?: () => Promise<void>; resume?: () => Promise<void> } | null {
+  try { return Tone.getContext().rawContext as unknown as { state?: string; suspend?: () => Promise<void>; resume?: () => Promise<void> }; } catch { return null; }
+}
+export async function parkAudioContext() {
+  const c = rawCtx();
+  if (c && c.state === "running" && typeof c.suspend === "function") {
+    try { await c.suspend(); } catch { /* ignore */ }
+  }
+}
+export async function unparkAudioContext() {
+  const c = rawCtx();
+  if (c && c.state === "suspended" && typeof c.resume === "function") {
+    try { await c.resume(); } catch { /* ignore */ }
+  }
+}

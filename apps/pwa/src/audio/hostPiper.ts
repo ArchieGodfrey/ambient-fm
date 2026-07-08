@@ -183,3 +183,10 @@ export function resetVoiceSession(): void {
 export function unlockVoice(): void {
   try { void getVoiceCtx().resume?.(); } catch { /* ignore */ }
 }
+
+// Stop the voice and suspend its context (power-down). It resumes automatically on
+// the next voicePlay().
+export function suspendVoice(): void {
+  stopVoice();
+  try { if (voiceCtx && voiceCtx.state === "running") void voiceCtx.suspend?.(); } catch { /* ignore */ }
+}
