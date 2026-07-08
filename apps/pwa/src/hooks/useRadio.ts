@@ -12,6 +12,8 @@ import {
 import { hostWelcome, hostGreeting, hostFiller, hostIntro } from "../ai/hostScript";
 import { soundToDirection } from "../sounds/soundDirection";
 import { recordFeedback, type TrackRef } from "../feedback/feedback";
+import { blendThemeWithYourSound } from "../themes/presets";
+import { useAppStore } from "../store/useAppStore";
 import type { Sound } from "../sounds/types";
 import type { StimulusEvent } from "../types";
 
@@ -54,9 +56,13 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
   // we know you a little, sometimes your emergent "Your Sound"; otherwise a
   // random saved Sound.
   const pickSource = useCallback((): { sound?: Partial<Sound>; name?: string; yours?: boolean } => {
+    const { preference: pref, yourSound: ys } = prefRef.current;
+    // A leaned-in theme is an explicit request — honour it above everything, but
+    // blend it gently with the listener's emergent sound.
+    const leanIn = useAppStore.getState().leanIn;
+    if (leanIn) return { sound: blendThemeWithYourSound(leanIn, ys, pref.confidence), name: leanIn.name };
     const hasFreshCapture = eventsRef.current.some((e) => e.source === "audio" && Date.now() - e.timestamp < FRESH_CAPTURE_MS);
     if (hasFreshCapture) return {}; // the audio stimulus in events drives it
-    const { preference: pref, yourSound: ys } = prefRef.current;
     if (pref.confidence >= 0.3 && Math.random() < 0.5) return { sound: ys, yours: true }; // steer by preference
     const list = soundsRef.current;
     if (!list.length) return {};

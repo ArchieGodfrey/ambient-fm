@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { StimulusEvent } from "../types";
 import type { CompositionPlan } from "../ai/types";
 import type { ComposerSettings } from "../features/composer/types";
+import type { ThemePreset } from "../themes/presets";
 
 interface AppState {
   events: StimulusEvent[];
@@ -16,6 +17,9 @@ interface AppState {
   playToggle: (() => Promise<void> | void) | null;
   composerSettings: ComposerSettings;
   setComposerSettings: (settings: ComposerSettings) => void;
+  // A temporary mood/theme the station leans into until cancelled (null = auto).
+  leanIn: ThemePreset | null;
+  setLeanIn: (theme: ThemePreset | null) => void;
   setCurrentPlan: (plan: CompositionPlan | null) => void;
   setCurrentTitle: (title: string | null) => void;
   setCurrentSessionId: (id: string | null) => void;
@@ -61,6 +65,8 @@ export const useAppStore = create<AppState>((set) => ({
   currentSessionStatus: "Ready",
   playToggle: null,
   composerSettings: DEFAULT_COMPOSER_SETTINGS,
+  leanIn: null,
+  setLeanIn: (theme) => set({ leanIn: theme }),
 
   setEvents: (events) => set({ events }),
   addEvent: (event) =>

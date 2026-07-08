@@ -7,6 +7,7 @@ import { recordFeedback } from "../feedback/feedback";
 import { useAppStore } from "../store/useAppStore";
 import { unlockAudio } from "../audio/toneEngine";
 import { unlockVoice, maybeAutoLoadVoice } from "../audio/host";
+import { THEMES } from "../themes/presets";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
 // The station front door. Tune in → the composer runs an ongoing set, the DJ
@@ -19,6 +20,8 @@ export default function Radio() {
   const { opinionFor } = useFeedback();
   const sessionId = useAppStore((s) => s.currentSessionId);
   const plan = useAppStore((s) => s.currentPlan);
+  const leanIn = useAppStore((s) => s.leanIn);
+  const setLeanIn = useAppStore((s) => s.setLeanIn);
   const [preparing, setPreparing] = useState(false);
   const opinion = opinionFor(sessionId ?? undefined);
 
@@ -57,6 +60,38 @@ export default function Radio() {
         <span style={screenEyebrow}>Radio</span>
         <h1 style={screenTitle}>Your station</h1>
         <p style={mutedNote}>Tune in for an endless set. The DJ picks from your sounds — or the room around you, when you're capturing.</p>
+      </div>
+
+      {/* Lean into a mood/genre — a temporary steer that also gently shapes your sound */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", fontWeight: 700, color: "var(--text-faint)" }}>Lean into a mood</span>
+          {leanIn ? (
+            <button type="button" onClick={() => setLeanIn(null)} style={{ border: "none", background: "none", color: "var(--accent)", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0 }}>Clear</button>
+          ) : null}
+        </div>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, margin: "0 -2px", scrollbarWidth: "none" }}>
+          {THEMES.map((t) => {
+            const active = leanIn?.id === t.id;
+            return (
+              <button key={t.id} type="button" onClick={() => setLeanIn(active ? null : t)} title={t.blurb}
+                style={{
+                  flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 7,
+                  padding: "7px 13px", borderRadius: "var(--radius-pill)", cursor: "pointer", whiteSpace: "nowrap",
+                  fontSize: 13, fontWeight: 600, transition: "all 0.15s ease",
+                  border: "1px solid " + (active ? "var(--accent-border)" : "var(--border)"),
+                  background: active ? "var(--accent-soft)" : "var(--surface)",
+                  color: active ? "var(--accent)" : "var(--text-muted)",
+                }}>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: `hsl(${t.hue} 62% 62%)`, flexShrink: 0 }} />
+                {t.name}
+              </button>
+            );
+          })}
+        </div>
+        {leanIn ? (
+          <span style={{ ...mutedNote, fontSize: 12 }}>Leaning into <b style={{ color: "var(--text-h)" }}>{leanIn.name}</b> — {on ? "from the next track." : "starts when you tune in."} It gently shapes your sound the longer you stay.</span>
+        ) : null}
       </div>
 
       {/* On-air indicator + tune-in control */}
