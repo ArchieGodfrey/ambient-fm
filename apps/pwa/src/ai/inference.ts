@@ -32,7 +32,7 @@ function cleanTitle(raw?: string): string | null {
   return name;
 }
 
-export async function generateComposition(events: StimulusEvent[], composerSettings: ComposerSettings, direction?: CompositionDirection): Promise<GeneratedComposition> {
+export async function generateComposition(events: StimulusEvent[], composerSettings: ComposerSettings, direction?: CompositionDirection, mood?: import("../sounds/types").SoundMood): Promise<GeneratedComposition> {
   if (!isModelLoaded()) {
     throw new Error("Model not loaded. Load the model before generating a composition.");
   }
@@ -67,7 +67,7 @@ export async function generateComposition(events: StimulusEvent[], composerSetti
 
     // Build step — turning the intent into an audible plan (harmony, motifs, memory bias).
     const seed = createSeed();
-    const plan = buildCompositionPlanFromIntent(intent, composerSettings, seed);
+    const plan = buildCompositionPlanFromIntent(intent, composerSettings, seed, mood);
     plan.intent = intent;
     const sessions = await getLastSessionSummaries();
     const biasedPlan = applyMemoryBias(plan, sessions);
