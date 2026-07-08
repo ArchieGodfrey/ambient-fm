@@ -2,17 +2,16 @@ import * as Tone from "tone";
 
 // Background / locked-screen playback + lock-screen controls.
 //
-// A standalone playing <audio> element keeps iOS's media pipeline alive but iOS
-// still suspends the Web Audio CONTEXT separately (symptom: music stops when
-// locked, then resumes only when the DJ voice calls ctx.resume()). The fix is to
-// route the looping (near-silent) element INTO the Web Audio graph via
-// createMediaElementSource — that anchors the context to the playing element, so
-// iOS keeps the whole context alive in the background. The element must start
-// inside the tune-in tap gesture (iOS blocks play() otherwise); we also re-assert
-// play + resume the context on any interruption / return to foreground.
+// iOS suspends the live Web Audio CONTEXT on lock (symptom: music stops when
+// locked, resuming only when the audible DJ voice calls ctx.resume()). A standalone
+// media element, however, keeps its media playback going in the background and
+// keeps firing `timeupdate` — even when locked. So we loop a hidden near-silent
+// element and, on every timeupdate tick, resume the audio context — reviving the
+// music continuously while locked. (We deliberately do NOT route the element into
+// the graph via createMediaElementSource — that couples the element's playback to
+// the context's suspension, defeating the purpose.) Must start in the tune-in tap.
 
 let el: HTMLAudioElement | null = null;
-let elSource: MediaElementAudioSourceNode | null = null;
 let url: string | null = null;
 let started = false;
 
@@ -61,13 +60,9 @@ export function startBackgroundKeepAlive() {
     el.src = url;
     el.style.display = "none";
     document.body.appendChild(el);
-    // Route the element INTO the Web Audio graph so the context is anchored to a
-    // playing media element and iOS keeps it alive when locked. (createMediaElement
-    // Source can only be called once per element; we make a fresh element each time.)
-    const ctx = ctxRaw();
-    if (ctx) {
-      try { elSource = ctx.createMediaElementSource(el); elSource.connect(ctx.destination); } catch { /* already sourced / unsupported */ }
-    }
+    // The engine: every media tick (fires ~4x/sec, even when locked) revives the
+    // suspended music context.
+    el.addEventListener("timeupdate", resumeCtx);
     el.addEventListener("pause", keepPlaying);
     document.addEventListener("visibilitychange", onVisibility);
     void el.play().catch(() => { /* outside a gesture — will retry via keepPlaying */ });
@@ -82,9 +77,8 @@ export function stopBackgroundKeepAlive() {
   if (!started) return;
   started = false; // set first so keepPlaying() won't re-play during teardown
   if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
-  try { elSource?.disconnect(); } catch { /* not connected */ }
-  elSource = null;
   if (el) {
+    el.removeEventListener("timeupdate", resumeCtx);
     el.removeEventListener("pause", keepPlaying);
     el.pause();
     el.removeAttribute("src");
