@@ -3,8 +3,13 @@ import react from '@vitejs/plugin-react'
 import mkcert from 'vite-plugin-mkcert'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Base path differs by target: '/' for local dev/preview (served at root behind
+// the proxy), '/ambient-fm/' for the GitHub Project Pages deploy. The deploy
+// workflow sets BASE_PATH; everything else falls back to root.
+const base = process.env.BASE_PATH ?? '/'
+
 export default defineConfig({
-  base: '/',
+  base,
   // Pre-bundle the voice deps so piper-tts-web's runtime `import("onnxruntime-web")`
   // (a bare specifier) resolves in the browser — otherwise the dynamic import
   // fails with "error importing a module script".
@@ -17,7 +22,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
-      includeAssets: ['favicon.svg', 'manifest.webmanifest'],
+      includeAssets: ['favicon.svg'],
       devOptions: {
         // Dev service worker relies on the HMR socket (disabled behind the
         // proxy) and crashes on it; keep the SW to production builds only.
@@ -72,21 +77,21 @@ export default defineConfig({
             },
           },
         ],
-        navigateFallback: '/index.html',
+        navigateFallback: `${base}index.html`,
         navigateFallbackDenylist: [new RegExp('^\/api\/')],
       },
       manifest: {
         name: 'Ambient FM',
         short_name: 'AmbientFM',
         description: 'A minimal ambient audio PWA.',
-        start_url: '.',
-        scope: '/',
+        start_url: base,
+        scope: base,
         display: 'standalone',
         background_color: '#0f172a',
         theme_color: '#0f172a',
         icons: [
           {
-            src: '/favicon.svg',
+            src: `${base}favicon.svg`,
             sizes: 'any',
             type: 'image/svg+xml'
           }

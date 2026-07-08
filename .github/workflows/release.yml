@@ -62,6 +62,9 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Build PWA
+        env:
+          # Project Pages serves under /<repo>/ — build asset URLs to match.
+          BASE_PATH: /ambient-fm/
         run: |
           cd apps/pwa
           bun run build
