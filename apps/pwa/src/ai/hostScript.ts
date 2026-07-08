@@ -1,6 +1,6 @@
 import type { StimulusEvent } from "../types";
 import type { CompositionPlan } from "./types";
-import { computeEmotionalState } from "../stimulus/emotionalState";
+import { moodWord } from "../stimulus/emotionalState";
 import { getStation } from "../config/station";
 import { getPooledLine } from "./hostLines";
 
@@ -48,16 +48,6 @@ function weatherBits(events: StimulusEvent[]): { label: string; temp?: number } 
 function sceneLabel(events: StimulusEvent[]): string | null {
   const s = [...events].reverse().find((e) => (e.source === "photo" || e.source === "audio") && e.label);
   return s ? s.label.toLowerCase() : null;
-}
-
-// A one-word mood descriptor from the same emotional state the music is built on.
-function moodWord(events: StimulusEvent[]): string {
-  const s = computeEmotionalState(events);
-  if (s.tension > 0.55) return "restless";
-  if (s.energy > 0.55) return "lively";
-  if (s.brightness > 0.6) return "bright";
-  if (s.calmness > 0.55) return "calm";
-  return "easy";
 }
 
 function weatherLine(events: StimulusEvent[]): string | null {

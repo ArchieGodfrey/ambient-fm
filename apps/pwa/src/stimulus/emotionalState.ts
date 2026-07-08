@@ -75,3 +75,14 @@ export function computeEmotionalState(events: StimulusEvent[]): EmotionalState {
 
   return normalize({ energy, calmness, tension, brightness });
 }
+
+// A single-word mood descriptor from the emotional state — shared by the DJ host
+// lines (deterministic + LLM) so they stay in step.
+export function moodWord(events: StimulusEvent[]): string {
+  const s = computeEmotionalState(events);
+  if (s.tension > 0.55) return "restless";
+  if (s.energy > 0.55) return "lively";
+  if (s.brightness > 0.6) return "bright";
+  if (s.calmness > 0.55) return "calm";
+  return "easy";
+}

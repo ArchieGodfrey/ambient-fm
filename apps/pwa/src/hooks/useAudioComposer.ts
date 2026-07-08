@@ -5,7 +5,7 @@ import { playRenderedBlob, stopRenderedBlob } from "../audio/renderedPlayer";
 import { takeFloor } from "../audio/playbackFloor";
 import { generateComposition, isModelLoaded } from "../ai/composer";
 import type { CompositionDirection } from "../ai/prompt";
-import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop, subscribeRuntimeState } from "../audio/compositionRuntime";
+import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop } from "../audio/compositionRuntime";
 import { startComposer, stopComposer } from "../composer/runtime";
 import { db } from "../db/db";
 import { analyzeSession } from "../memory/analyzeSession";
@@ -17,7 +17,6 @@ import { useAppStore } from "../store/useAppStore";
 import type { CompositionPlan } from "../ai/types";
 import type { CompositionIntent } from "../ai/intentSchema";
 import type { StimulusEvent } from "../types";
-import type { CompositionRuntimeSnapshot } from "../audio/compositionRuntime";
 
 export default function useAudioComposer(events: StimulusEvent[]) {
   const setStoreIsPlaying = useAppStore((state) => state.setIsPlaying);
@@ -31,20 +30,6 @@ export default function useAudioComposer(events: StimulusEvent[]) {
   const [plan, setPlan] = useState<CompositionPlan | null>(null);
   const setCurrentPlan = useAppStore((state) => state.setCurrentPlan);
   const [currentSessionSaved, setCurrentSessionSaved] = useState(false);
-  const [runtimeState, setRuntimeState] = useState<CompositionRuntimeSnapshot>({
-    cursor: 0,
-    activeSection: null,
-    activePhrase: null,
-    intensity: 0,
-    drift: 0,
-    planDuration: 0,
-    sectionTimeRemaining: 0,
-    activeMotifs: 0,
-    runtimeUptime: 0,
-    frameDelay: 0,
-    audioRestartCount: 0,
-    snapshotCount: 0,
-  });
 
   const setSharedPlan = useCallback((planInput: CompositionPlan | null) => {
     setPlan(planInput);
@@ -122,11 +107,6 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       playToggleRef.current = handlePlayToggle;
     }
   }, [handlePlayToggle, setPlayToggle]);
-
-  useEffect(() => {
-    const unsubscribe = subscribeRuntimeState(setRuntimeState);
-    return unsubscribe;
-  }, []);
 
   type Composed = { plan: CompositionPlan; intent: CompositionIntent; title: string; sessionId: string | null };
 
@@ -318,7 +298,6 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     aiStatus,
     status,
     plan,
-    runtimeState,
     handlePlayToggle,
     runAIComposer,
     composeTrack,

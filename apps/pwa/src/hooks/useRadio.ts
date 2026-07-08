@@ -58,6 +58,11 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
 
   const runningRef = useRef(false);
   const runIdRef = useRef(0);
+  // Bumped by every playback transition (auto-advance / skip / prev / write-in) so a
+  // transition started mid-announce/mid-gap invalidates the in-flight flow (which is
+  // awaiting a DJ line) — preventing two flows racing over the element + buffer.
+  // Separate from runIdRef so it doesn't disturb the in-flight fill() batch.
+  const playSeqRef = useRef(0);
   const timerRef = useRef<number | null>(null);
   const unloadTimerRef = useRef<number | null>(null);
   const playingRef = useRef<TrackRef | null>(null);
@@ -135,10 +140,69 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     }
   };
 
+  // ── Shared DJ / playback helpers (one code path for every transition) ──
+
+  type Gen = { composed: NonNullable<Awaited<ReturnType<typeof audio.composeTrack>>>; blob: Blob } | null;
+
+  // Speak one DJ line; returns false if the run went stale mid-line (caller bails).
+  const speakLine = async (line: string, live: () => boolean): Promise<boolean> => {
+    setHostText(line);
+    const play = await prepareLine(line);
+    if (!live()) return false;
+    await play();
+    return live();
+  };
+
+  // Talk over the bed — a seed segment then rotating filler, ~500ms apart — until
+  // `ready()` flips or the run goes stale.
+  const talkUntil = async (live: () => boolean, ready: () => boolean, seed: string[]): Promise<void> => {
+    let i = 0;
+    while (!ready() && live()) {
+      const line = i < seed.length ? seed[i] : hostExtraLine(eventsRef.current, i);
+      if (!(await speakLine(line, live))) return;
+      i += 1;
+      if (!ready() && live()) await wait(500); // a beat between lines
+    }
+  };
+
+  // Compose a not-saved track and render it to a backgroundable blob, or null on failure.
+  const composeAndRender = async (
+    direction?: Parameters<typeof audio.composeTrack>[1],
+    sound?: Parameters<typeof audio.composeTrack>[2],
+  ): Promise<Gen> => {
+    try {
+      const composed = await audio.composeTrack(undefined, direction, sound, { save: false });
+      if (!composed) return null;
+      const blob = await renderTrack(composed.plan);
+      return { composed, blob };
+    } catch (e) { console.error("Compose/render failed", e); return null; }
+  };
+
+  // The common playback-start tail: play the rendered blob + arm the advance timer.
+  const startPlayingRendered = async (
+    rid: number,
+    live: () => boolean,
+    track: { plan: CompositionPlan; blob: Blob; title: string; sessionId: string | null },
+  ): Promise<void> => {
+    setHostText(null);
+    setState("playing");
+    fadeOutBed(); // bring the ambient bed down as the track comes in (no-op if idle)
+    // A fresh media element (full volume) replaces the previous track's; survives lock.
+    await audio.playRenderedTrack(track.plan, track.blob, track.title, track.sessionId);
+    // If a tune-out / transition raced in while playback was starting, bail cleanly.
+    if (!live()) { audio.stopPlayback(); return; }
+    playingRef.current = { sessionId: track.sessionId ?? "", mood: String(track.plan.globalMood ?? ""), key: track.plan.key, bpm: track.plan.bpm };
+    unduck();
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const ms = Math.max(MIN_TRACK_MS, Math.round((track.plan.duration ?? 120) * 1000));
+    timerRef.current = window.setTimeout(() => void apiRef.current.toNext?.(rid as never, { auto: true } as never), ms);
+  };
+
   // Play whatever the cursor points at. announce → the DJ intros it (natural
   // transitions / first tune-in); manual skip/prev are snappy (no voice).
   const playCurrent = async (rid: number, opts: { announce: boolean; first?: boolean }) => {
-    const live = () => runIdRef.current === rid && runningRef.current;
+    const seq = playSeqRef.current; // shares its caller's transition seq
+    const live = () => runIdRef.current === rid && runningRef.current && playSeqRef.current === seq;
     const item = playedRef.current[cursorRef.current];
     if (!item || !live()) return;
     setCanPrev(cursorRef.current > 0);
@@ -149,33 +213,15 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
       duckRendered(true); // fade the outgoing track under the DJ line
       // Back-announce the track that just played, then intro this one.
       const prevTitle = cursorRef.current > 0 ? playedRef.current[cursorRef.current - 1]?.title : null;
-      const back = hostBackAnnounce(prevTitle);
-      const intro = hostIntro(item.title, item.plan, { soundName: item.name, yours: item.yours, events: eventsRef.current });
-      const line = [back, intro].filter(Boolean).join(" ");
-      setHostText(line);
-      const playLine = await prepareLine(line);
-      if (!live()) return;
-      await playLine();
-      if (!live()) return;
+      const line = [hostBackAnnounce(prevTitle), hostIntro(item.title, item.plan, { soundName: item.name, yours: item.yours, events: eventsRef.current })].filter(Boolean).join(" ");
+      if (!(await speakLine(line, live))) return;
     }
-    setHostText(null);
-    setState("playing");
-    fadeOutBed(); // bring the ambient bed down as the track comes in (no-op if idle)
-    // Play the pre-rendered blob through a media element (survives lock). This
-    // replaces the previous track's element, so the new track starts at full volume.
-    await audio.playRenderedTrack(item.plan, item.blob, item.title, item.sessionId);
-    // If a tune-out raced in while playback was starting, it just un-stopped us —
-    // stop again so playback doesn't linger for a few seconds.
-    if (!live()) { audio.stopPlayback(); return; }
-    playingRef.current = { sessionId: item.sessionId ?? "", mood: String(item.plan.globalMood ?? ""), key: item.plan.key, bpm: item.plan.bpm };
-    unduck();
-    if (timerRef.current) clearTimeout(timerRef.current);
-    const ms = Math.max(MIN_TRACK_MS, Math.round((item.plan.duration ?? 120) * 1000));
-    timerRef.current = window.setTimeout(() => void apiRef.current.toNext?.(rid as never, { auto: true } as never), ms);
+    await startPlayingRendered(rid, live, item);
   };
 
   const toNext = async (rid: number, opts: { auto?: boolean; first?: boolean }) => {
-    const live = () => runIdRef.current === rid && runningRef.current;
+    const seq = ++playSeqRef.current;
+    const live = () => runIdRef.current === rid && runningRef.current && playSeqRef.current === seq;
     if (!live()) return;
     if (opts.auto && playingRef.current) void recordFeedback("complete", playingRef.current); // natural end only
     playingRef.current = null;
@@ -189,9 +235,8 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     }
 
     // Need a fresh track from the buffer. If it isn't ready, cover the wait with the
-    // DJ over a soft ambient bed: keep talking (intro segment → rotating
-    // observations) until the track is ready, then name it. If we announced here,
-    // don't ALSO announce in playCurrent below.
+    // DJ over a soft ambient bed: talk (intro segment → rotating observations) until
+    // the track is ready, then name it. If we announced here, don't re-announce below.
     let didAnnounceInGap = false;
     if (queueRef.current.length === 0) {
       duckTo(-16);
@@ -199,26 +244,12 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
       // Ambient bed under the DJ — renders once (~1s) then loops quietly.
       void getBed().then((bed) => { if (live() && queueRef.current.length === 0) playBed(bed); }).catch(() => { /* bed is optional */ });
       const segment = opts.first ? hostIntroSegment(eventsRef.current) : [hostFiller(eventsRef.current)];
-      let i = 0;
-      while (queueRef.current.length === 0 && live()) {
-        const line = i < segment.length ? segment[i] : hostExtraLine(eventsRef.current, i);
-        setHostText(line);
-        const playLine = await prepareLine(line);
-        if (!live()) return;
-        await playLine();
-        if (!live()) return;
-        i += 1;
-        if (queueRef.current.length === 0 && live()) await wait(500); // a beat between lines
-      }
-      // Track is ready — name it as the hand-off line, then let it play.
+      await talkUntil(live, () => queueRef.current.length !== 0, segment);
+      if (!live()) return;
       const upcoming = queueRef.current[0];
-      if (upcoming && live()) {
+      if (upcoming) {
         const introLine = hostIntro(upcoming.title, upcoming.plan, { soundName: upcoming.name, yours: upcoming.yours, events: eventsRef.current });
-        setHostText(introLine);
-        const playIntro = await prepareLine(introLine);
-        if (!live()) return;
-        await playIntro();
-        if (!live()) return;
+        if (!(await speakLine(introLine, live))) return;
         didAnnounceInGap = true;
       }
     }
@@ -232,7 +263,8 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
   };
 
   const toPrev = async (rid: number) => {
-    const live = () => runIdRef.current === rid && runningRef.current;
+    const seq = ++playSeqRef.current;
+    const live = () => runIdRef.current === rid && runningRef.current && playSeqRef.current === seq;
     if (!live() || cursorRef.current <= 0) return;
     playingRef.current = null; // going back isn't a "complete"
     cursorRef.current -= 1;
@@ -242,9 +274,9 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
   // A listener write-in request: the host reads it out over the bed while a bespoke
   // track is generated from the request text, then plays it next (interrupts the
   // current track). Self-contained so it doesn't tangle with the pre-gen buffer.
-  type Gen = { composed: NonNullable<Awaited<ReturnType<typeof audio.composeTrack>>>; blob: Blob } | null;
   const playRequest = async (rid: number, text: string) => {
-    const live = () => runIdRef.current === rid && runningRef.current;
+    const seq = ++playSeqRef.current;
+    const live = () => runIdRef.current === rid && runningRef.current && playSeqRef.current === seq;
     if (!live()) return;
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
     playingRef.current = null;
@@ -259,32 +291,11 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
       if (ok === false || !live()) return;
       loadedHere = true;
     }
-    // Generate the bespoke track from the request (direction = the request text).
-    const genP: Promise<Gen> = (async () => {
-      try {
-        const composed = await audio.composeTrack(undefined, { vibe: text, instruction: text }, undefined, { save: false });
-        if (!composed) return null;
-        const blob = await renderTrack(composed.plan);
-        return { composed, blob };
-      } catch (e) { console.error("Request generation failed", e); return null; }
-    })();
-
-    // Read the request aloud over the bed until the track is ready.
-    const ack = hostRequestAck(text, eventsRef.current);
+    // Generate the bespoke track (direction = the request text) while reading it aloud.
+    const genP = composeAndRender({ vibe: text, instruction: text });
     let result: Gen = null; let done = false;
     void genP.then((r) => { result = r; done = true; });
-    let i = 0;
-    while (!done && live()) {
-      const line = i < ack.length ? ack[i] : hostExtraLine(eventsRef.current, i);
-      setHostText(line);
-      const playLine = await prepareLine(line);
-      if (!live()) return;
-      await playLine();
-      if (!live()) return;
-      i += 1;
-      if (!done && live()) await wait(500);
-    }
-    if (!result) await genP; // ensure settled if the loop exited on the last line
+    await talkUntil(live, () => done, hostRequestAck(text, eventsRef.current));
     result = result ?? (await genP);
     if (loadedHere && isModelLoaded()) await model.unloadModelAction();
     if (!live()) return;
@@ -297,16 +308,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     cursorRef.current = playedRef.current.length - 1;
     setCanPrev(cursorRef.current > 0);
     setNowPlaying({ title: composed.title, mood: String(composed.plan.globalMood ?? "ambient"), key: composed.plan.key });
-    setHostText(null);
-    setState("playing");
-    fadeOutBed();
-    await audio.playRenderedTrack(composed.plan, blob, composed.title, sessionId);
-    if (!live()) { audio.stopPlayback(); return; }
-    playingRef.current = { sessionId: sessionId ?? "", mood: String(composed.plan.globalMood ?? ""), key: composed.plan.key, bpm: composed.plan.bpm };
-    unduck();
-    if (timerRef.current) clearTimeout(timerRef.current);
-    const ms = Math.max(MIN_TRACK_MS, Math.round((composed.plan.duration ?? 120) * 1000));
-    timerRef.current = window.setTimeout(() => void apiRef.current.toNext?.(rid as never, { auto: true } as never), ms);
+    await startPlayingRendered(rid, live, { plan: composed.plan, blob, title: composed.title, sessionId });
   };
 
   function doTuneOut() {
@@ -348,20 +350,28 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     void toNext(rid, { first: true });
   }
 
+  // Stop any in-flight DJ line / bed before a new transition starts, so the
+  // outgoing audio doesn't linger over the new flow. (The seq bump inside
+  // toNext/toPrev/playRequest is what actually invalidates the old coroutine.)
+  function interruptFlow() {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    cancelHost();
+    fadeOutBed();
+  }
   function doSkip() {
     if (!runningRef.current) return;
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    interruptFlow();
     void toNext(runIdRef.current, { auto: false });
   }
   function doPrevious() {
     if (!runningRef.current) return;
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    interruptFlow();
     void toPrev(runIdRef.current);
   }
   function doWriteIn(text: string) {
     const t = text.trim();
     if (!t || !runningRef.current) return;
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    interruptFlow();
     void playRequest(runIdRef.current, t);
   }
 

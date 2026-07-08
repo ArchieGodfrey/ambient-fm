@@ -1,6 +1,6 @@
 import { infer, isModelLoaded } from "../runtime/modelRuntime";
 import { sanitizeJsonResponse, tryParseJsonWithRecovery } from "./prompt";
-import { computeEmotionalState } from "../stimulus/emotionalState";
+import { moodWord } from "../stimulus/emotionalState";
 import { getStation } from "../config/station";
 import type { StimulusEvent } from "../types";
 
@@ -50,15 +50,6 @@ export function getPooledLine(category: HostPoolCategory, seed: number): string 
   const arr = p[category];
   if (!arr?.length) return null;
   return arr[((seed % arr.length) + arr.length) % arr.length];
-}
-
-function moodWord(events: StimulusEvent[]): string {
-  const s = computeEmotionalState(events);
-  if (s.tension > 0.55) return "restless";
-  if (s.energy > 0.55) return "lively";
-  if (s.brightness > 0.6) return "bright";
-  if (s.calmness > 0.55) return "calm";
-  return "easy";
 }
 
 function buildPrompt(events: StimulusEvent[]): string {

@@ -134,6 +134,7 @@ function notifySubscribers() {
 }
 
 function updateSnapshot(cursor: number, activeSection: CompositionSection | null, drift: number) {
+  if (subscribers.size === 0) return; // nobody listening → skip the per-tick snapshot build
   const intensity = activeSection?.intensity ?? 0.5;
   const sectionTimeRemaining = getSectionTimeRemaining(cursor, activeSection);
   const runtimeUptime = plan ? (performance.now() - startTime) / 1000 : 0;
