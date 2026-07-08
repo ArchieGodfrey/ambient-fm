@@ -1,19 +1,30 @@
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "../session/SessionProvider";
 
 // A subtle, ambient indicator of how hard the app is working (≈ how much battery
-// it's drawing right now): a faint accent glow from the top that grows with the
-// runtime workload. Idle → invisible; playing → faint; generating/loading →
-// strongest. Purely decorative (pointer-events: none), sits above content at very
-// low opacity so it never hurts readability.
+// it's drawing): an accent glow from the top that's strongest while the model is
+// working (loading or composing), softer during plain playback, gone when idle.
+// Purely decorative (pointer-events: none). Model activity is bursty, so we hold
+// the "busy" state briefly after it clears so each burst is actually visible.
 export default function WorkloadTint() {
   const { radio, model, isGenerating } = useSession();
+  const [busy, setBusy] = useState(false);
+  const clearRef = useRef<number | null>(null);
 
-  const loading = model.modelProgress != null && model.modelProgress < 1;
-  const level =
-    loading ? 1
-    : isGenerating || radio.state === "generating" ? 0.85
-    : radio.state === "announcing" ? 0.45
-    : radio.state === "playing" ? 0.28
+  // Any model activity sets modelProgress (load or per-track inference).
+  const active = model.modelProgress != null || isGenerating || radio.state === "generating";
+  useEffect(() => {
+    if (active) {
+      if (clearRef.current) { clearTimeout(clearRef.current); clearRef.current = null; }
+      setBusy(true);
+    } else if (busy && clearRef.current == null) {
+      clearRef.current = window.setTimeout(() => { setBusy(false); clearRef.current = null; }, 1800);
+    }
+  }, [active, busy]);
+
+  const opacity =
+    busy ? 0.6
+    : radio.state === "playing" || radio.state === "announcing" ? 0.22
     : 0;
 
   return (
@@ -25,9 +36,9 @@ export default function WorkloadTint() {
         zIndex: 5,
         pointerEvents: "none",
         background:
-          "radial-gradient(135% 90% at 50% 0%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 62%)",
-        opacity: level,
-        transition: "opacity 1.1s ease",
+          "radial-gradient(150% 100% at 50% 0%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 58%)",
+        opacity,
+        transition: "opacity 0.9s ease",
       }}
     />
   );

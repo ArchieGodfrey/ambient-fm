@@ -24,7 +24,11 @@ function cleanTitle(raw?: string): string | null {
   if (typeof raw !== "string") return null;
   const name = raw.replace(/^["'`*\s]+|["'`*.\s]+$/g, "").trim();
   const words = name.split(/\s+/).filter(Boolean);
-  if (!name || words.length > 4 || name.length > 32 || !/[a-z]/i.test(name)) return null;
+  if (!name || words.length > 4 || name.length > 32) return null;
+  // Letters/spaces/apostrophe/hyphen only — rejects placeholders like "<title>".
+  if (!/^[a-z][a-z '-]*$/i.test(name)) return null;
+  // Don't let the small model copy the prompt's example title verbatim.
+  if (name.toLowerCase() === "drifting ember") return null;
   return name;
 }
 

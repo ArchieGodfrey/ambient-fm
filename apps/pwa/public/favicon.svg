@@ -27,9 +27,9 @@
     <clipPath id="discClip"><circle cx="256" cy="256" r="190"/></clipPath>
   </defs>
 
-  <!-- app background: full-bleed square (iOS/Android apply their own icon mask;
-       a rounded source would leave transparent corners → white on the home screen) -->
-  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- app background: full-bleed solid (iOS/Android apply their own icon mask; a
+       solid fill avoids any gradient banding that can read as a faint seam) -->
+  <rect width="512" height="512" fill="#231d47"/>
 
   <!-- disc body -->
   <circle cx="256" cy="256" r="190" fill="url(#disc)"/>
