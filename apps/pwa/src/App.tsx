@@ -10,6 +10,7 @@ import NowPlaying from "./components/NowPlaying";
 import DebugLog from "./components/DebugLog";
 import InstallGate from "./components/InstallGate";
 import SetupWizard from "./components/SetupWizard";
+import WorkloadTint from "./components/WorkloadTint";
 import { isStandalone, isOnboarded, isSetupDone } from "./utils/install";
 import { useAppStore } from "./store/useAppStore";
 
@@ -45,6 +46,7 @@ export default function App() {
 
   return (
     <SessionProvider>
+      <WorkloadTint />
       {phase === "install" ? (
         <InstallGate onContinue={() => setPhase(isSetupDone() ? "app" : "setup")} />
       ) : phase === "setup" ? (

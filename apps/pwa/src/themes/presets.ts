@@ -1,5 +1,6 @@
 import type { Sound, SoundMood } from "../sounds/types";
 import type { ComposerSettings } from "../features/composer/types";
+import { describeMood } from "../sounds/previewPlan";
 
 // Seed themes/genres you can "lean into" from the Radio. Each is a Partial<Sound>,
 // so it flows through the existing soundToDirection → composeTrack path unchanged.
@@ -89,28 +90,73 @@ function lerpMood(a: SoundMood, b: SoundMood, t: number): SoundMood {
   };
 }
 
-// Turn a theme into the Partial<Sound> the radio composes from, blending its mood
-// gently (~30%) toward the listener's emergent "Your Sound" when we know them —
-// so the genre leads but still feels personal. Structure (key/progression/tempo/
-// layers/vibe) stays the theme's.
-export function blendThemeWithYourSound(
-  theme: ThemePreset,
-  yourSound?: Partial<Sound> | null,
-  confidence = 0,
-): Partial<Sound> {
-  const sound: Partial<Sound> = {
-    name: theme.name,
-    mood: theme.mood,
-    key: theme.key,
-    progression: theme.progression,
-    tempo: theme.tempo,
-    layers: theme.layers,
-    composerSettings: theme.composerSettings,
-    vibe: theme.vibe,
-    fillInstruction: theme.fillInstruction,
+// ── Lean targets & radio bubbles ──
+//
+// A "lean target" is anything you can lean the station into: a seed theme, one of
+// your saved Sounds, or a suggestion. It carries a display name + hue and the
+// Partial<Sound> the radio composes from.
+export type LeanTarget = { id: string; name: string; hue: number; sound: Partial<Sound> };
+export type RadioBubble = { target: LeanTarget; kind: "suggested" | "mine" | "theme" };
+
+const MOOD_HUE: Record<string, number> = {
+  calm: 200, still: 200, slow: 200, focus: 250, focused: 250, tense: 8, dark: 8,
+  energ: 330, bright: 330, ambient: 282, dream: 282, warm: 42,
+};
+export function hueForMood(mood?: SoundMood): number {
+  if (!mood) return 248;
+  const word = describeMood(mood);
+  for (const key of Object.keys(MOOD_HUE)) if (word.includes(key)) return MOOD_HUE[key];
+  return 248;
+}
+
+function themeSound(t: ThemePreset): Partial<Sound> {
+  return {
+    name: t.name, mood: t.mood, key: t.key, progression: t.progression, tempo: t.tempo,
+    layers: t.layers, composerSettings: t.composerSettings, vibe: t.vibe, fillInstruction: t.fillInstruction,
   };
-  if (yourSound?.mood && confidence >= 0.3) {
-    sound.mood = lerpMood(theme.mood, yourSound.mood, 0.3);
+}
+export function themeToLeanTarget(t: ThemePreset): LeanTarget {
+  return { id: `theme:${t.id}`, name: t.name, hue: t.hue, sound: themeSound(t) };
+}
+export function soundToLeanTarget(s: Sound): LeanTarget {
+  return { id: `sound:${s.id}`, name: s.name, hue: hueForMood(s.mood), sound: s };
+}
+
+// Blend a lean target's mood ~30% toward the listener's emergent sound (when we
+// know them), so a genre still feels personal. Structure stays the target's.
+export function blendLean(sound: Partial<Sound>, yourSound?: Partial<Sound> | null, confidence = 0): Partial<Sound> {
+  if (sound.mood && yourSound?.mood && confidence >= 0.3) {
+    return { ...sound, mood: lerpMood(sound.mood, yourSound.mood, 0.3) };
   }
   return sound;
+}
+
+// The bubbles orbiting the radio: a time-of-day suggestion, your emergent sound
+// (once we know you), your saved sounds, then seed themes — capped so the page
+// never needs to scroll.
+export function buildRadioBubbles(opts: {
+  sounds: Sound[]; yourSound?: Partial<Sound> | null; confidence: number; hour: number;
+}): RadioBubble[] {
+  const { sounds, yourSound, confidence, hour } = opts;
+  const bubbles: RadioBubble[] = [];
+
+  const ctx = hour < 5 || hour >= 22 ? { id: "dreamy", name: "Late night" }
+    : hour < 11 ? { id: "focus", name: "Morning focus" }
+    : hour < 17 ? { id: "lofi", name: "Afternoon lo-fi" }
+    : { id: "calm", name: "Evening wind-down" };
+  const ctxTheme = THEMES.find((t) => t.id === ctx.id)!;
+  bubbles.push({ kind: "suggested", target: { id: `suggested:${ctx.id}`, name: ctx.name, hue: ctxTheme.hue, sound: themeSound(ctxTheme) } });
+
+  if (yourSound?.mood && confidence >= 0.3) {
+    bubbles.push({ kind: "suggested", target: { id: "suggested:yours", name: yourSound.name || "Your sound", hue: hueForMood(yourSound.mood), sound: yourSound } });
+  }
+
+  for (const s of sounds.slice(0, 3)) bubbles.push({ kind: "mine", target: soundToLeanTarget(s) });
+
+  for (const t of THEMES) {
+    if (bubbles.length >= 8) break;
+    if (t.id === ctx.id) continue;
+    bubbles.push({ kind: "theme", target: themeToLeanTarget(t) });
+  }
+  return bubbles.slice(0, 8);
 }
