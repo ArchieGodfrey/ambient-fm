@@ -3,6 +3,7 @@ import { Download, Check, Sparkles, ArrowRight, ArrowLeft, Loader } from "lucide
 import { useSession } from "../session/SessionProvider";
 import useVoiceManager from "../hooks/useVoiceManager";
 import { setSetupDone, requestPersistentStorage } from "../utils/install";
+import { downloadSamples } from "../audio/sampleLibrary";
 import { primaryButton, ghostButton, mutedNote } from "../ui/styles";
 
 type Step = "welcome" | "downloading" | "done";
@@ -15,6 +16,7 @@ export default function SetupWizard({ onDone }: { onDone: () => void }) {
   const voice = useVoiceManager();
   const [step, setStep] = useState<Step>("welcome");
   const [failed, setFailed] = useState(false);
+  const [samplesProgress, setSamplesProgress] = useState<number | null>(null);
   const runRef = useRef(0); // bumped on cancel so a stale in-flight download can't resurface
 
   const finish = () => { setSetupDone(true); onDone(); };
@@ -24,17 +26,21 @@ export default function SetupWizard({ onDone }: { onDone: () => void }) {
     const rid = ++runRef.current;
     setStep("downloading");
     setFailed(false);
+    setSamplesProgress(null);
     await requestPersistentStorage(); // ask before we store GBs, so they aren't eviction-eligible
-    let okVoice = false, okModel = false;
+    let okVoice = false, okModel = false, okSamples = false;
     try {
-      // Voice first — it's a small, reliable CPU download. Then the model, which
-      // caches its weights (a one-time load pass, then unloaded — not kept in RAM).
+      // Voice first — small, reliable CPU download. Then the instrument samples
+      // (a few MB, cached for offline). Then the model, which caches its weights
+      // (a one-time load pass, then unloaded — not kept in RAM).
       okVoice = await voice.download();
-      if (runRef.current !== rid) return; // cancelled while downloading the voice
+      if (runRef.current !== rid) return; // cancelled mid-download
+      okSamples = await downloadSamples((l, t) => setSamplesProgress(t ? l / t : 1));
+      if (runRef.current !== rid) return;
       okModel = await model.downloadModelAction();
     } catch { /* reflected in the ok flags below */ }
     if (runRef.current !== rid) return;   // cancelled → don't overwrite the reset UI
-    setFailed(!(okVoice && okModel));
+    setFailed(!(okVoice && okModel && okSamples));
     setStep("done");
   };
 
@@ -64,8 +70,8 @@ export default function SetupWizard({ onDone }: { onDone: () => void }) {
                 <div>
                   <div style={{ fontWeight: 600, color: "var(--text-h)", fontSize: 14 }}>Prepare for offline</div>
                   <p style={{ ...mutedNote, marginTop: 3 }}>
-                    We'll download the AI music model and the DJ voice now — roughly <b>300–600&nbsp;MB</b>,
-                    once. After that the app works fully offline.
+                    We'll download the AI music model, the DJ voice, and the instrument samples now —
+                    roughly <b>300–600&nbsp;MB</b>, once. After that the app works fully offline.
                   </p>
                 </div>
               </div>
@@ -83,6 +89,7 @@ export default function SetupWizard({ onDone }: { onDone: () => void }) {
             <p style={{ ...mutedNote, textAlign: "center" }}>Downloading to your device. This can take a few minutes on first run.</p>
             <div style={{ ...panel, marginTop: 12, display: "flex", flexDirection: "column", gap: 16 }}>
               <ProgressRow label="DJ voice" progress={voice.progress} text={voice.progressText} />
+              <ProgressRow label="Instruments" progress={samplesProgress} text={null} />
               <ProgressRow label="Music model" progress={model.modelProgress} text={model.progressText} />
             </div>
             <button type="button" onClick={back} style={{ ...ghostButton, marginTop: 14 }}>

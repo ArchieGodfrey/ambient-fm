@@ -1,5 +1,5 @@
 import * as Tone from "tone";
-import { PALETTES, type VoiceCfg } from "./palettes";
+import { PALETTES, SAMPLE_INSTRUMENTS, type VoiceCfg } from "./palettes";
 
 // Voices the harmonic bed — block chords + a bass root — as looping Tone.Parts
 // over the section timeline (seconds), plus an optional arpeggio over the
@@ -11,9 +11,9 @@ type BassEvent = { note: string; start: number; duration: number };
 let chordPart: Tone.Part | null = null;
 let bassPart: Tone.Part | null = null;
 let arpLoop: Tone.Loop | null = null;
-let padSynth: Tone.PolySynth | null = null;
+let padSynth: Tone.PolySynth | Tone.Sampler | null = null;
 let bassSynth: Tone.Synth | null = null;
-let arpSynth: Tone.Synth | null = null;
+let arpSynth: Tone.Synth | Tone.Sampler | null = null;
 let choirSynth: Tone.PolySynth | null = null;
 let choirVibrato: Tone.Vibrato | null = null;
 let choirFilter: Tone.Filter | null = null;
@@ -34,6 +34,11 @@ function makeMono(c: VoiceCfg): Tone.Synth {
   s.volume.value = c.vol;
   return s;
 }
+function makeSampler(inst: string, vol: number): Tone.Sampler {
+  const s = new Tone.Sampler({ urls: SAMPLE_INSTRUMENTS[inst], baseUrl: `${import.meta.env.BASE_URL}samples/${inst}/` }).toDestination();
+  s.volume.value = vol;
+  return s;
+}
 
 // (Re)build the pad/bass/arp voices for the given palette. On a palette change we
 // dispose the old voices and create the new timbres; the choir stays constant.
@@ -45,9 +50,9 @@ function ensure(paletteId?: string) {
     currentPaletteId = id;
   }
   const p = PALETTES[currentPaletteId];
-  if (!padSynth) padSynth = makePoly(p.pad);
+  if (!padSynth) padSynth = p.sample ? makeSampler(p.sample, p.pad.vol) : makePoly(p.pad);
   if (!bassSynth) bassSynth = makeMono(p.bass);
-  if (!arpSynth) arpSynth = makeMono(p.arp);
+  if (!arpSynth) arpSynth = p.sample ? makeSampler(p.sample, p.arp.vol) : makeMono(p.arp);
   if (!choirSynth) {
     // A breathy "aah" choir: a sawtooth swell through a vowel-ish bandpass with
     // gentle vibrato — a synthesized vocal texture (the near-term step toward
@@ -112,12 +117,15 @@ export function stopHarmony() {
   // Release any sounding voices — disposing the Parts only stops scheduling; a
   // held chord (long duration + 2.5–3s release) would otherwise ring on as a
   // "drone" if the master is ever un-muted.
-  try {
-    padSynth?.releaseAll();
-    choirSynth?.releaseAll();
-    bassSynth?.triggerRelease();
-    arpSynth?.triggerRelease();
-  } catch { /* not started */ }
+  // Release sounding voices (PolySynth/Sampler use releaseAll; a mono Synth uses
+  // triggerRelease) so a held chord doesn't ring on if the master is un-muted.
+  const rel = (v: Tone.PolySynth | Tone.Sampler | Tone.Synth | null) => {
+    try { if (v && "releaseAll" in v) v.releaseAll(); else (v as Tone.Synth | null)?.triggerRelease(); } catch { /* not started */ }
+  };
+  rel(padSynth);
+  rel(arpSynth);
+  rel(choirSynth);
+  try { bassSynth?.triggerRelease(); } catch { /* not started */ }
   chordPart = null;
   bassPart = null;
   currentChord = [];

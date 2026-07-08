@@ -11,7 +11,18 @@ export type VoiceCfg = {
   vol: number; // dB
 };
 
-export type Palette = { id: string; label: string; pad: VoiceCfg; bass: VoiceCfg; arp: VoiceCfg };
+// A palette may be a pure-synth palette, or use a sampled real instrument for its
+// pad + arp (bass stays a synth). `sample` names a folder under public/samples/.
+export type Palette = { id: string; label: string; sample?: string; pad: VoiceCfg; bass: VoiceCfg; arp: VoiceCfg };
+
+// Sampled real instruments (curated subsets from tonejs-instruments; Tone.Sampler
+// pitch-shifts between them). Bundled in public/samples/<inst>/ and cached offline
+// via the setup wizard (see audio/sampleLibrary.ts).
+export const SAMPLE_INSTRUMENTS: Record<string, Record<string, string>> = {
+  piano: { C2: "C2.mp3", G2: "G2.mp3", C3: "C3.mp3", G3: "G3.mp3", C4: "C4.mp3", G4: "G4.mp3", C5: "C5.mp3", G5: "G5.mp3", C6: "C6.mp3" },
+  harp: { C3: "C3.mp3", E3: "E3.mp3", G3: "G3.mp3", C5: "C5.mp3", E5: "E5.mp3", G5: "G5.mp3" },
+  cello: { C2: "C2.mp3", G2: "G2.mp3", C3: "C3.mp3", E3: "E3.mp3", G3: "G3.mp3", C4: "C4.mp3", G4: "G4.mp3" },
+};
 
 export const PALETTES: Record<string, Palette> = {
   glass: {
@@ -50,13 +61,35 @@ export const PALETTES: Record<string, Palette> = {
     bass: { oscType: "sawtooth", a: 0.03, d: 0.3, s: 0.75, r: 0.8, vol: -16 },
     arp: { oscType: "square", a: 0.004, d: 0.18, s: 0, r: 0.28, vol: -23 },
   },
+  // Sampled real instruments (pad + arp use the sampler; bass is a synth). The
+  // pad/arp VoiceCfg are synth fallbacks if samples can't load.
+  piano: {
+    id: "piano", label: "Felt piano", sample: "piano",
+    pad: { oscType: "triangle", a: 0.01, d: 1.4, s: 0.2, r: 2.2, vol: -12 },
+    bass: { oscType: "sine", a: 0.05, d: 0.5, s: 0.8, r: 1.2, vol: -16 },
+    arp: { oscType: "triangle", a: 0.005, d: 0.4, s: 0, r: 0.5, vol: -14 },
+  },
+  harp: {
+    id: "harp", label: "Harp", sample: "harp",
+    pad: { oscType: "triangle", a: 0.01, d: 1.2, s: 0.15, r: 2.0, vol: -12 },
+    bass: { oscType: "sine", a: 0.06, d: 0.5, s: 0.8, r: 1.2, vol: -16 },
+    arp: { oscType: "triangle", a: 0.004, d: 0.5, s: 0, r: 0.6, vol: -13 },
+  },
+  cello: {
+    id: "cello", label: "Cello", sample: "cello",
+    pad: { oscType: "sawtooth", a: 0.6, d: 0.8, s: 0.8, r: 2.5, vol: -14 },
+    bass: { oscType: "sine", a: 0.08, d: 0.5, s: 0.85, r: 1.5, vol: -15 },
+    arp: { oscType: "sine", a: 0.02, d: 0.4, s: 0.2, r: 0.6, vol: -16 },
+  },
 };
 
-// Deterministic mood → palette (hybrid). Tie-breaks use the seed roll `r`.
+// Deterministic mood → palette (hybrid). Acoustic sampled instruments (piano/
+// harp/cello) favour calm/warm/bright feels; synths cover energetic/tense.
+// Tie-breaks use the seed roll `r`.
 export function pickPaletteId(energy: number, tension: number, brightness: number, calmness: number, r: number): string {
-  if (tension > 0.6) return r < 0.5 ? "reed" : "synth";
+  if (tension > 0.6) return r < 0.5 ? "cello" : "synth";
   if (energy > 0.62) return brightness > 0.55 ? "synth" : "bells";
-  if (calmness > 0.6) return brightness > 0.55 ? "glass" : "strings";
-  if (brightness > 0.6) return "bells";
-  return r < 0.5 ? "warm" : "strings";
+  if (calmness > 0.6) return brightness > 0.55 ? "piano" : r < 0.5 ? "harp" : "strings";
+  if (brightness > 0.6) return r < 0.5 ? "piano" : "bells";
+  return r < 0.5 ? "warm" : "cello";
 }
