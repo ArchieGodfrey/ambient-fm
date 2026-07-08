@@ -164,7 +164,10 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
       return;
     }
 
-    // Need a fresh track from the buffer.
+    // Need a fresh track from the buffer. If it isn't ready, cover the wait with a
+    // spoken line — and if we do, don't ALSO play an intro below (one line, no
+    // double announcement).
+    let didFiller = false;
     if (queueRef.current.length === 0) {
       duckTo(-16);
       setState("generating");
@@ -174,6 +177,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
       while (queueRef.current.length === 0 && live()) await wait(200);
       await voiceP;
       if (!live()) return;
+      didFiller = true;
     }
     const q = queueRef.current.shift();
     if (!q) { apiRef.current.tuneOut?.(); return; }
@@ -181,7 +185,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     if (!live()) return;
     playedRef.current.push({ ...q, sessionId });
     cursorRef.current = playedRef.current.length - 1;
-    await playCurrent(rid, { announce: !!opts.auto || !!opts.first, first: opts.first });
+    await playCurrent(rid, { announce: (!!opts.auto || !!opts.first) && !didFiller, first: opts.first });
   };
 
   const toPrev = async (rid: number) => {
