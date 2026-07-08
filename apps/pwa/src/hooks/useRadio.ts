@@ -162,8 +162,8 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
       if (!(await speakLine(line, live))) return;
       i += 1;
       // Speak sparingly when a track is already playing under the DJ (it carries the
-      // silence); talk more often when only the ambient bed is filling it (tune-in).
-      if (!ready() && live()) await wait(isRenderedPlaying() ? 9000 : 2500);
+      // silence); talk more on first tune-in, where only the ambient bed fills the gap.
+      if (!ready() && live()) await wait(isRenderedPlaying() ? 9000 : 1400);
     }
   };
 
