@@ -10,6 +10,7 @@ import { useAppStore } from "../store/useAppStore";
 import { unlockAudio } from "../audio/toneEngine";
 import { unlockVoice, maybeAutoLoadVoice } from "../audio/host";
 import { unlockRenderedPlayer } from "../audio/renderedPlayer";
+import { unlockBedPlayer } from "../audio/bedPlayer";
 import { buildRadioBubbles, type LeanTarget } from "../themes/presets";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
@@ -55,6 +56,7 @@ export default function Radio() {
     // tracks — otherwise iOS blocks its play() ~15s later once a track has rendered.
     unlockAudio(); unlockVoice(); maybeAutoLoadVoice();
     unlockRenderedPlayer();
+    unlockBedPlayer();
     setPreparing(true);
     try { await startRadio(); } finally { setPreparing(false); }
   };

@@ -8,7 +8,9 @@ import { duckTo, unduck } from "../audio/toneEngine";
 import { takeFloor, releaseFloor } from "../audio/playbackFloor";
 import { renderTrack } from "../audio/renderTrack";
 import { duckRendered } from "../audio/renderedPlayer";
-import { hostWelcome, hostFiller, hostIntro } from "../ai/hostScript";
+import { getBed } from "../audio/djBed";
+import { playBed, fadeOutBed, stopBed } from "../audio/bedPlayer";
+import { hostIntroSegment, hostExtraLine, hostFiller, hostIntro, hostBackAnnounce } from "../ai/hostScript";
 import { soundToDirection } from "../sounds/soundDirection";
 import { recordFeedback, type TrackRef } from "../feedback/feedback";
 import { blendLean } from "../themes/presets";
@@ -140,7 +142,11 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     if (opts.announce) {
       setState("announcing");
       duckRendered(true); // fade the outgoing track under the DJ line
-      const line = opts.first ? hostWelcome(eventsRef.current) : hostIntro(item.title, item.plan, { soundName: item.name, yours: item.yours });
+      // Back-announce the track that just played, then intro this one.
+      const prevTitle = cursorRef.current > 0 ? playedRef.current[cursorRef.current - 1]?.title : null;
+      const back = hostBackAnnounce(prevTitle);
+      const intro = hostIntro(item.title, item.plan, { soundName: item.name, yours: item.yours, events: eventsRef.current });
+      const line = [back, intro].filter(Boolean).join(" ");
       setHostText(line);
       const playLine = await prepareLine(line);
       if (!live()) return;
@@ -149,6 +155,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     }
     setHostText(null);
     setState("playing");
+    fadeOutBed(); // bring the ambient bed down as the track comes in (no-op if idle)
     // Play the pre-rendered blob through a media element (survives lock). This
     // replaces the previous track's element, so the new track starts at full volume.
     await audio.playRenderedTrack(item.plan, item.blob, item.title, item.sessionId);
@@ -176,20 +183,39 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
       return;
     }
 
-    // Need a fresh track from the buffer. If it isn't ready, cover the wait with a
-    // spoken line — and if we do, don't ALSO play an intro below (one line, no
-    // double announcement).
-    let didFiller = false;
+    // Need a fresh track from the buffer. If it isn't ready, cover the wait with the
+    // DJ over a soft ambient bed: keep talking (intro segment → rotating
+    // observations) until the track is ready, then name it. If we announced here,
+    // don't ALSO announce in playCurrent below.
+    let didAnnounceInGap = false;
     if (queueRef.current.length === 0) {
       duckTo(-16);
       setState("generating");
-      const line = opts.first ? hostWelcome(eventsRef.current) : hostFiller(eventsRef.current);
-      setHostText(line);
-      const voiceP = (await prepareLine(line))();
-      while (queueRef.current.length === 0 && live()) await wait(200);
-      await voiceP;
-      if (!live()) return;
-      didFiller = true;
+      // Ambient bed under the DJ — renders once (~1s) then loops quietly.
+      void getBed().then((bed) => { if (live() && queueRef.current.length === 0) playBed(bed); }).catch(() => { /* bed is optional */ });
+      const segment = opts.first ? hostIntroSegment(eventsRef.current) : [hostFiller(eventsRef.current)];
+      let i = 0;
+      while (queueRef.current.length === 0 && live()) {
+        const line = i < segment.length ? segment[i] : hostExtraLine(eventsRef.current, i);
+        setHostText(line);
+        const playLine = await prepareLine(line);
+        if (!live()) return;
+        await playLine();
+        if (!live()) return;
+        i += 1;
+        if (queueRef.current.length === 0 && live()) await wait(500); // a beat between lines
+      }
+      // Track is ready — name it as the hand-off line, then let it play.
+      const upcoming = queueRef.current[0];
+      if (upcoming && live()) {
+        const introLine = hostIntro(upcoming.title, upcoming.plan, { soundName: upcoming.name, yours: upcoming.yours, events: eventsRef.current });
+        setHostText(introLine);
+        const playIntro = await prepareLine(introLine);
+        if (!live()) return;
+        await playIntro();
+        if (!live()) return;
+        didAnnounceInGap = true;
+      }
     }
     const q = queueRef.current.shift();
     if (!q) { apiRef.current.tuneOut?.(); return; }
@@ -197,7 +223,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     if (!live()) return;
     playedRef.current.push({ ...q, sessionId });
     cursorRef.current = playedRef.current.length - 1;
-    await playCurrent(rid, { announce: (!!opts.auto || !!opts.first) && !didFiller, first: opts.first });
+    await playCurrent(rid, { announce: (!!opts.auto || !!opts.first) && !didAnnounceInGap, first: opts.first });
   };
 
   const toPrev = async (rid: number) => {
@@ -219,6 +245,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     playingRef.current = null;
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
     cancelHost();
+    stopBed();
     setHostText(null); setNowPlaying(null); setState("idle"); setCanPrev(false);
     releaseFloor(tuneOut);
     audio.stopPlayback();

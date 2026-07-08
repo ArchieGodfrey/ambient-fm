@@ -1,5 +1,14 @@
-import * as Tone from "tone";
 import { runExclusive } from "../runtime/modelRuntime";
+
+// The voice plays on its OWN AudioContext, not Tone's shared one. Offline track/
+// bed renders transiently swap Tone's global context to an OfflineContext; keeping
+// the voice on a separate context means it can decode + play during a render (to
+// cover the generation gap) without ever reading the offline context.
+let voiceCtx: AudioContext | null = null;
+function getVoiceCtx(): AudioContext {
+  if (!voiceCtx) voiceCtx = new AudioContext();
+  return voiceCtx;
+}
 
 // The DJ voice, via Piper (VITS) running fully on-device in WASM/CPU — no WebGPU,
 // so it doesn't contend with WebLLM, and it's light enough (~75MB, <100MB RAM) to
@@ -108,8 +117,7 @@ export async function voiceRender(text: string): Promise<AudioBuffer | null> {
     const blob = await runExclusive("tts", () => s.predict(text));
     status = "ready";
     try { localStorage.setItem(INSTALLED_KEY, "1"); } catch { /* ignore */ }
-    const ctx = Tone.getContext().rawContext as unknown as AudioContext;
-    return await ctx.decodeAudioData(await blob.arrayBuffer());
+    return await getVoiceCtx().decodeAudioData(await blob.arrayBuffer());
   } catch (e) {
     console.warn("Voice render failed:", errStr(e));
     return null;
@@ -122,11 +130,11 @@ export function voicePlay(buffer: AudioBuffer): Promise<void> {
   stopVoice();
   return new Promise((resolve) => {
     try {
-      const ctx = Tone.getContext().rawContext as unknown as AudioContext;
+      const ctx = getVoiceCtx();
       void ctx.resume?.();
       const src = ctx.createBufferSource();
       src.buffer = buffer;
-      src.connect(ctx.destination); // above the duck
+      src.connect(ctx.destination);
       src.onended = () => { current = null; resolve(); };
       current = src;
       src.start();
@@ -152,5 +160,8 @@ export async function clearVoice(): Promise<void> {
   } catch { /* ignore */ }
 }
 
-// Back-compat: gesture unlock is handled by unlockAudio() (Tone.start).
-export function unlockVoice(): void { /* no-op */ }
+// Create + resume the voice's own AudioContext inside a user gesture (tune-in tap)
+// so it's allowed to produce sound later.
+export function unlockVoice(): void {
+  try { void getVoiceCtx().resume?.(); } catch { /* ignore */ }
+}

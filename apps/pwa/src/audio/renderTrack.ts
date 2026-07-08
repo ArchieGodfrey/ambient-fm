@@ -1,7 +1,7 @@
 import * as Tone from "tone";
 import type { CompositionPlan, CompositionSection, Phrase } from "../ai/types";
 import { resetAudioModules, markLiveGraphDirty } from "./resetAudio";
-import { beginRender, endRender } from "./renderGate";
+import { runRender } from "./renderGate";
 import { PALETTES } from "./palettes";
 import { preloadInstrument } from "./sampleBuffers";
 import { initAudioGraph, applyComposition } from "./audioGraph";
@@ -94,12 +94,9 @@ export async function renderTrack(plan: CompositionPlan): Promise<Blob> {
   const sampleInst = plan.palette ? PALETTES[plan.palette]?.sample : undefined;
   if (sampleInst) await preloadInstrument(sampleInst);
 
-  // Mark the render window: for its duration Tone's global context is offline, so
-  // the voice/SFX must wait or skip rather than play into the render.
-  beginRender();
-  let rendered: Awaited<ReturnType<typeof Tone.Offline>>;
-  try {
-    rendered = await Tone.Offline(async () => {
+  // Serialize with other offline renders (the DJ bed) — each swaps Tone's global
+  // context, so they must not overlap; isRendering() also gates the disc SFX.
+  const rendered = await runRender(() => Tone.Offline(async () => {
     // During the Offline callback the global Tone context IS the offline context,
     // so getTransport()/toDestination()/new Tone.Part etc. all bind to it.
     const transport = Tone.getTransport();
@@ -155,10 +152,7 @@ export async function renderTrack(plan: CompositionPlan): Promise<Blob> {
     }, RENDER_TICK_SECONDS);
 
     transport.start(0);
-    }, duration, 2);
-  } finally {
-    endRender();
-  }
+  }, duration, 2));
 
   const audioBuffer = rendered.get();
   if (!audioBuffer) {

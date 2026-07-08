@@ -1,28 +1,29 @@
-// While a track renders offline (Tone.Offline), Tone's GLOBAL context is
-// temporarily an OfflineAudioContext. Anything that reads Tone.getContext() to
-// start LIVE playback during that window (the DJ voice, the disc SFX) would grab
-// the offline context and play into the render instead of the speakers. This gate
-// marks the render window so those callers can wait for it (voice) or skip (SFX).
+// Offline renders (renderTrack, the DJ bed) each temporarily swap Tone's GLOBAL
+// context to an OfflineAudioContext. Two overlapping renders would corrupt each
+// other, and the disc SFX (which reads Tone.getContext() to play a one-shot) must
+// not fire into a render. So all offline renders go through runRender(), which
+// serializes them and marks isRendering() while one is in flight.
+//
+// (The DJ voice used to wait on this too, but it now runs on its own AudioContext
+// and no longer touches Tone's global context — so it can talk during a render.)
 
-let gate: Promise<void> | null = null;
-let release: (() => void) | null = null;
-
-export function beginRender() {
-  // Renders are serialized (one at a time), so a single gate promise is enough.
-  gate = new Promise<void>((resolve) => { release = resolve; });
-}
-
-export function endRender() {
-  release?.();
-  gate = null;
-  release = null;
-}
+let active = false;
+let chain: Promise<unknown> = Promise.resolve();
 
 export function isRendering(): boolean {
-  return gate !== null;
+  return active;
 }
 
-// Resolves immediately when no render is in flight, otherwise when it finishes.
-export function whenRenderIdle(): Promise<void> {
-  return gate ?? Promise.resolve();
+// Run an offline render exclusively — queued behind any in-flight render.
+export function runRender<T>(fn: () => Promise<T>): Promise<T> {
+  const result = chain.then(async () => {
+    active = true;
+    try {
+      return await fn();
+    } finally {
+      active = false;
+    }
+  });
+  chain = result.then(() => {}, () => {}); // keep the chain alive through failures
+  return result as Promise<T>;
 }
