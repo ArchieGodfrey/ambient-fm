@@ -1,4 +1,5 @@
-import { RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { RefreshCw, Loader, Square } from "lucide-react";
 import ModelActions from "../components/ModelActions";
 import VoiceActions from "../components/VoiceActions";
 import ThemeToggle from "../components/ThemeToggle";
@@ -6,12 +7,38 @@ import SystemHealth from "../components/SystemHealth";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
 import { resetApp } from "../utils/resetApp";
+import { renderTrack } from "../audio/renderTrack";
+import { playRenderedBlob, stopRenderedBlob } from "../audio/renderedPlayer";
 import { screen, screenEyebrow, screenTitle, sectionLabel, card, mutedNote, ghostButton } from "../ui/styles";
 
 export default function Settings() {
-  const { model, availableModels, selectedModelId, selectModelAction } = useSession();
+  const { model, audio, radio, availableModels, selectedModelId, selectModelAction } = useSession();
   const debug = useAppStore((s) => s.debug);
   const setDebug = useAppStore((s) => s.setDebug);
+  const [rendering, setRendering] = useState(false);
+  const [renderStatus, setRenderStatus] = useState<string | null>(null);
+
+  // Test the pre-rendered background path: render the current track to audio and
+  // play it through a media element (which iOS keeps alive when locked). Lets us
+  // validate render faithfulness + locked playback before rewiring the radio.
+  const testRender = async () => {
+    const plan = useAppStore.getState().currentPlan;
+    if (!plan) { setRenderStatus("No track loaded to render — burn one first."); return; }
+    if (radio.isOn) radio.tuneOut(); else audio.stopPlayback();
+    setRendering(true);
+    setRenderStatus("Rendering…");
+    try {
+      const blob = await renderTrack(plan);
+      playRenderedBlob(blob);
+      setRenderStatus("Playing the rendered track — lock the phone to test.");
+    } catch (e) {
+      setRenderStatus(`Render failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setRendering(false);
+    }
+  };
+
+  const stopTest = () => { stopRenderedBlob(); setRenderStatus(null); };
 
   return (
     <div style={screen} className="afm-rise">
@@ -76,6 +103,19 @@ export default function Settings() {
             <span style={mutedNote}>Reload with the latest version if the app seems out of date. Keeps your sounds and downloaded models.</span>
           </span>
           <button type="button" onClick={() => void resetApp()} style={{ ...ghostButton, flexShrink: 0 }}><RefreshCw size={15} /> Reset</button>
+        </div>
+        <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+          <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-h)" }}>Test background render</span>
+            <span style={mutedNote}>Render the current track to audio and play it through a media element — then lock the phone. Validates the pre-render approach (does it sound right, does it survive lock).</span>
+            {renderStatus ? <span style={{ ...mutedNote, color: "var(--accent)" }}>{renderStatus}</span> : null}
+          </span>
+          <span style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <button type="button" onClick={() => void testRender()} disabled={rendering} style={{ ...ghostButton, opacity: rendering ? 0.6 : 1 }}>
+              {rendering ? <span className="afm-spin"><Loader size={15} /></span> : null} {rendering ? "Rendering…" : "Render & play"}
+            </button>
+            <button type="button" onClick={stopTest} style={ghostButton}><Square size={15} /></button>
+          </span>
         </div>
       </div>
 
