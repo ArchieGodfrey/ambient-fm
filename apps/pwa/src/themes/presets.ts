@@ -80,6 +80,8 @@ export const THEMES: ThemePreset[] = [
   },
 ];
 
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+
 function lerpMood(a: SoundMood, b: SoundMood, t: number): SoundMood {
   const mix = (x: number, y: number) => x + (y - x) * t;
   return {
@@ -149,6 +151,16 @@ export function buildRadioBubbles(opts: {
 
   if (yourSound?.mood && confidence >= 0.3) {
     bubbles.push({ kind: "suggested", target: { id: "suggested:yours", name: yourSound.name || "Your sound", hue: hueForMood(yourSound.mood), sound: yourSound } });
+
+    // Adjacent-to-taste: a variation of your sound nudged one way — novelty right
+    // next to comfort. Days lean brighter/livelier, evenings softer/calmer.
+    const m = yourSound.mood;
+    const daytime = hour >= 8 && hour < 18;
+    const variation: SoundMood = daytime
+      ? { ...m, brightness: clamp01(m.brightness + 0.2), energy: clamp01(m.energy + 0.15), tension: clamp01(m.tension - 0.1) }
+      : { ...m, calmness: clamp01(m.calmness + 0.2), energy: clamp01(m.energy - 0.15), brightness: clamp01(m.brightness - 0.1) };
+    const vName = daytime ? "Brighter you" : "Softer you";
+    bubbles.push({ kind: "suggested", target: { id: "suggested:variation", name: vName, hue: hueForMood(variation), sound: { ...yourSound, name: vName, mood: variation } } });
   }
 
   for (const s of sounds.slice(0, 3)) bubbles.push({ kind: "mine", target: soundToLeanTarget(s) });
