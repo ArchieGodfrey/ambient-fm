@@ -14,9 +14,10 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 // Pick a deterministic-but-varied option from a pool, seeded by a rotating index.
 const pick = (pool: string[], seed: number) => pool[((seed % pool.length) + pool.length) % pool.length];
 
-function hourOf(events: StimulusEvent[]): number {
-  const t = events.find((e) => e.source === "time");
-  return typeof t?.metadata?.hour === "number" ? t.metadata.hour : new Date().getHours();
+// The host speaks the LIVE clock time. (The `time` stimulus captures the hour when
+// it's generated, which goes stale during a session — so don't read it here.)
+function hourOf(): number {
+  return new Date().getHours();
 }
 
 function partOfDay(hour: number): string {
@@ -66,8 +67,8 @@ function weatherLine(events: StimulusEvent[]): string | null {
   return `${cap(w.label)} out there${t}.`;
 }
 
-function timeLine(events: StimulusEvent[]): string {
-  const hour = hourOf(events);
+function timeLine(): string {
+  const hour = hourOf();
   return pick([
     `It's ${clockPhrase(hour)}.`,
     `We're into the ${partOfDay(hour)}.`,
@@ -77,8 +78,8 @@ function timeLine(events: StimulusEvent[]): string {
 
 // ── Tune-in: a paced multi-line segment that covers the first-track wait ──
 
-export function hostWelcome(events: StimulusEvent[]): string {
-  const hour = hourOf(events);
+export function hostWelcome(): string {
+  const hour = hourOf();
   const { stationName, hostName } = getStation();
   return pick([
     `You're tuned in to ${stationName} — ${clockPhrase(hour)}.`,
@@ -90,7 +91,7 @@ export function hostWelcome(events: StimulusEvent[]): string {
 // The opening run of lines while the first track is being made. The radio keeps
 // speaking through these (and hostExtraLine after) until the track is ready.
 export function hostIntroSegment(events: StimulusEvent[]): string[] {
-  const lines: string[] = [hostWelcome(events)];
+  const lines: string[] = [hostWelcome()];
   const wx = weatherLine(events);
   if (wx) lines.push(wx);
   const scene = sceneLabel(events);
@@ -109,11 +110,11 @@ export function hostIntroSegment(events: StimulusEvent[]): string[] {
 // Extra observations to keep talking if the track still isn't ready (rotates).
 // Prefers a personality-flavored pooled line, falling back to deterministic.
 export function hostExtraLine(events: StimulusEvent[], i: number): string {
-  const hour = hourOf(events);
+  const hour = hourOf();
   return getPooledLine("observation", i) ?? pick([
     `Nearly there.`,
     `Something ${moodWord(events)} coming together.`,
-    timeLine(events),
+    timeLine(),
     `Stay with me.`,
     `Just shaping the last of it.`,
     weatherLine(events) ?? `Settle in.`,

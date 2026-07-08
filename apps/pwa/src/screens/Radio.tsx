@@ -71,13 +71,6 @@ export default function Radio() {
   const toggleTune = () => { if (on) radio.tuneOut(); else if (!busy) void tuneIn(); };
   const pickBubble = (t: LeanTarget) => setLeanIn(leanIn?.id === t.id ? null : t);
 
-  const statusLine =
-    preparing ? "tuning in…"
-    : radio.state === "generating" ? "composing…"
-    : radio.state === "announcing" ? "on air"
-    : radio.state === "playing" ? "now playing"
-    : "off air";
-
   const ringR = 62;
   const ringC = 2 * Math.PI * ringR;
   const prog = model.modelProgress ?? 0;
@@ -157,17 +150,12 @@ export default function Radio() {
         })}
       </div>
 
-      {/* Status + host line / now playing */}
-      <div style={{ textAlign: "center", minHeight: 52 }}>
-        <div style={{ fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700, color: on ? "var(--accent)" : "var(--text-faint)" }}>{statusLine}</div>
+      {/* The host's spoken line (the track title/status live in the now-playing bar). */}
+      <div style={{ textAlign: "center", minHeight: 44 }}>
         {radio.hostText ? (
-          <p style={{ fontSize: 14, color: "var(--text-h)", marginTop: 5, maxWidth: 320, marginInline: "auto", lineHeight: 1.45, fontStyle: "italic" }}>“{radio.hostText}”</p>
-        ) : radio.nowPlaying ? (
-          <p style={{ fontSize: 15, color: "var(--text-h)", marginTop: 5, fontWeight: 600 }}>
-            {radio.nowPlaying.title} <span style={{ color: "var(--text-muted)", fontWeight: 500, textTransform: "capitalize" }}>· {radio.nowPlaying.mood}</span>
-          </p>
+          <p style={{ fontSize: 14, color: "var(--text-h)", maxWidth: 320, marginInline: "auto", lineHeight: 1.45, fontStyle: "italic" }}>“{radio.hostText}”</p>
         ) : leanIn ? (
-          <p style={{ ...mutedNote, fontSize: 12.5, marginTop: 5 }}>
+          <p style={{ ...mutedNote, fontSize: 12.5 }}>
             Leaning into <b style={{ color: "var(--text-h)" }}>{leanIn.name}</b> ·{" "}
             <button type="button" onClick={() => setLeanIn(null)} style={{ border: "none", background: "none", color: "var(--accent)", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 12.5 }}>clear</button>
           </p>
