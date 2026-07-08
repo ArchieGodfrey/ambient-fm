@@ -1,16 +1,28 @@
+import * as Tone from "tone";
+
 // Background / locked-screen playback + lock-screen controls.
 //
-// iOS keeps a page's audio session — and therefore the Web Audio context playing
-// the music — alive while an <audio> element is actively playing REAL media. A
-// MediaStream element isn't reliably treated as such (it's closer to live
-// capture), so we loop a short, near-silent WAV FILE in a hidden element instead.
-// The element MUST start inside the tune-in tap gesture (iOS blocks play()
-// otherwise), so startBackgroundKeepAlive() is called synchronously from the
-// Tune-in click. The music itself stays on the normal Web Audio output.
+// A standalone playing <audio> element keeps iOS's media pipeline alive but iOS
+// still suspends the Web Audio CONTEXT separately (symptom: music stops when
+// locked, then resumes only when the DJ voice calls ctx.resume()). The fix is to
+// route the looping (near-silent) element INTO the Web Audio graph via
+// createMediaElementSource — that anchors the context to the playing element, so
+// iOS keeps the whole context alive in the background. The element must start
+// inside the tune-in tap gesture (iOS blocks play() otherwise); we also re-assert
+// play + resume the context on any interruption / return to foreground.
 
 let el: HTMLAudioElement | null = null;
+let elSource: MediaElementAudioSourceNode | null = null;
 let url: string | null = null;
 let started = false;
+
+function ctxRaw(): AudioContext | null {
+  try { return Tone.getContext().rawContext as unknown as AudioContext; } catch { return null; }
+}
+function resumeCtx() {
+  const c = ctxRaw();
+  if (c && c.state === "suspended") void c.resume?.().catch(() => { /* needs a gesture */ });
+}
 
 // A 2s mono WAV of an inaudible 40Hz tone (like the old keep-alive oscillator) —
 // non-silent so iOS treats the element as genuinely playing, but far below
@@ -28,9 +40,12 @@ function silentToneWavUrl(): string {
   return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
 }
 
-// iOS may pause the element (interruptions, returning from lock). Re-assert it.
+// iOS may pause the element / suspend the context (interruptions, returning from
+// lock). Re-assert playback and revive the context.
 function keepPlaying() {
-  if (started && el && el.paused) void el.play().catch(() => { /* needs a gesture */ });
+  if (!started) return;
+  if (el && el.paused) void el.play().catch(() => { /* needs a gesture */ });
+  resumeCtx();
 }
 const onVisibility = () => { if (typeof document !== "undefined" && !document.hidden) keepPlaying(); };
 
@@ -45,9 +60,16 @@ export function startBackgroundKeepAlive() {
     el.preload = "auto";
     el.src = url;
     el.style.display = "none";
+    document.body.appendChild(el);
+    // Route the element INTO the Web Audio graph so the context is anchored to a
+    // playing media element and iOS keeps it alive when locked. (createMediaElement
+    // Source can only be called once per element; we make a fresh element each time.)
+    const ctx = ctxRaw();
+    if (ctx) {
+      try { elSource = ctx.createMediaElementSource(el); elSource.connect(ctx.destination); } catch { /* already sourced / unsupported */ }
+    }
     el.addEventListener("pause", keepPlaying);
     document.addEventListener("visibilitychange", onVisibility);
-    document.body.appendChild(el);
     void el.play().catch(() => { /* outside a gesture — will retry via keepPlaying */ });
     started = true;
   } catch {
@@ -60,6 +82,8 @@ export function stopBackgroundKeepAlive() {
   if (!started) return;
   started = false; // set first so keepPlaying() won't re-play during teardown
   if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
+  try { elSource?.disconnect(); } catch { /* not connected */ }
+  elSource = null;
   if (el) {
     el.removeEventListener("pause", keepPlaying);
     el.pause();
