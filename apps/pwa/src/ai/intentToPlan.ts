@@ -1,5 +1,6 @@
 import { resolveProgression, getScale } from "../music/harmony/index";
 import { generateMotif } from "../music/motifs/generator";
+import { pickPaletteId } from "../audio/palettes";
 import { createSeed } from "../utils/randomField";
 import { field } from "../music/random/randomField";
 import type { CompositionIntent } from "./intentSchema";
@@ -136,6 +137,7 @@ export function buildCompositionPlanFromIntent(
     sections,
     chordEvents,
     bassEvents,
+    palette: pickPaletteId(energy, tension, brightness, calmness, rnd("palette")),
     percussionDensity: clamp(energy * 0.95 - calmness * 0.25, 0, 1),
     arpDensity: clamp(motifDensity * 0.5 + brightness * 0.4, 0, 1),
     vocalLevel: clamp((1 - energy) * 0.25 + calmness * 0.4 + complexity * 0.2, 0, 1),

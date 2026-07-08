@@ -1,4 +1,5 @@
 import * as Tone from "tone";
+import { PALETTES, type VoiceCfg } from "./palettes";
 
 // Voices the harmonic bed — block chords + a bass root — as looping Tone.Parts
 // over the section timeline (seconds), plus an optional arpeggio over the
@@ -18,22 +19,35 @@ let choirVibrato: Tone.Vibrato | null = null;
 let choirFilter: Tone.Filter | null = null;
 let currentChord: string[] = [];
 let arpIndex = 0;
+let currentPaletteId = "";
 
 const upOctave = (note: string) => note.replace(/(\d)$/, (d) => String(Number(d) + 1));
 
-function ensure() {
-  if (!padSynth) {
-    padSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.5, decay: 0.8, sustain: 0.7, release: 2.5 } }).toDestination();
-    padSynth.volume.value = -20;
+const env = (c: VoiceCfg) => ({ attack: c.a, decay: c.d, sustain: c.s, release: c.r });
+function makePoly(c: VoiceCfg): Tone.PolySynth {
+  const s = new Tone.PolySynth(Tone.Synth, { oscillator: { type: c.oscType as never }, envelope: env(c) }).toDestination();
+  s.volume.value = c.vol;
+  return s;
+}
+function makeMono(c: VoiceCfg): Tone.Synth {
+  const s = new Tone.Synth({ oscillator: { type: c.oscType as never }, envelope: env(c) }).toDestination();
+  s.volume.value = c.vol;
+  return s;
+}
+
+// (Re)build the pad/bass/arp voices for the given palette. On a palette change we
+// dispose the old voices and create the new timbres; the choir stays constant.
+function ensure(paletteId?: string) {
+  const id = paletteId && PALETTES[paletteId] ? paletteId : PALETTES[currentPaletteId] ? currentPaletteId : "glass";
+  if (id !== currentPaletteId) {
+    padSynth?.dispose(); bassSynth?.dispose(); arpSynth?.dispose();
+    padSynth = null; bassSynth = null; arpSynth = null;
+    currentPaletteId = id;
   }
-  if (!bassSynth) {
-    bassSynth = new Tone.Synth({ oscillator: { type: "sine" }, envelope: { attack: 0.06, decay: 0.4, sustain: 0.8, release: 1 } }).toDestination();
-    bassSynth.volume.value = -15;
-  }
-  if (!arpSynth) {
-    arpSynth = new Tone.Synth({ oscillator: { type: "triangle" }, envelope: { attack: 0.005, decay: 0.2, sustain: 0, release: 0.3 } }).toDestination();
-    arpSynth.volume.value = -20;
-  }
+  const p = PALETTES[currentPaletteId];
+  if (!padSynth) padSynth = makePoly(p.pad);
+  if (!bassSynth) bassSynth = makeMono(p.bass);
+  if (!arpSynth) arpSynth = makeMono(p.arp);
   if (!choirSynth) {
     // A breathy "aah" choir: a sawtooth swell through a vowel-ish bandpass with
     // gentle vibrato — a synthesized vocal texture (the near-term step toward
@@ -45,12 +59,12 @@ function ensure() {
   }
 }
 
-export function setHarmony(chords?: ChordEvent[], bass?: BassEvent[], arpDensity = 0, vocalLevel = 0) {
+export function setHarmony(chords?: ChordEvent[], bass?: BassEvent[], arpDensity = 0, vocalLevel = 0, paletteId?: string) {
   stopHarmony();
   const hasChords = !!chords?.length;
   const hasBass = !!bass?.length;
   if (!hasChords && !hasBass) return;
-  ensure();
+  ensure(paletteId);
   const end = Math.max(1, ...[...(chords ?? []), ...(bass ?? [])].map((e) => e.start + e.duration));
 
   if (hasChords && padSynth) {
