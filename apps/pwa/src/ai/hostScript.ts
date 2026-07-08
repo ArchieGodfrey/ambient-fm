@@ -2,6 +2,7 @@ import type { StimulusEvent } from "../types";
 import type { CompositionPlan } from "./types";
 import { computeEmotionalState } from "../stimulus/emotionalState";
 import { getStation } from "../config/station";
+import { getPooledLine } from "./hostLines";
 
 // The DJ host's lines. Deterministic (assembled from the same stimulus the music
 // uses — time, weather, scene, mood) so no inference is needed per transition.
@@ -94,6 +95,9 @@ export function hostIntroSegment(events: StimulusEvent[]): string[] {
   if (wx) lines.push(wx);
   const scene = sceneLabel(events);
   if (scene) lines.push(`Looks like ${article(scene)} ${scene} kind of moment.`);
+  // A personality-flavored pooled line (LLM), if one's ready — adds character.
+  const pooled = getPooledLine("welcome", events.length) ?? getPooledLine("observation", events.length);
+  if (pooled) lines.push(pooled);
   lines.push(pick([
     `Let me line something up for you.`,
     `Give me a second — finding the right one.`,
@@ -103,9 +107,10 @@ export function hostIntroSegment(events: StimulusEvent[]): string[] {
 }
 
 // Extra observations to keep talking if the track still isn't ready (rotates).
+// Prefers a personality-flavored pooled line, falling back to deterministic.
 export function hostExtraLine(events: StimulusEvent[], i: number): string {
   const hour = hourOf(events);
-  return pick([
+  return getPooledLine("observation", i) ?? pick([
     `Nearly there.`,
     `Something ${moodWord(events)} coming together.`,
     timeLine(events),
@@ -118,7 +123,7 @@ export function hostExtraLine(events: StimulusEvent[], i: number): string {
 
 // A shorter filler for mid-session transitions where the buffer briefly runs dry.
 export function hostFiller(events: StimulusEvent[]): string {
-  return pick([
+  return getPooledLine("observation", events.length) ?? pick([
     `And we roll on.`,
     `Here comes the next one.`,
     `Keeping the ${moodWord(events)} going.`,
@@ -134,6 +139,16 @@ export function hostBackAnnounce(prevTitle?: string | null): string | null {
     `${prevTitle}, there.`,
     `That one was ${prevTitle}.`,
   ], prevTitle.length);
+}
+
+// Read out a listener's write-in request (over the bed, while it generates).
+export function hostRequestAck(text: string, events: StimulusEvent[]): string[] {
+  const seed = text.length + events.length;
+  return [
+    pick([`Ooh — a request just came in.`, `We've got a request.`, `Someone's written in.`], seed),
+    `They're after: ${text}.`,
+    pick([`Let me put that together.`, `Say no more — making it now.`, `Love it. Give me a moment.`], seed),
+  ];
 }
 
 // Name and frame the track that's about to play.

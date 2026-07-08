@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Radio as RadioIcon, Mic, Square, Heart, X, Sparkles, SkipBack, SkipForward } from "lucide-react";
+import { Radio as RadioIcon, Mic, Square, Heart, X, Sparkles, SkipBack, SkipForward, Send } from "lucide-react";
 import { useSession } from "../session/SessionProvider";
 import useCapture from "../hooks/useCapture";
 import useFeedback from "../hooks/useFeedback";
@@ -33,7 +33,15 @@ export default function Radio() {
   const leanIn = useAppStore((s) => s.leanIn);
   const setLeanIn = useAppStore((s) => s.setLeanIn);
   const [preparing, setPreparing] = useState(false);
+  const [request, setRequest] = useState("");
   const opinion = opinionFor(sessionId ?? undefined);
+
+  const sendRequest = () => {
+    const t = request.trim();
+    if (!t) return;
+    radio.writeIn(t);
+    setRequest("");
+  };
 
   const on = radio.isOn;
   const needsDownload = !model.modelDownloaded && !model.modelLoaded;
@@ -220,6 +228,23 @@ export default function Radio() {
           {recording ? <Square size={14} /> : <Mic size={14} />}
           {recording ? "Listening… tap to stop" : "Capture the room"}
         </button>
+
+        {/* Write in — send the host a request; they read it out and spin one for you */}
+        {on ? (
+          <form onSubmit={(e) => { e.preventDefault(); sendRequest(); }} style={{ display: "flex", gap: 8, width: "100%", maxWidth: 360, marginTop: 2 }}>
+            <input
+              value={request}
+              onChange={(e) => setRequest(e.target.value)}
+              placeholder="Write in a request for the host…"
+              maxLength={120}
+              style={{ flex: 1, minWidth: 0, padding: "9px 14px", borderRadius: "var(--radius-pill)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-h)", fontSize: 13, fontFamily: "inherit" }}
+            />
+            <button type="submit" aria-label="Send request" disabled={!request.trim() || busy}
+              style={{ ...reactBtn, width: 40, height: 40, opacity: (!request.trim() || busy) ? 0.4 : 1, cursor: (!request.trim() || busy) ? "default" : "pointer" }}>
+              <Send size={15} />
+            </button>
+          </form>
+        ) : null}
       </div>
     </div>
   );

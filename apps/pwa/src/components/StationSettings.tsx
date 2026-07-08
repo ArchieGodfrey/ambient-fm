@@ -1,4 +1,5 @@
 import { useStation } from "../config/station";
+import VoicePicker from "./VoicePicker";
 import { card, mutedNote } from "../ui/styles";
 
 // Edit the station identity + host (name, personality). The voice picker is a
@@ -48,6 +49,12 @@ export default function StationSettings() {
         />
         <span style={mutedNote}>Shapes how the host talks between tracks.</span>
       </label>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <span style={labelText}>Voice</span>
+        <VoicePicker />
+        <span style={mutedNote}>Your host's voice. It downloads on first tune-in (or in the Voice host section).</span>
+      </div>
     </div>
   );
 }

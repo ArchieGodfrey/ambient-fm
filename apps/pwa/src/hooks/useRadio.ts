@@ -10,7 +10,8 @@ import { renderTrack } from "../audio/renderTrack";
 import { duckRendered } from "../audio/renderedPlayer";
 import { getBed } from "../audio/djBed";
 import { playBed, fadeOutBed, stopBed } from "../audio/bedPlayer";
-import { hostIntroSegment, hostExtraLine, hostFiller, hostIntro, hostBackAnnounce } from "../ai/hostScript";
+import { hostIntroSegment, hostExtraLine, hostFiller, hostIntro, hostBackAnnounce, hostRequestAck } from "../ai/hostScript";
+import { maybeRefreshHostPool } from "../ai/hostLines";
 import { soundToDirection } from "../sounds/soundDirection";
 import { recordFeedback, type TrackRef } from "../feedback/feedback";
 import { blendLean } from "../themes/presets";
@@ -78,6 +79,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
   const tuneOut = useCallback(() => apiRef.current.tuneOut?.(), []);
   const skip = useCallback(() => apiRef.current.skip?.(), []);
   const previous = useCallback(() => apiRef.current.previous?.(), []);
+  const writeIn = useCallback((text: string) => apiRef.current.writeIn?.(text as never), []);
 
   const pickSource = (): { sound?: Partial<Sound>; name?: string; yours?: boolean } => {
     const { preference: pref, yourSound: ys } = prefRef.current;
@@ -124,6 +126,9 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
         if (!live()) break;
         queueRef.current.push({ plan: composed.plan, intent: composed.intent, title, name: src.name, yours: src.yours, blob });
       }
+      // Buffer's full and the model's still loaded — refresh the personality
+      // host-line pool now (won't delay tracks; ready for later transitions).
+      if (live() && isModelLoaded()) await maybeRefreshHostPool(eventsRef.current);
     } finally {
       if (isModelLoaded()) await model.unloadModelAction();
       fillingRef.current = false;
@@ -234,6 +239,76 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     await playCurrent(rid, { announce: false });
   };
 
+  // A listener write-in request: the host reads it out over the bed while a bespoke
+  // track is generated from the request text, then plays it next (interrupts the
+  // current track). Self-contained so it doesn't tangle with the pre-gen buffer.
+  type Gen = { composed: NonNullable<Awaited<ReturnType<typeof audio.composeTrack>>>; blob: Blob } | null;
+  const playRequest = async (rid: number, text: string) => {
+    const live = () => runIdRef.current === rid && runningRef.current;
+    if (!live()) return;
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    playingRef.current = null;
+    duckTo(-16);
+    duckRendered(true);
+    setState("generating");
+    void getBed().then((bed) => { if (live()) playBed(bed); }).catch(() => { /* bed optional */ });
+
+    let loadedHere = false;
+    if (!isModelLoaded()) {
+      const ok = await model.loadModelAction({ keepAudio: true });
+      if (ok === false || !live()) return;
+      loadedHere = true;
+    }
+    // Generate the bespoke track from the request (direction = the request text).
+    const genP: Promise<Gen> = (async () => {
+      try {
+        const composed = await audio.composeTrack(undefined, { vibe: text, instruction: text }, undefined, { save: false });
+        if (!composed) return null;
+        const blob = await renderTrack(composed.plan);
+        return { composed, blob };
+      } catch (e) { console.error("Request generation failed", e); return null; }
+    })();
+
+    // Read the request aloud over the bed until the track is ready.
+    const ack = hostRequestAck(text, eventsRef.current);
+    let result: Gen = null; let done = false;
+    void genP.then((r) => { result = r; done = true; });
+    let i = 0;
+    while (!done && live()) {
+      const line = i < ack.length ? ack[i] : hostExtraLine(eventsRef.current, i);
+      setHostText(line);
+      const playLine = await prepareLine(line);
+      if (!live()) return;
+      await playLine();
+      if (!live()) return;
+      i += 1;
+      if (!done && live()) await wait(500);
+    }
+    if (!result) await genP; // ensure settled if the loop exited on the last line
+    result = result ?? (await genP);
+    if (loadedHere && isModelLoaded()) await model.unloadModelAction();
+    if (!live()) return;
+    if (!result) { setHostText(null); void toNext(rid, { auto: false }); return; } // gen failed → normal next
+
+    const { composed, blob } = result;
+    const sessionId = await audio.persistComposed(eventsRef.current, composed.plan, composed.title);
+    if (!live()) return;
+    playedRef.current.push({ plan: composed.plan, intent: composed.intent, title: composed.title, name: "your request", blob, sessionId });
+    cursorRef.current = playedRef.current.length - 1;
+    setCanPrev(cursorRef.current > 0);
+    setNowPlaying({ title: composed.title, mood: String(composed.plan.globalMood ?? "ambient"), key: composed.plan.key });
+    setHostText(null);
+    setState("playing");
+    fadeOutBed();
+    await audio.playRenderedTrack(composed.plan, blob, composed.title, sessionId);
+    if (!live()) { audio.stopPlayback(); return; }
+    playingRef.current = { sessionId: sessionId ?? "", mood: String(composed.plan.globalMood ?? ""), key: composed.plan.key, bpm: composed.plan.bpm };
+    unduck();
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const ms = Math.max(MIN_TRACK_MS, Math.round((composed.plan.duration ?? 120) * 1000));
+    timerRef.current = window.setTimeout(() => void apiRef.current.toNext?.(rid as never, { auto: true } as never), ms);
+  };
+
   function doTuneOut() {
     runningRef.current = false;
     runIdRef.current += 1;
@@ -283,10 +358,17 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
     void toPrev(runIdRef.current);
   }
+  function doWriteIn(text: string) {
+    const t = text.trim();
+    if (!t || !runningRef.current) return;
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    void playRequest(runIdRef.current, t);
+  }
 
   apiRef.current = {
     tuneIn: doTuneIn as never, tuneOut: doTuneOut as never, skip: doSkip as never,
     previous: doPrevious as never, toNext: toNext as never, fill: fill as never,
+    writeIn: doWriteIn as never,
   };
 
   // A new lean-in target: drop the buffered (old-lean) future tracks and bump the
@@ -299,5 +381,5 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     if (!fillingRef.current) void apiRef.current.fill?.(runIdRef.current as never, BUFFER_SIZE as never);
   }, [leanIn]);
 
-  return { state, hostText, nowPlaying, tuneIn, tuneOut, skip, previous, canPrev, isOn: state !== "idle", voiceAudible: voiceAudible() };
+  return { state, hostText, nowPlaying, tuneIn, tuneOut, skip, previous, writeIn, canPrev, isOn: state !== "idle", voiceAudible: voiceAudible() };
 }

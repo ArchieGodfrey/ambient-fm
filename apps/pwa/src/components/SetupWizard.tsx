@@ -4,9 +4,10 @@ import { useSession } from "../session/SessionProvider";
 import useVoiceManager from "../hooks/useVoiceManager";
 import { setSetupDone, requestPersistentStorage } from "../utils/install";
 import { downloadSamples } from "../audio/sampleLibrary";
+import StationSettings from "./StationSettings";
 import { primaryButton, ghostButton, mutedNote } from "../ui/styles";
 
-type Step = "welcome" | "downloading" | "done";
+type Step = "welcome" | "customize" | "downloading" | "done";
 
 // First-run setup wizard: explains the app, then — only after the user explicitly
 // accepts — downloads the on-device model + DJ voice, requests persistent storage
@@ -76,10 +77,29 @@ export default function SetupWizard({ onDone }: { onDone: () => void }) {
                 </div>
               </div>
             </div>
+            <button type="button" onClick={() => setStep("customize")} style={{ ...primaryButton, width: "100%", justifyContent: "center", marginTop: 14 }}>
+              <ArrowRight size={16} /> Get started
+            </button>
+            <button type="button" onClick={skip} style={ghostButton}>Skip for now</button>
+          </>
+        )}
+
+        {step === "customize" && (
+          <>
+            <h1 style={title}>Make it yours</h1>
+            <p style={{ ...mutedNote, textAlign: "center", maxWidth: 360 }}>
+              Name your station and host, give the host a personality, and pick a voice. You can change
+              any of this later in Settings.
+            </p>
+            <div style={{ width: "100%", marginTop: 12 }}>
+              <StationSettings />
+            </div>
             <button type="button" onClick={accept} style={{ ...primaryButton, width: "100%", justifyContent: "center", marginTop: 14 }}>
               <Download size={16} /> Download &amp; continue
             </button>
-            <button type="button" onClick={skip} style={ghostButton}>Skip for now</button>
+            <button type="button" onClick={() => setStep("welcome")} style={ghostButton}>
+              <ArrowLeft size={15} /> Back
+            </button>
           </>
         )}
 
