@@ -4,6 +4,7 @@ import ModelActions from "../components/ModelActions";
 import VoiceActions from "../components/VoiceActions";
 import ThemeToggle from "../components/ThemeToggle";
 import SystemHealth from "../components/SystemHealth";
+import StationSettings from "../components/StationSettings";
 import { useSession } from "../session/SessionProvider";
 import { useAppStore } from "../store/useAppStore";
 import { resetApp } from "../utils/resetApp";
@@ -82,6 +83,11 @@ export default function Settings() {
           onDelete={model.deleteModelAction}
           onResetRuntime={model.resetRuntimeAction}
         />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <span style={sectionLabel}>Station & host</span>
+        <StationSettings />
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

@@ -1,6 +1,7 @@
 import type { StimulusEvent } from "../types";
 import type { CompositionPlan } from "./types";
 import { computeEmotionalState } from "../stimulus/emotionalState";
+import { getStation } from "../config/station";
 
 // The DJ host's lines. Deterministic (assembled from the same stimulus the music
 // uses — time, weather, scene, mood) so no inference is needed per transition.
@@ -77,10 +78,11 @@ function timeLine(events: StimulusEvent[]): string {
 
 export function hostWelcome(events: StimulusEvent[]): string {
   const hour = hourOf(events);
+  const { stationName, hostName } = getStation();
   return pick([
-    `You're tuned in — ${clockPhrase(hour)}.`,
-    `Welcome in. ${cap(clockPhrase(hour))}.`,
-    `Good to have you — it's ${clockPhrase(hour)}.`,
+    `You're tuned in to ${stationName} — ${clockPhrase(hour)}.`,
+    `${hostName} with you on ${stationName}. ${cap(clockPhrase(hour))}.`,
+    `Welcome to ${stationName}, I'm ${hostName} — it's ${clockPhrase(hour)}.`,
   ], hour);
 }
 
