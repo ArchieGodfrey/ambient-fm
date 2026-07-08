@@ -9,6 +9,7 @@ import { composerState } from "../composer/composerState";
 import { setMelody, stopMelody } from "./melodyTrack";
 import { setHarmony, stopHarmony } from "./harmonyTrack";
 import { setPercussion, stopPercussion } from "./percussionTrack";
+import { resetAudioModulesIfDirty } from "./resetAudio";
 
 export type CompositionRuntimeSnapshot = {
   cursor: number;
@@ -82,12 +83,12 @@ function getSectionTimeRemaining(cursor: number, section: CompositionSection | n
   return Math.max(0, section.start + section.duration - cursor);
 }
 
-function getDrift(plan: CompositionPlan, tick: number) {
+export function getDrift(plan: CompositionPlan, tick: number) {
   const rng = field(plan.seed, tick, "drift");
   return (rng() - 0.5) * 0.2;
 }
 
-function deriveComposerState(plan: CompositionPlan, tick: number) {
+export function deriveComposerState(plan: CompositionPlan, tick: number) {
   const profile = plan.evolutionProfile;
   const density = Math.min(1, Math.max(0, composerState.currentDensity ?? 0.4));
   const densityRng = field(plan.seed, tick, "density");
@@ -284,6 +285,12 @@ function handleVisibility() {
 }
 
 export function startCompositionRuntime(planInput: CompositionPlan, startOffset = 0) {
+  // Rebuild every cached audio singleton in the (current) live Tone context. This
+  // makes live playback robust even if an offline render (renderTrack) previously
+  // rebuilt these nodes in an offline context. It just recreates the same nodes,
+  // so live behaviour is unchanged.
+  resetAudioModulesIfDirty();
+
   plan = planInput;
   startScheduler(planInput);
   setMelody(planInput.melodyNotes, planInput.melodyInstrument); // recorded melody track (if any)

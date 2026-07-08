@@ -142,3 +142,25 @@ export function stopHarmony() {
   bassPart = null;
   currentChord = [];
 }
+
+// Dispose every cached voice (not just the Parts, as stopHarmony does) and null
+// the singletons so the next setHarmony() rebuilds them in whatever Tone context
+// is active — needed to render into an offline context and to rebuild live after.
+export function resetHarmony() {
+  stopHarmony();
+  const safe = (fn: () => void) => { try { fn(); } catch { /* node from a disposed context */ } };
+  safe(() => padSynth?.dispose());
+  safe(() => bassSynth?.dispose());
+  safe(() => arpSynth?.dispose());
+  safe(() => choirSynth?.dispose());
+  safe(() => choirVibrato?.dispose());
+  choirFormants.forEach(({ bp, g }) => { safe(() => bp.dispose()); safe(() => g.dispose()); });
+  padSynth = null;
+  bassSynth = null;
+  arpSynth = null;
+  choirSynth = null;
+  choirVibrato = null;
+  choirFormants = [];
+  currentPaletteId = "";
+  arpIndex = 0;
+}

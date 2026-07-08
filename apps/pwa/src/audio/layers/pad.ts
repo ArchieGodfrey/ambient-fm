@@ -12,5 +12,9 @@ export function createPad() {
     triggerChord() {
       synth.triggerAttackRelease(["C4", "E4", "G4"], "2n");
     },
+
+    dispose() {
+      synth.dispose();
+    },
   };
 }

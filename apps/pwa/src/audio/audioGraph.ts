@@ -66,6 +66,21 @@ export function initAudioGraph() {
   pulse = createPulse(); // not started — the percussion track handles rhythm now
 }
 
+// Dispose the cached layer nodes and null the singletons so the next
+// initAudioGraph() rebuilds them in whatever Tone context is currently active.
+// Needed to render into an offline context (and to rebuild in the live context
+// afterwards). Disposing (not just nulling) avoids stacking duplicate drones.
+export function resetAudioGraph() {
+  try { drone?.dispose(); } catch { /* node from a disposed context */ }
+  try { pad?.dispose(); } catch { /* node from a disposed context */ }
+  try { texture?.dispose(); } catch { /* node from a disposed context */ }
+  try { pulse?.dispose(); } catch { /* node from a disposed context */ }
+  drone = null;
+  pad = null;
+  texture = null;
+  pulse = null;
+}
+
 export function applyComposition(plan: CompositionPlan) {
   if (!drone || !pad || !texture || !pulse) {
     initAudioGraph();

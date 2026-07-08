@@ -23,5 +23,9 @@ export function createTextureInstrument(): Instrument {
     setIntensity(v) {
       synth.volume.value = -34 + v * 20;
     },
+
+    dispose() {
+      synth.dispose();
+    },
   };
 }

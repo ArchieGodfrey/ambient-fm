@@ -18,5 +18,9 @@ export function createPulseInstrument(): Instrument {
     setIntensity(v) {
       synth.volume.value = -30 + v * 18;
     },
+
+    dispose() {
+      synth.dispose();
+    },
   };
 }

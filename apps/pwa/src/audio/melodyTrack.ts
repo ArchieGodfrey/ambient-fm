@@ -40,3 +40,12 @@ export function stopMelody() {
     part = null;
   }
 }
+
+// Dispose the cached synth and null the singleton so the next setMelody()
+// rebuilds it in whatever Tone context is active (offline render / live rebuild).
+export function resetMelody() {
+  stopMelody();
+  try { synth?.dispose(); } catch { /* node from a disposed context */ }
+  synth = null;
+  synthId = "";
+}
