@@ -19,6 +19,14 @@ let osc: OscillatorNode | null = null;
 let streamDest: MediaStreamAudioDestinationNode | null = null;
 let started = false;
 
+// iOS may pause the element (interruptions, coming back from lock). Re-assert
+// playback whenever it's paused or we regain foreground, so the session doesn't
+// silently drop.
+function keepPlaying() {
+  if (started && el && el.paused) void el.play().catch(() => { /* needs a gesture */ });
+}
+const onVisibility = () => { if (typeof document !== "undefined" && !document.hidden) keepPlaying(); };
+
 // Start the keep-alive stream. MUST be called inside a user gesture (e.g. the
 // Tune-in click) so the <audio> element is allowed to play.
 export function startBackgroundKeepAlive() {
@@ -38,6 +46,8 @@ export function startBackgroundKeepAlive() {
     el.loop = true;
     el.srcObject = streamDest.stream;
     el.style.display = "none";
+    el.addEventListener("pause", keepPlaying);
+    document.addEventListener("visibilitychange", onVisibility);
     document.body.appendChild(el);
     void el.play().catch(() => { /* no gesture yet — caller runs this within one */ });
     started = true;
@@ -47,16 +57,18 @@ export function startBackgroundKeepAlive() {
 }
 
 export function stopBackgroundKeepAlive() {
+  started = false; // set first so keepPlaying() won't re-play during teardown
+  if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
   try { osc?.stop(); } catch { /* already stopped */ }
   osc = null;
   if (el) {
+    el.removeEventListener("pause", keepPlaying);
     el.pause();
     el.srcObject = null;
     el.remove();
     el = null;
   }
   streamDest = null;
-  started = false;
 }
 
 // ── MediaSession: lock-screen transport ──

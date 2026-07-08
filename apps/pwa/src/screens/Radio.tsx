@@ -99,13 +99,16 @@ export default function Radio() {
           </span>
         </button>
         {busy ? (
-          <svg width={132} height={132} viewBox="0 0 132 132" className={determinate ? undefined : "afm-spin"}
-            style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)" }}>
-            <circle cx="66" cy="66" r={ringR} fill="none" stroke="var(--border)" strokeWidth="3" />
-            <circle cx="66" cy="66" r={ringR} fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round"
-              strokeDasharray={ringC} strokeDashoffset={determinate ? ringC * (1 - prog) : ringC * 0.72}
-              transform="rotate(-90 66 66)" style={{ transition: determinate ? "stroke-dashoffset 0.3s ease" : undefined }} />
-          </svg>
+          // Wrapper does the centering (translate); the inner SVG does the spin
+          // (rotate) — so the spin animation can't clobber the centering transform.
+          <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: 132, height: 132, pointerEvents: "none" }}>
+            <svg width={132} height={132} viewBox="0 0 132 132" className={determinate ? undefined : "afm-spin"} style={{ display: "block" }}>
+              <circle cx="66" cy="66" r={ringR} fill="none" stroke="var(--border)" strokeWidth="3" />
+              <circle cx="66" cy="66" r={ringR} fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round"
+                strokeDasharray={ringC} strokeDashoffset={determinate ? ringC * (1 - prog) : ringC * 0.72}
+                transform="rotate(-90 66 66)" style={{ transition: determinate ? "stroke-dashoffset 0.3s ease" : undefined }} />
+            </svg>
+          </div>
         ) : null}
 
         {/* Bubbles */}

@@ -140,6 +140,9 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     setHostText(null);
     setState("playing");
     await audio.playComposed(item.plan, item.intent, item.title, item.sessionId);
+    // If a tune-out raced in while playComposed was starting audio, it just
+    // un-stopped us — stop again so playback doesn't linger for a few seconds.
+    if (!live()) { audio.stopPlayback(); return; }
     playingRef.current = { sessionId: item.sessionId ?? "", mood: String(item.plan.globalMood ?? ""), key: item.plan.key, bpm: item.plan.bpm };
     unduck();
     if (timerRef.current) clearTimeout(timerRef.current);

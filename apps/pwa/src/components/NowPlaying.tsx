@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ChevronDown, Pause, Play, Lock, Heart, X } from "lucide-react";
+import { ChevronDown, Pause, Play, Lock, Heart, X, SkipBack, SkipForward } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { useSession } from "../session/SessionProvider";
 import useSessionHistory from "../hooks/useSessionHistory";
@@ -80,12 +80,25 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
           <p style={{ fontSize: 14, color: "var(--text)", maxWidth: 360, textAlign: "center", lineHeight: 1.5, fontStyle: "italic" }}>“{radio.hostText}”</p>
         ) : null}
 
-        {/* Manual transport only when the station is off (the radio owns playback while on air) */}
-        {!radio.isOn && !locked ? (
-          <button type="button" onClick={() => playToggle?.()} disabled={!playToggle} aria-label={isPlaying ? "Stop" : "Play"}
-            style={{ width: 62, height: 62, borderRadius: "50%", border: "none", background: "var(--accent)", color: "#fff", cursor: playToggle ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow)" }}>
-            {isPlaying ? <Pause size={25} /> : <Play size={25} />}
-          </button>
+        {/* Transport. On air: skip/rewind through the station's tracks. Off air:
+            the manual play/stop toggle. */}
+        {!locked ? (
+          radio.isOn ? (
+            <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+              <button type="button" onClick={() => radio.previous()} disabled={!radio.canPrev} aria-label="Previous track"
+                style={{ ...transportBtn, opacity: radio.canPrev ? 1 : 0.4, cursor: radio.canPrev ? "pointer" : "default" }}>
+                <SkipBack size={24} />
+              </button>
+              <button type="button" onClick={() => radio.skip()} aria-label="Skip track" style={transportBtn}>
+                <SkipForward size={24} />
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => playToggle?.()} disabled={!playToggle} aria-label={isPlaying ? "Stop" : "Play"}
+              style={{ width: 62, height: 62, borderRadius: "50%", border: "none", background: "var(--accent)", color: "#fff", cursor: playToggle ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow)" }}>
+              {isPlaying ? <Pause size={25} /> : <Play size={25} />}
+            </button>
+          )
         ) : null}
       </div>
 
@@ -136,3 +149,4 @@ export default function NowPlaying({ onClose }: { onClose: () => void }) {
 
 const roundBtn = { border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", borderRadius: "50%", width: 40, height: 40, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } as const;
 const reactBtn = { border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-muted)", borderRadius: "50%", width: 44, height: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.15s ease" } as const;
+const transportBtn = { border: "1px solid var(--accent-border)", background: "var(--accent-soft)", color: "var(--accent)", borderRadius: "50%", width: 58, height: 58, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } as const;
