@@ -174,7 +174,9 @@ export class MLLayer {
           console.error("Failed to ping worker", error);
         }
       }
-    }, 1000);
+      // Battery: a 2.5s cadence still resolves the 5s ping / 10s death thresholds
+      // with plenty of granularity, at a fraction of the idle wakeups of 1s.
+    }, 2500);
 
     try {
       return await this.workerReady;

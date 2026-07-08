@@ -5,6 +5,10 @@ import type useAudioComposer from "./useAudioComposer";
 import { prepareLine, cancelHost, voiceAudible, maybeAutoLoadVoice } from "../audio/host";
 import { duckTo, unduck } from "../audio/toneEngine";
 import { takeFloor, releaseFloor } from "../audio/playbackFloor";
+import {
+  startBackgroundKeepAlive, stopBackgroundKeepAlive,
+  setMediaSessionPlaying, setMediaSessionTrack, setMediaSessionHandlers, clearMediaSession,
+} from "../audio/backgroundAudio";
 import { hostWelcome, hostGreeting, hostFiller, hostIntro } from "../ai/hostScript";
 import { soundToDirection } from "../sounds/soundDirection";
 import { recordFeedback, type TrackRef } from "../feedback/feedback";
@@ -73,6 +77,9 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     releaseFloor(tuneOut);
     audio.stopPlayback(); // stop the current track immediately
     unduck(0.3);          // reset the duck so the next tune-in isn't quiet
+    stopBackgroundKeepAlive();
+    setMediaSessionPlaying(false);
+    clearMediaSession();
   }, [audio]);
 
   const cycle = useCallback(async (first: boolean, rid: number) => {
@@ -104,6 +111,7 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
 
     // Introduce the new track over the bed, then bring it up to full.
     setNowPlaying({ title: result.title, mood: String(result.plan.globalMood ?? "ambient"), key: result.plan.key });
+    setMediaSessionTrack(result.title); // lock-screen "now playing"
     setState("announcing");
     const introLine = hostIntro(result.title, result.plan, { soundName: name, yours });
     setHostText(introLine);
@@ -132,6 +140,9 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[]) 
     countRef.current = 0;
     maybeAutoLoadVoice(); // warm (or first-time download) the DJ voice
     takeFloor(tuneOut);   // claim the playback floor — stops any preview/manual playback
+    startBackgroundKeepAlive(); // hold the iOS audio session open (within this gesture)
+    setMediaSessionHandlers({ onPlay: tuneIn, onPause: tuneOut });
+    setMediaSessionPlaying(true);
     void cycle(true, rid);
   }, [cycle, tuneOut]);
 
