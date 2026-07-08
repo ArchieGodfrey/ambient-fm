@@ -1,66 +1,61 @@
 import * as Tone from "tone";
+import { setMasterSink } from "./toneEngine";
 
-// Keep the audio session alive in the background + expose lock-screen controls.
+// Background / locked-screen playback + lock-screen controls.
 //
-// iOS suspends a page's Web Audio context on screen-lock / backgrounding unless
-// the page has an actively-playing media element. We play a near-silent
-// MediaStream (sourced from the same audio context) through a hidden <audio>
-// element to hold the session open. The music itself is untouched — these are
-// separate nodes, so there's no rerouting and no doubling of the mix. MediaSession
-// gives play/pause on the lock screen (skip/artwork are deliberately deferred).
+// iOS suspends a bare Web Audio context on lock, but keeps an actively-playing
+// <audio> element alive. So we route the ENTIRE music mix through a
+// MediaStreamAudioDestinationNode played by a hidden <audio> element (and sever
+// the master's direct hardware path so it doesn't double). While the radio is on
+// the element is the sole audible sink; on tune-out we route the master back to
+// hardware for normal (manual) playback. MediaSession gives lock-screen controls.
 //
-// NOTE: iOS background-audio behaviour is version-dependent and must be verified
-// on a real device. This is the safe first layer (it can never double or break the
-// foreground mix). If lock-screen persistence proves unreliable on device, the
-// follow-up is routing the actual master mix through the element.
+// NOTE: iOS background behaviour is version-dependent — verify on a real device
+// that (a) music continues when locked, (b) there's no doubling/echo in the
+// foreground, (c) playback isn't broken. The routing is guarded; on failure it
+// falls back to the default output.
 
 let el: HTMLAudioElement | null = null;
-let osc: OscillatorNode | null = null;
 let streamDest: MediaStreamAudioDestinationNode | null = null;
 let started = false;
 
 // iOS may pause the element (interruptions, coming back from lock). Re-assert
-// playback whenever it's paused or we regain foreground, so the session doesn't
-// silently drop.
+// playback whenever it's paused or we regain foreground.
 function keepPlaying() {
   if (started && el && el.paused) void el.play().catch(() => { /* needs a gesture */ });
 }
 const onVisibility = () => { if (typeof document !== "undefined" && !document.hidden) keepPlaying(); };
 
-// Start the keep-alive stream. MUST be called inside a user gesture (e.g. the
-// Tune-in click) so the <audio> element is allowed to play.
+// Route the music mix through the element. MUST be called inside a user gesture
+// (the Tune-in click) so the <audio> element is allowed to play.
 export function startBackgroundKeepAlive() {
   if (started) return;
   try {
     const raw = Tone.getContext().rawContext as unknown as AudioContext;
     streamDest = raw.createMediaStreamDestination();
-    const gain = raw.createGain();
-    gain.gain.value = 0.0001; // imperceptible, but a non-silent stream reads as "active"
-    osc = raw.createOscillator();
-    osc.frequency.value = 40;
-    osc.connect(gain).connect(streamDest);
-    osc.start();
 
     el = document.createElement("audio");
     el.setAttribute("playsinline", "");
-    el.loop = true;
     el.srcObject = streamDest.stream;
     el.style.display = "none";
     el.addEventListener("pause", keepPlaying);
     document.addEventListener("visibilitychange", onVisibility);
     document.body.appendChild(el);
     void el.play().catch(() => { /* no gesture yet — caller runs this within one */ });
+
+    setMasterSink(streamDest); // the whole mix now plays through the element
     started = true;
   } catch {
     // Web Audio / MediaStream unavailable — degrade silently (no background support).
+    streamDest = null; el = null;
   }
 }
 
 export function stopBackgroundKeepAlive() {
+  if (!started) return;
   started = false; // set first so keepPlaying() won't re-play during teardown
   if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
-  try { osc?.stop(); } catch { /* already stopped */ }
-  osc = null;
+  setMasterSink(null); // back to the hardware output for manual playback
   if (el) {
     el.removeEventListener("pause", keepPlaying);
     el.pause();

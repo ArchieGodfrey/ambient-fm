@@ -39,6 +39,21 @@ export function unduck(seconds = 0.8) {
   try { Tone.getDestination().volume.rampTo(0, seconds); } catch { /* no context yet */ }
 }
 
+// Route the master mix either to the hardware (default) or to a
+// MediaStreamAudioDestinationNode — so it can be played through an <audio>
+// element for reliable background/locked-screen playback on iOS. Swaps are done
+// between tracks (no audible gap): disconnect the master, connect the new sink.
+export function setMasterSink(streamDest: MediaStreamAudioDestinationNode | null) {
+  try {
+    const dest = Tone.getDestination();
+    const raw = Tone.getContext().rawContext as unknown as AudioContext;
+    dest.disconnect();
+    dest.connect(streamDest ?? raw.destination);
+  } catch (error) {
+    console.warn("setMasterSink failed; audio stays on the default output", error);
+  }
+}
+
 export async function startAudio() {
   if (!started) {
     await Tone.start();
