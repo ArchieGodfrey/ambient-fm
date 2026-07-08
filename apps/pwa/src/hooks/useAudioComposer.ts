@@ -9,7 +9,7 @@ import { startComposer, stopComposer } from "../composer/runtime";
 import { postToast } from "../utils/toast";
 import { db } from "../db/db";
 import { analyzeSession } from "../memory/analyzeSession";
-import { generateTrackName, generateTrackNameLLM } from "../ai/trackName";
+import { generateTrackName } from "../ai/trackName";
 import { applySoundToPlan } from "../sounds/soundDirection";
 import type { Sound } from "../sounds/types";
 import { restoreRuntime } from "../runtime/restoreRuntime";
@@ -144,11 +144,10 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     setStatus("Generating composition...");
     try {
       const settings = sound?.composerSettings ?? composerSettings;
-      const { plan: composition, intent } = await generateComposition(inputEvents, settings, direction);
+      const { plan: composition, intent, title } = await generateComposition(inputEvents, settings, direction);
       // Graft in the parts of the loaded Sound the intent path can't emit —
       // the recorded melody, explicit layers, tempo — so it's truly "your sound".
       if (sound) applySoundToPlan(composition, sound);
-      const title = await generateTrackNameLLM(composition, { vibe: sound?.vibe ?? direction?.vibe, moodWords: direction?.moodWords });
       const sessionId = await saveSession(inputEvents, composition, title);
       return { plan: composition, intent, title, sessionId };
     } catch (error) {
