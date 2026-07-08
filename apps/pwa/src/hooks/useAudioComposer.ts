@@ -144,7 +144,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     setStatus("Generating composition...");
     try {
       const settings = sound?.composerSettings ?? composerSettings;
-      const { plan: composition, intent, title } = await generateComposition(inputEvents, settings, direction);
+      const { plan: composition, intent, title } = await generateComposition(inputEvents, settings, direction, sound?.mood);
       // Graft in the parts of the loaded Sound the intent path can't emit —
       // the recorded melody, explicit layers, tempo — so it's truly "your sound".
       if (sound) applySoundToPlan(composition, sound);
@@ -174,7 +174,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     setStatus("Filling in your sound...");
     try {
       const settings = sound?.composerSettings ?? composerSettings;
-      const { plan, intent } = await generateComposition(overrideEvents ?? events, settings, direction);
+      const { plan, intent } = await generateComposition(overrideEvents ?? events, settings, direction, sound?.mood);
       if (sound) applySoundToPlan(plan, sound);
       return { plan, intent };
     } catch (error) {
