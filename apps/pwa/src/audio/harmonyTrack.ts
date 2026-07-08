@@ -1,5 +1,5 @@
 import * as Tone from "tone";
-import { PALETTES, SAMPLE_INSTRUMENTS, type VoiceCfg } from "./palettes";
+import { PALETTES, SAMPLE_INSTRUMENTS, VOWELS, PALETTE_VOWEL, type VoiceCfg } from "./palettes";
 
 // Voices the harmonic bed — block chords + a bass root — as looping Tone.Parts
 // over the section timeline (seconds), plus an optional arpeggio over the
@@ -16,7 +16,7 @@ let bassSynth: Tone.Synth | null = null;
 let arpSynth: Tone.Synth | Tone.Sampler | null = null;
 let choirSynth: Tone.PolySynth | null = null;
 let choirVibrato: Tone.Vibrato | null = null;
-let choirFilter: Tone.Filter | null = null;
+let choirFormants: { bp: Tone.Filter; g: Tone.Gain }[] = [];
 let currentChord: string[] = [];
 let arpIndex = 0;
 let currentPaletteId = "";
@@ -47,6 +47,10 @@ function ensure(paletteId?: string) {
   if (id !== currentPaletteId) {
     padSynth?.dispose(); bassSynth?.dispose(); arpSynth?.dispose();
     padSynth = null; bassSynth = null; arpSynth = null;
+    // the choir's vowel is palette-dependent → rebuild it too
+    choirSynth?.dispose(); choirVibrato?.dispose();
+    choirFormants.forEach(({ bp, g }) => { bp.dispose(); g.dispose(); });
+    choirSynth = null; choirVibrato = null; choirFormants = [];
     currentPaletteId = id;
   }
   const p = PALETTES[currentPaletteId];
@@ -54,13 +58,21 @@ function ensure(paletteId?: string) {
   if (!bassSynth) bassSynth = makeMono(p.bass);
   if (!arpSynth) arpSynth = p.sample ? makeSampler(p.sample, p.arp.vol) : makeMono(p.arp);
   if (!choirSynth) {
-    // A breathy "aah" choir: a sawtooth swell through a vowel-ish bandpass with
-    // gentle vibrato — a synthesized vocal texture (the near-term step toward
-    // real vocals). Kept soft so it colours rather than dominates.
-    choirFilter = new Tone.Filter({ type: "bandpass", frequency: 900, Q: 1.4 }).toDestination();
-    choirVibrato = new Tone.Vibrato({ frequency: 5, depth: 0.12 }).connect(choirFilter);
-    choirSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 1.2, decay: 0.6, sustain: 0.8, release: 3 } }).connect(choirVibrato);
-    choirSynth.volume.value = -26;
+    // A sung-vowel choir via FORMANT SYNTHESIS: a sawtooth swell (with gentle
+    // vibrato) fed through parallel band-pass filters tuned to the vowel's F1/F2/F3
+    // resonances — reads as a real "aah/ooh/…" rather than a filtered buzz. The
+    // vowel is chosen by the palette. Kept soft so it colours rather than dominates.
+    const vowel = VOWELS[PALETTE_VOWEL[currentPaletteId] ?? "aah"] ?? VOWELS.aah;
+    choirVibrato = new Tone.Vibrato({ frequency: 5, depth: 0.1 });
+    choirFormants = vowel.f.map((freq, i) => {
+      const bp = new Tone.Filter({ type: "bandpass", frequency: freq, Q: 8 });
+      const g = new Tone.Gain(vowel.g[i] * 0.5).toDestination();
+      choirVibrato!.connect(bp);
+      bp.connect(g);
+      return { bp, g };
+    });
+    choirSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 1.2, decay: 0.6, sustain: 0.85, release: 3 } }).connect(choirVibrato);
+    choirSynth.volume.value = -16;
   }
 }
 

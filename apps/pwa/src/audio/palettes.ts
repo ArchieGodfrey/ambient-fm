@@ -83,6 +83,19 @@ export const PALETTES: Record<string, Palette> = {
   },
 };
 
+// Vowel formants (F1/F2/F3 in Hz + relative gains) for the choir's formant-synth
+// voice — the resonances that make a source read as a sung "aah / ooh / …". Far
+// more vocal than the old single band-pass. Each palette implies a vowel.
+export const VOWELS: Record<string, { f: number[]; g: number[] }> = {
+  aah: { f: [800, 1150, 2900], g: [1.0, 0.5, 0.2] },
+  ooh: { f: [350, 800, 2800], g: [1.0, 0.35, 0.12] },
+  ohh: { f: [500, 1000, 2600], g: [1.0, 0.45, 0.15] },
+  eeh: { f: [350, 2100, 2900], g: [1.0, 0.6, 0.25] },
+};
+export const PALETTE_VOWEL: Record<string, string> = {
+  glass: "aah", warm: "ooh", strings: "ooh", bells: "eeh", reed: "ohh", synth: "ohh", piano: "aah", harp: "eeh", cello: "ooh",
+};
+
 // Deterministic mood → palette (hybrid). Acoustic sampled instruments (piano/
 // harp/cello) favour calm/warm/bright feels; synths cover energetic/tense.
 // Tie-breaks use the seed roll `r`.
