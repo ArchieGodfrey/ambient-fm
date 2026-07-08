@@ -29,7 +29,7 @@ function useSessionRuntime() {
 
   const model = useModelManager(workerInitPayload);
   const audio = useAudioComposer(events);
-  const radio = useRadio(audio, events);
+  const radio = useRadio(audio, events, model);
   const { sessions } = useSessionHistory();
 
   async function refreshStimuli() {

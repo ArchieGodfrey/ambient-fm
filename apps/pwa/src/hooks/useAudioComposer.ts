@@ -134,7 +134,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
 
   // Compose a track (generate + name + persist) WITHOUT starting playback, so
   // callers (esp. the radio) can narrate the intro before the track comes in.
-  async function composeTrack(overrideEvents?: StimulusEvent[], direction?: CompositionDirection, sound?: Partial<Sound>): Promise<Composed | null> {
+  async function composeTrack(overrideEvents?: StimulusEvent[], direction?: CompositionDirection, sound?: Partial<Sound>, opts?: { save?: boolean }): Promise<Composed | null> {
     if (!isModelLoaded()) {
       setStatus("Composer isn't ready yet — the model failed to load.");
       return null;
@@ -148,7 +148,10 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       // Graft in the parts of the loaded Sound the intent path can't emit —
       // the recorded melody, explicit layers, tempo — so it's truly "your sound".
       if (sound) applySoundToPlan(composition, sound);
-      const sessionId = await saveSession(inputEvents, composition, title);
+      // The radio pre-generates a buffer; those tracks are saved only when they
+      // actually play (opts.save === false here), so unplayed buffer/regenerated
+      // tracks never pollute the library.
+      const sessionId = opts?.save === false ? null : await saveSession(inputEvents, composition, title);
       return { plan: composition, intent, title, sessionId };
     } catch (error) {
       console.error("Failed to generate composition", error);
@@ -256,6 +259,9 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     startRuntimeLoop();
   }, [setCurrentTitle, setCurrentSessionId, stopPlayback]);
 
+  // Persist a pre-generated (buffered) track at the moment it actually plays.
+  const persistComposed = useCallback((evts: StimulusEvent[], planInput: CompositionPlan, title: string) => saveSession(evts, planInput, title), []);
+
   const loadStaticPlan = useCallback((planInput: CompositionPlan) => {
     setSharedPlan(planInput);
     setCurrentSessionSaved(true);
@@ -304,6 +310,7 @@ export default function useAudioComposer(events: StimulusEvent[]) {
     runAIComposer,
     composeTrack,
     composePlanOnly,
+    persistComposed,
     playComposed,
     stopPlayback,
     loadSessionPlan,
