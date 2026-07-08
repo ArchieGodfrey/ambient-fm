@@ -23,6 +23,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       includeAssets: ['favicon.svg'],
+      // Generate the icon set from public/favicon.svg (see pwa-assets.config.ts)
+      // and inject the manifest icons + head links.
+      pwaAssets: {
+        config: true,
+        overrideManifestIcons: true,
+      },
       devOptions: {
         // Dev service worker relies on the HMR socket (disabled behind the
         // proxy) and crashes on it; keep the SW to production builds only.
@@ -87,15 +93,10 @@ export default defineConfig({
         start_url: base,
         scope: base,
         display: 'standalone',
-        background_color: '#0f172a',
-        theme_color: '#0f172a',
-        icons: [
-          {
-            src: `${base}favicon.svg`,
-            sizes: 'any',
-            type: 'image/svg+xml'
-          }
-        ]
+        // Periwinkle brand: deeper tone for the splash background, the accent for
+        // the theme (status bar). Icons are supplied by pwaAssets.
+        background_color: '#2a2456',
+        theme_color: '#6b62c9',
       }
     })
   ],
