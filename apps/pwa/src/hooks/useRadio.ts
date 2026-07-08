@@ -37,7 +37,8 @@ type QueueItem = { plan: CompositionPlan; intent: CompositionIntent; title: stri
 // (no inference), and buffered tracks are saved only when they actually play.
 const MIN_TRACK_MS = 120_000; // tracks run at least two minutes (loop if shorter)
 const FRESH_CAPTURE_MS = 15 * 60 * 1000;
-const BUFFER_SIZE = 5;        // how many tracks to keep pre-generated
+const BUFFER_SIZE = 5;        // how many tracks a batch fills the buffer to
+const LOW_WATER = 1;         // reload + refill once the buffer drops to this
 const UNLOAD_GRACE_MS = 45_000; // unload the model this long after tuning out
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -84,11 +85,19 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
   // Top the buffer up to `target` tracks. Runs while the model is already loaded
   // (during a session) so it never gaps audio. One fill at a time.
   const fill = useCallback(async (rid: number, target: number) => {
-    if (fillingRef.current) return;
+    if (fillingRef.current || queueRef.current.length >= target) return;
     fillingRef.current = true;
     const gen = genRef.current;
     const live = () => runIdRef.current === rid && runningRef.current && genRef.current === gen;
     try {
+      // Reload the model if it was unloaded between batches — WITHOUT suspending
+      // audio (keepAudio), so the currently-playing track keeps going while the
+      // model loads in its worker. The reload is hidden behind the last buffered
+      // track, so the batch is ready before it ends.
+      if (!isModelLoaded()) {
+        const ok = await model.loadModelAction({ keepAudio: true });
+        if (ok === false || !live()) return;
+      }
       while (queueRef.current.length < target && live() && isModelLoaded()) {
         const src = pickSource();
         const direction = src.sound ? soundToDirection(src.sound) : undefined;
@@ -97,9 +106,12 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
         queueRef.current.push({ plan: composed.plan, intent: composed.intent, title: composed.title, name: src.name, yours: src.yours });
       }
     } finally {
+      // Free the model from memory between batches; the next low-water fill
+      // reloads it gaplessly (keepAudio) while a track is still playing.
+      if (isModelLoaded()) await model.unloadModelAction();
       fillingRef.current = false;
     }
-  }, [audio, pickSource]);
+  }, [audio, pickSource, model]);
   const fillRef = useRef(fill);
   fillRef.current = fill;
 
@@ -135,8 +147,9 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     // The track that was on air played to its natural end → a "complete" signal.
     if (playingRef.current) { void recordFeedback("complete", playingRef.current); playingRef.current = null; }
 
-    // Keep the buffer topped up in the background (model is loaded this session).
-    if (queueRef.current.length < BUFFER_SIZE && !fillingRef.current) void fill(rid, BUFFER_SIZE);
+    // At the low-water mark, reload (gaplessly) and refill the batch in the
+    // background while the last buffered track plays.
+    if (queueRef.current.length <= LOW_WATER && !fillingRef.current) void fill(rid, BUFFER_SIZE);
 
     // Nothing ready yet (cold start, or generation briefly fell behind) — narrate
     // while we wait for the first buffered track.

@@ -226,14 +226,14 @@ export default function useModelManager(workerInitPayload?: WorkerInitPayload) {
     return success;
   }
 
-  async function loadModelAction() {
+  async function loadModelAction(opts?: { keepAudio?: boolean }) {
     setStatus("Starting model load...");
     setModelProgress(0);
     setProgressText("Loading model...");
 
     let success = true;
     try {
-      await loadModel(handleProgress, workerInitPayload);
+      await loadModel(handleProgress, workerInitPayload, opts);
       setModelLoaded(true);
       setModelProgress(1);
       setStatus("Model loaded");
