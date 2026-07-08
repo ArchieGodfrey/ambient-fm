@@ -1,65 +1,58 @@
-import * as Tone from "tone";
-import { setMasterSink } from "./toneEngine";
-
 // Background / locked-screen playback + lock-screen controls.
 //
-// iOS suspends a bare Web Audio context on lock, but keeps an actively-playing
-// <audio> element alive. So we route the ENTIRE music mix through a
-// MediaStreamAudioDestinationNode played by a hidden <audio> element (and sever
-// the master's direct hardware path so it doesn't double). While the radio is on
-// the element is the sole audible sink; on tune-out we route the master back to
-// hardware for normal (manual) playback. MediaSession gives lock-screen controls.
-//
-// NOTE: iOS background behaviour is version-dependent — verify on a real device
-// that (a) music continues when locked, (b) there's no doubling/echo in the
-// foreground, (c) playback isn't broken. The routing is guarded; on failure it
-// falls back to the default output.
+// iOS keeps a page's audio session — and therefore the Web Audio context playing
+// the music — alive while an <audio> element is actively playing REAL media. A
+// MediaStream element isn't reliably treated as such (it's closer to live
+// capture), so we loop a short, near-silent WAV FILE in a hidden element instead.
+// The element MUST start inside the tune-in tap gesture (iOS blocks play()
+// otherwise), so startBackgroundKeepAlive() is called synchronously from the
+// Tune-in click. The music itself stays on the normal Web Audio output.
 
 let el: HTMLAudioElement | null = null;
-let osc: OscillatorNode | null = null;
-let streamDest: MediaStreamAudioDestinationNode | null = null;
+let url: string | null = null;
 let started = false;
 
-// iOS may pause the element (interruptions, coming back from lock). Re-assert
-// playback whenever it's paused or we regain foreground.
+// A 2s mono WAV of an inaudible 40Hz tone (like the old keep-alive oscillator) —
+// non-silent so iOS treats the element as genuinely playing, but far below
+// hearing. Built at runtime so there's no giant base64 blob in the bundle.
+function silentToneWavUrl(): string {
+  const rate = 8000, seconds = 2, n = rate * seconds, bytes = n * 2;
+  const buf = new ArrayBuffer(44 + bytes);
+  const dv = new DataView(buf);
+  const str = (o: number, s: string) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, "RIFF"); dv.setUint32(4, 36 + bytes, true); str(8, "WAVE");
+  str(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  str(36, "data"); dv.setUint32(40, bytes, true);
+  for (let i = 0; i < n; i++) dv.setInt16(44 + i * 2, Math.round(4 * Math.sin((2 * Math.PI * 40 * i) / rate)), true);
+  return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+}
+
+// iOS may pause the element (interruptions, returning from lock). Re-assert it.
 function keepPlaying() {
   if (started && el && el.paused) void el.play().catch(() => { /* needs a gesture */ });
 }
 const onVisibility = () => { if (typeof document !== "undefined" && !document.hidden) keepPlaying(); };
 
-// Route the music mix through the element. MUST be called inside a user gesture
-// (the Tune-in click) so the <audio> element is allowed to play.
+// MUST be called inside a user gesture (the Tune-in tap) so iOS allows playback.
 export function startBackgroundKeepAlive() {
   if (started) return;
   try {
-    const raw = Tone.getContext().rawContext as unknown as AudioContext;
-    streamDest = raw.createMediaStreamDestination();
-
-    // A continuous, inaudible tone into the SAME stream so it's never fully
-    // silent. iOS only registers/keeps a media element that's actually producing
-    // audio (this is what makes the lock-screen "now playing" appear and keeps
-    // playback alive when locked); the real music is routed in alongside it.
-    const g = raw.createGain();
-    g.gain.value = 0.0001;
-    osc = raw.createOscillator();
-    osc.frequency.value = 40;
-    osc.connect(g).connect(streamDest);
-    osc.start();
-
+    url = silentToneWavUrl();
     el = document.createElement("audio");
     el.setAttribute("playsinline", "");
-    el.srcObject = streamDest.stream;
+    el.loop = true;
+    el.preload = "auto";
+    el.src = url;
     el.style.display = "none";
     el.addEventListener("pause", keepPlaying);
     document.addEventListener("visibilitychange", onVisibility);
     document.body.appendChild(el);
-    void el.play().catch(() => { /* no gesture yet — caller runs this within one */ });
-
-    setMasterSink(streamDest); // the whole mix now plays through the element
+    void el.play().catch(() => { /* outside a gesture — will retry via keepPlaying */ });
     started = true;
   } catch {
-    // Web Audio / MediaStream unavailable — degrade silently (no background support).
-    streamDest = null; el = null;
+    el = null;
+    if (url) { URL.revokeObjectURL(url); url = null; }
   }
 }
 
@@ -67,17 +60,15 @@ export function stopBackgroundKeepAlive() {
   if (!started) return;
   started = false; // set first so keepPlaying() won't re-play during teardown
   if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
-  setMasterSink(null); // back to the hardware output for manual playback
-  try { osc?.stop(); } catch { /* already stopped */ }
-  osc = null;
   if (el) {
     el.removeEventListener("pause", keepPlaying);
     el.pause();
-    el.srcObject = null;
+    el.removeAttribute("src");
+    el.load();
     el.remove();
     el = null;
   }
-  streamDest = null;
+  if (url) { URL.revokeObjectURL(url); url = null; }
 }
 
 // ── MediaSession: lock-screen transport ──
@@ -94,7 +85,6 @@ export function setMediaSessionTrack(title: string, artist = "Ambient FM") {
   } catch { /* unsupported */ }
 }
 
-// Wire the lock-screen transport buttons to app actions.
 export function setMediaSessionHandlers(handlers: { onPlay: () => void; onPause: () => void; onNext?: () => void; onPrev?: () => void }) {
   if (!("mediaSession" in navigator)) return;
   try {

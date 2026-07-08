@@ -9,6 +9,7 @@ import { recordFeedback } from "../feedback/feedback";
 import { useAppStore } from "../store/useAppStore";
 import { unlockAudio } from "../audio/toneEngine";
 import { unlockVoice, maybeAutoLoadVoice } from "../audio/host";
+import { startBackgroundKeepAlive } from "../audio/backgroundAudio";
 import { buildRadioBubbles, type LeanTarget } from "../themes/presets";
 import { screen, screenEyebrow, screenTitle, mutedNote } from "../ui/styles";
 
@@ -50,6 +51,7 @@ export default function Radio() {
 
   const tuneIn = async () => {
     unlockAudio(); unlockVoice(); maybeAutoLoadVoice();
+    startBackgroundKeepAlive(); // start the keep-alive WITHIN the tap gesture (iOS requires it)
     setPreparing(true);
     try { await startRadio(); } finally { setPreparing(false); }
   };
