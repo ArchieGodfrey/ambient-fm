@@ -8,7 +8,6 @@ import useAudioComposer from "../hooks/useAudioComposer";
 import useRadio from "../hooks/useRadio";
 import useSessionHistory from "../hooks/useSessionHistory";
 import { getAvailableModels, getSelectedModelId, selectModel, isModelLoaded } from "../ai/composer";
-import { postToast } from "../utils/toast";
 import { resumeAudioContext } from "../audio/toneEngine";
 import type { CompositionDirection } from "../ai/prompt";
 import type { Sound } from "../sounds/types";
@@ -46,8 +45,7 @@ function useSessionRuntime() {
         addEvent(event);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      postToast(`Refresh failed: ${message}`, "error");
+      console.error("Refresh failed", error);
     }
   }
 
@@ -67,8 +65,7 @@ function useSessionRuntime() {
         await refreshStimuli();
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      postToast(`Failed to load events: ${message}`, "error");
+      console.error("Failed to load events", error);
       setAppStatus("Load failed");
     }
   }

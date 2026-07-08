@@ -3,7 +3,6 @@ import usePreference from "../hooks/usePreference";
 import useSounds from "../hooks/useSounds";
 import { useSession } from "../session/SessionProvider";
 import { buildSoundscape, describeMood } from "../sounds/previewPlan";
-import { postToast } from "../utils/toast";
 import Disc from "./Disc";
 import { card, mutedNote, chip, ghostButton } from "../ui/styles";
 
@@ -41,7 +40,6 @@ export default function YourSoundCard() {
 
   async function branch() {
     await createFromSound(yourSound, "My sound");
-    postToast("Branched your sound — edit it in the studio.", "success");
   }
 
   return (

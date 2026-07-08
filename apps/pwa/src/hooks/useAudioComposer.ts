@@ -6,7 +6,6 @@ import { generateComposition, isModelLoaded } from "../ai/composer";
 import type { CompositionDirection } from "../ai/prompt";
 import { startCompositionRuntime, startRuntimeLoop, stopRuntimeLoop, subscribeRuntimeState } from "../audio/compositionRuntime";
 import { startComposer, stopComposer } from "../composer/runtime";
-import { postToast } from "../utils/toast";
 import { db } from "../db/db";
 import { analyzeSession } from "../memory/analyzeSession";
 import { generateTrackName } from "../ai/trackName";
@@ -112,8 +111,6 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       setStatus("Audio started");
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : String(error);
-      postToast(`Audio failed: ${message}`, "error");
       setStatus("Audio failed");
     }
   }, [endSession, events, isPlaying, plan, setStoreIsPlaying]);
@@ -203,7 +200,6 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       setStatus(`Now playing: ${composition.key}`);
     } catch (error) {
       console.error(error);
-      postToast(`Audio failed: ${error instanceof Error ? error.message : String(error)}`, "error");
       setStatus("Audio failed");
     }
   }, [setSharedPlan, setCurrentTitle, setCurrentSessionId, setStoreIsPlaying]);
@@ -249,8 +245,6 @@ export default function useAudioComposer(events: StimulusEvent[]) {
       setStatus("Session loaded and playing");
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : String(error);
-      postToast(`Audio failed: ${message}`, "error");
       setStatus("Audio failed");
       return;
     }

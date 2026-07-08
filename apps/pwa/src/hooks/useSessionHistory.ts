@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { getSessionHistory, deleteSessionSummary } from "../memory/getMemoryContext";
 import type { SessionSummary } from "../memory/types";
-import { postToast } from "../utils/toast";
 
 export default function useSessionHistory() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -12,8 +11,6 @@ export default function useSessionHistory() {
       setSessions(history);
     } catch (error) {
       console.error("Failed to load session history", error);
-      const message = error instanceof Error ? error.message : String(error);
-      postToast(`Failed to load session history: ${message}`, "error");
     }
   }
 
@@ -23,11 +20,8 @@ export default function useSessionHistory() {
       await loadSessions();
       // Notify other useSessionHistory instances (Today tracklist, eject-on-empty).
       window.dispatchEvent(new Event("session-saved"));
-      postToast("Session deleted.", "success");
     } catch (error) {
       console.error("Failed to delete session", error);
-      const message = error instanceof Error ? error.message : String(error);
-      postToast(`Delete failed: ${message}`, "error");
     }
   }
 

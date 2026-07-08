@@ -51,11 +51,11 @@ export class MLLayer {
       }
 
       if (message?.kind === "toast") {
-        const detail = {
-          message: String(message.message ?? ""),
-          type: String(message.type ?? "info"),
-        } as const;
-        window.dispatchEvent(new CustomEvent("app-toast", { detail }));
+        // Surface worker diagnostics through the console so they land in the
+        // debug log (no user-facing toast UI).
+        const text = String(message.message ?? "");
+        if (String(message.type) === "error") console.error(text);
+        else console.warn(text);
         return;
       }
 
@@ -164,7 +164,6 @@ export class MLLayer {
       const elapsed = Date.now() - this.lastActivity;
       if (elapsed > 10000) {
         console.warn("Worker heartbeat missing, worker may have died", elapsed);
-        window.dispatchEvent(new CustomEvent("app-toast", { detail: { message: "Worker heartbeat missing, model worker may have died.", type: "warning" } }));
       }
 
       if (elapsed > 5000) {
