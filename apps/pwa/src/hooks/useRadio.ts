@@ -6,10 +6,7 @@ import type useModelManager from "./useModelManager";
 import { prepareLine, cancelHost, voiceAudible, maybeAutoLoadVoice } from "../audio/host";
 import { duckTo, unduck } from "../audio/toneEngine";
 import { takeFloor, releaseFloor } from "../audio/playbackFloor";
-import {
-  startBackgroundKeepAlive, stopBackgroundKeepAlive,
-  setMediaSessionPlaying, setMediaSessionTrack, setMediaSessionHandlers, clearMediaSession,
-} from "../audio/backgroundAudio";
+import { startBackgroundKeepAlive } from "../audio/backgroundAudio";
 import { hostWelcome, hostFiller, hostIntro } from "../ai/hostScript";
 import { soundToDirection } from "../sounds/soundDirection";
 import { recordFeedback, type TrackRef } from "../feedback/feedback";
@@ -127,7 +124,6 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     setCanPrev(cursorRef.current > 0);
     duckTo(-16);
     setNowPlaying({ title: item.title, mood: String(item.plan.globalMood ?? "ambient"), key: item.plan.key });
-    setMediaSessionTrack(item.title);
     if (opts.announce) {
       setState("announcing");
       const line = opts.first ? hostWelcome(eventsRef.current) : hostIntro(item.title, item.plan, { soundName: item.name, yours: item.yours });
@@ -211,9 +207,6 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     releaseFloor(tuneOut);
     audio.stopPlayback();
     unduck(0.3);
-    stopBackgroundKeepAlive();
-    setMediaSessionPlaying(false);
-    clearMediaSession();
     if (unloadTimerRef.current) clearTimeout(unloadTimerRef.current);
     unloadTimerRef.current = window.setTimeout(() => {
       unloadTimerRef.current = null;
@@ -233,8 +226,6 @@ export default function useRadio(audio: AudioComposer, events: StimulusEvent[], 
     maybeAutoLoadVoice();
     takeFloor(tuneOut);
     startBackgroundKeepAlive();
-    setMediaSessionHandlers({ onPlay: tuneIn, onPause: tuneOut, onNext: skip, onPrev: previous });
-    setMediaSessionPlaying(true);
     void toNext(rid, { first: true });
   }
 

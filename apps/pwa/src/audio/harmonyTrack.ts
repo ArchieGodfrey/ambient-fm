@@ -95,6 +95,15 @@ export function stopHarmony() {
   chordPart?.dispose();
   bassPart?.dispose();
   if (arpLoop) { arpLoop.stop(); arpLoop.dispose(); arpLoop = null; }
+  // Release any sounding voices — disposing the Parts only stops scheduling; a
+  // held chord (long duration + 2.5–3s release) would otherwise ring on as a
+  // "drone" if the master is ever un-muted.
+  try {
+    padSynth?.releaseAll();
+    choirSynth?.releaseAll();
+    bassSynth?.triggerRelease();
+    arpSynth?.triggerRelease();
+  } catch { /* not started */ }
   chordPart = null;
   bassPart = null;
   currentChord = [];

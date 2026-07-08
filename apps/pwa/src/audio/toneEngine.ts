@@ -1,5 +1,6 @@
 import * as Tone from "tone";
 import { initAudioGraph } from "./audioGraph";
+import { startBackgroundKeepAlive, stopBackgroundKeepAlive } from "./backgroundAudio";
 
 let started = false;
 let playing = false;
@@ -46,6 +47,10 @@ export async function startAudio() {
     initAudioGraph();
   }
 
+  // Common path for ALL playback (radio + manual): hold the iOS audio session
+  // open so playback survives a screen lock. Guarded, so repeat calls are no-ops.
+  startBackgroundKeepAlive();
+
   Tone.Destination.mute = false;
 
   if (!playing) {
@@ -70,6 +75,7 @@ export function stopAudio() {
   }
 
   Tone.Destination.mute = true;
+  stopBackgroundKeepAlive();
   playing = false;
   suspended = false;
   transportWasPlayingBeforeSuspend = false;

@@ -72,6 +72,10 @@ export default function Disc({
           background: `radial-gradient(circle at 50% 50%, hsla(${hue},70%,60%,0.28), transparent 66%), ${sheen}, ${grooves}, ${iridescent}, #14121b`,
           backgroundBlendMode: "screen, screen, overlay, normal, normal",
           border: "1px solid rgba(0,0,0,0.25)",
+          // Promote to its own layer — the blended conic gradient otherwise
+          // sometimes fails to paint on iOS Safari until a scroll invalidates it.
+          willChange: "transform",
+          backfaceVisibility: "hidden",
           // Keep the animation mounted and just toggle play-state, so pausing
           // freezes the disc at its current angle and resuming continues from there.
           animation: "afm-spin 3.2s linear infinite",
